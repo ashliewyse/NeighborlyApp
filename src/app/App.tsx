@@ -249,12 +249,12 @@ const USER_PROFILES: Record<string, UserProfile> = {
 const AVATAR_COLORS = ["bg-emerald-700", "bg-amber-600", "bg-sky-700", "bg-rose-600", "bg-violet-700", "bg-teal-700"];
 
 const CATEGORY_META: Record<PostCategory, { label: string; color: string; icon: React.ReactNode }> = {
-  news: { label: "Local News", color: "text-blue-600 bg-blue-50 border-blue-200", icon: <Megaphone size={12} /> },
-  safety: { label: "Safety", color: "text-red-600 bg-red-50 border-red-200", icon: <ShieldAlert size={12} /> },
-  event: { label: "Event", color: "text-purple-600 bg-purple-50 border-purple-200", icon: <CalendarDays size={12} /> },
-  forsale: { label: "For Sale", color: "text-orange-600 bg-orange-50 border-orange-200", icon: <ShoppingBag size={12} /> },
-  recommendation: { label: "Recommendation", color: "text-emerald-600 bg-emerald-50 border-emerald-200", icon: <Star size={12} /> },
-  general: { label: "General", color: "text-stone-600 bg-white border-border", icon: <Leaf size={12} /> },
+  news: { label: "Local News", color: "text-sky-700 bg-sky-50 border-sky-200", icon: <Megaphone size={11} /> },
+  safety: { label: "Safety", color: "text-red-700 bg-red-50 border-red-200", icon: <ShieldAlert size={11} /> },
+  event: { label: "Event", color: "text-violet-700 bg-violet-50 border-violet-200", icon: <CalendarDays size={11} /> },
+  forsale: { label: "For Sale", color: "text-amber-700 bg-amber-50 border-amber-200", icon: <ShoppingBag size={11} /> },
+  recommendation: { label: "Recommendation", color: "text-emerald-700 bg-emerald-50 border-emerald-200", icon: <Star size={11} /> },
+  general: { label: "General", color: "text-stone-600 bg-stone-50 border-stone-200", icon: <Leaf size={11} /> },
 };
 
 const INITIAL_POSTS: Post[] = [
@@ -1009,43 +1009,27 @@ export default function App() {
               <button className="bg-primary text-primary-foreground px-3 py-2 rounded-lg text-sm font-medium"><Plus size={14} /> Post</button>
             </div>
           ) : (
-            <div className="bg-card rounded-xl border border-border p-5 shadow-sm flex flex-col">
-              <div className="flex items-start gap-3 mb-4">
-                <Avatar name={currentUserName} size="md" src={myAvatarUrl} />
-                <textarea 
-                  autoFocus 
-                  placeholder="Share something with your neighbors..." 
-                  value={newPostText} 
-                  onChange={(e) => setNewPostText(e.target.value)} 
-                  className="w-full bg-transparent text-sm focus:outline-none resize-none min-h-[60px] text-foreground mt-1.5" 
-                />
+            <div className="bg-card rounded-xl border border-primary/30 p-4 shadow-sm flex flex-col gap-3">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Post Category</span>
+              <div className="flex flex-wrap gap-1.5">
+                {(["general", "news", "safety", "event", "forsale", "recommendation"] as PostCategory[]).map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`text-xs px-3 py-1.5 rounded-lg font-medium border transition-colors ${
+                      selectedCategory === cat ? "bg-primary text-primary-foreground border-primary" : "bg-muted text-muted-foreground border-border hover:bg-muted/80"
+                    }`}
+                  >
+                    {CATEGORY_META[cat]?.label || cat}
+                  </button>
+                ))}
               </div>
 
-              <div className="flex items-center justify-between border-t border-border pt-4">
-                <div className="flex flex-wrap gap-2">
-                  {(["news", "safety", "event", "forsale", "recommendation", "general"] as PostCategory[]).map((cat) => {
-                    const meta = CATEGORY_META[cat];
-                    const isSelected = selectedCategory === cat;
-                    return (
-                      <button
-                        key={cat}
-                        type="button"
-                        onClick={() => setSelectedCategory(cat)}
-                        className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border transition-all font-medium ${meta.color} ${
-                          isSelected ? "ring-2 ring-current ring-offset-1 opacity-100 shadow-sm" : "opacity-70 hover:opacity-100"
-                        }`}
-                      >
-                        {meta.icon}
-                        {meta.label}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button onClick={() => setComposing(false)} className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground">Cancel</button>
-                  <button onClick={handleCreatePost} className="px-5 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">Post</button>
-                </div>
+              <textarea autoFocus placeholder="Share what's happening in your neighborhood..." value={newPostText} onChange={(e) => setNewPostText(e.target.value)} className="w-full bg-transparent text-sm focus:outline-none resize-none min-h-[90px] text-foreground mt-1" />
+              <div className="flex justify-end gap-2 mt-2">
+                <button onClick={() => setComposing(false)} className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground">Cancel</button>
+                <button onClick={handleCreatePost} className="px-4 py-1.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium">Post</button>
               </div>
             </div>
           )}
