@@ -211,12 +211,20 @@ const USER_PROFILES: Record<string, UserProfile> = {
     neighborhood: "Michigan City",
     city: "Michigan City",
     joinDate: "March 2019",
-    bio: "Born and raised in Maplewood Heights. Passionate about neighborhood safety.",
+    bio: "Born and raised in Maplewood Heights. Passionate about neighborhood safety, local schools, and getting to know my neighbors. Mom of two, dog owner (Biscuit says hi), and avid gardener.",
     badges: ["champion", "safety-watcher", "helpful"],
-    posts: 84, neighbors: 231, helpfulVotes: 347, recsGiven: 29,
-    rating: 4.8, ratingCount: 36,
-    neighborReviews: [],
-    galleryPhotos: [],
+    posts: 84,
+    neighbors: 231,
+    helpfulVotes: 347,
+    recsGiven: 29,
+    rating: 4.7,
+    ratingCount: 3,
+    neighborReviews: [
+      { id: 1, author: "James Whitfield", authorBadges: ["organizer"], rating: 5, date: "Aug 3, 2026", body: "Maria is the heart of this neighborhood.", helpful: 18 }
+    ],
+    galleryPhotos: [
+      { url: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=600&h=400&fit=crop&auto=format", alt: "Park" },
+    ],
     recentActivity: [{ type: "post", text: "Posted a safety alert", time: "2 hours ago" }],
   },
   "Ashlie Wyse": {
@@ -226,8 +234,12 @@ const USER_PROFILES: Record<string, UserProfile> = {
     joinDate: "August 2026",
     bio: "Owner of Beachside Cleaners. Local resident in Michigan City.",
     badges: ["newcomer"],
-    posts: 1, neighbors: 1, helpfulVotes: 0, recsGiven: 0,
-    rating: 5.0, ratingCount: 1,
+    posts: 1,
+    neighbors: 1,
+    helpfulVotes: 0,
+    recsGiven: 0,
+    rating: 5.0,
+    ratingCount: 1,
     neighborReviews: [],
     galleryPhotos: [],
     recentActivity: [{ type: "post", text: "Joined Neighborly", time: "Just now" }],
@@ -418,6 +430,7 @@ function UserProfileView({ profile, onBack, isOwnProfile, myAvatarUrl, onAvatarC
   onAvatarChange?: (url: string) => void;
   onProfileUpdate?: (updated: Partial<UserProfile>) => void;
 }) {
+  const [profileTab, setProfileTab] = useState<"about" | "photos" | "reviews">("about");
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(profile.name);
   const [editNeighborhood, setEditNeighborhood] = useState(profile.neighborhood);
@@ -452,6 +465,7 @@ function UserProfileView({ profile, onBack, isOwnProfile, myAvatarUrl, onAvatarC
 
   return (
     <div className="min-h-screen bg-background font-['DM_Sans',sans-serif] pb-20">
+      {/* Cover Photo */}
       <div className="relative h-44 md:h-56 overflow-hidden bg-purple-900">
         {coverUrl ? (
           <img src={coverUrl} alt="Cover" className="w-full h-full object-cover" />
@@ -469,11 +483,12 @@ function UserProfileView({ profile, onBack, isOwnProfile, myAvatarUrl, onAvatarC
         )}
       </div>
 
-      <div className="bg-white border-b border-border">
-        <div className="max-w-3xl mx-auto px-4 pb-4">
+      {/* Profile Header Bar */}
+      <div className="bg-white border-b border-border shadow-sm">
+        <div className="max-w-4xl mx-auto px-6 pb-4">
           <div className="flex items-start justify-between -mt-10 pt-0 pb-2">
             <div className="relative flex-shrink-0 mt-1">
-              <div className="w-20 h-20 rounded-full border-4 border-white shadow-lg overflow-hidden bg-muted">
+              <div className="w-24 h-24 rounded-full border-4 border-white shadow-lg overflow-hidden bg-muted">
                 {avatarUrl ? (
                   <img src={avatarUrl} alt={profile.name} className="w-full h-full object-cover" />
                 ) : (
@@ -481,8 +496,8 @@ function UserProfileView({ profile, onBack, isOwnProfile, myAvatarUrl, onAvatarC
                 )}
               </div>
               {isOwnProfile && (
-                <label className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-white border border-border shadow flex items-center justify-center cursor-pointer hover:bg-muted transition-colors">
-                  <Camera size={11} className="text-foreground" />
+                <label className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-white border border-border shadow flex items-center justify-center cursor-pointer hover:bg-muted transition-colors">
+                  <Camera size={12} className="text-foreground" />
                   <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
                 </label>
               )}
@@ -505,35 +520,114 @@ function UserProfileView({ profile, onBack, isOwnProfile, myAvatarUrl, onAvatarC
               </div>
             ) : (
               <>
-                <h1 className="font-['Playfair_Display',serif] font-bold text-xl leading-tight">{profile.name}</h1>
+                <h1 className="font-['Playfair_Display',serif] font-bold text-2xl leading-tight">{profile.name}</h1>
                 <div className="flex items-center gap-1.5 mt-1">
                   <StarRating rating={profile.rating} />
                   <span className="text-sm font-semibold ml-0.5">{profile.rating.toFixed(1)}</span>
                   <span className="text-xs text-muted-foreground">({profile.ratingCount} ratings)</span>
                 </div>
                 <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                  <MapPin size={10} /> {profile.neighborhood} · Member since {profile.joinDate}
+                  <MapPin size={11} /> {profile.neighborhood} · Member since {profile.joinDate}
                 </p>
+                <div className="flex flex-wrap gap-1.5 mt-3">
+                  {profile.badges.map((b) => (
+                    <span key={b} className="text-xs font-medium px-2 py-0.5 rounded-full border bg-purple-50 text-purple-700 border-purple-200">
+                      {b === "champion" ? "Community Champion" : b === "safety-watcher" ? "Safety Watcher" : "Helpful Neighbor"}
+                    </span>
+                  ))}
+                </div>
               </>
             )}
+          </div>
+
+          {/* Profile Navigation Tabs */}
+          <div className="flex gap-6 border-t border-border mt-6 pt-2">
+            <button onClick={() => setProfileTab("about")} className={`pb-2 text-sm font-semibold border-b-2 transition-colors ${profileTab === "about" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>About</button>
+            <button onClick={() => setProfileTab("photos")} className={`pb-2 text-sm font-semibold border-b-2 transition-colors ${profileTab === "photos" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>Photos ({profile.galleryPhotos.length})</button>
+            <button onClick={() => setProfileTab("reviews")} className={`pb-2 text-sm font-semibold border-b-2 transition-colors ${profileTab === "reviews" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>Reviews ({profile.neighborReviews.length})</button>
           </div>
         </div>
       </div>
 
-      <div className="max-w-3xl mx-auto px-4 py-6">
-        <div className="bg-white rounded-xl border border-border p-5">
-          <h2 className="font-semibold text-sm mb-3 flex items-center gap-2">About</h2>
-          {isEditing ? (
-            <div className="flex flex-col gap-3">
-              <textarea rows={3} value={editBio} onChange={(e) => setEditBio(e.target.value)} placeholder="Write your bio..." className="w-full bg-muted border border-border rounded-lg p-2.5 text-sm resize-none text-foreground" />
-              <div className="flex gap-2">
-                <button onClick={handleSaveProfile} className="px-4 py-1.5 bg-primary text-primary-foreground text-xs font-medium rounded-lg">Save Changes</button>
-                <button onClick={() => setIsEditing(false)} className="px-3 py-1.5 border border-border rounded-lg text-xs">Cancel</button>
-              </div>
+      {/* Profile Body Content */}
+      <div className="max-w-4xl mx-auto px-6 py-6 grid grid-cols-1 md:grid-cols-[1fr_300px] gap-6">
+        <div>
+          {profileTab === "about" && (
+            <div className="bg-white rounded-xl border border-border p-6 shadow-sm">
+              <h2 className="font-semibold text-sm mb-3">About</h2>
+              {isEditing ? (
+                <div className="flex flex-col gap-3">
+                  <textarea rows={4} value={editBio} onChange={(e) => setEditBio(e.target.value)} placeholder="Write your bio..." className="w-full bg-muted border border-border rounded-lg p-3 text-sm resize-none text-foreground" />
+                  <div className="flex gap-2">
+                    <button onClick={handleSaveProfile} className="px-4 py-2 bg-primary text-primary-foreground text-xs font-medium rounded-lg">Save Changes</button>
+                    <button onClick={() => setIsEditing(false)} className="px-3 py-2 border border-border rounded-lg text-xs">Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-foreground/80 leading-relaxed">{profile.bio}</p>
+              )}
             </div>
-          ) : (
-            <p className="text-sm text-foreground/80 leading-relaxed">{profile.bio}</p>
           )}
+
+          {profileTab === "photos" && (
+            <div className="bg-white rounded-xl border border-border p-6 shadow-sm">
+              <h2 className="font-semibold text-sm mb-4">Gallery Photos</h2>
+              {profile.galleryPhotos.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No photos added yet.</p>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {profile.galleryPhotos.map((p, idx) => (
+                    <img key={idx} src={p.url} alt={p.alt} className="w-full h-32 object-cover rounded-lg border border-border" />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {profileTab === "reviews" && (
+            <div className="bg-white rounded-xl border border-border p-6 shadow-sm">
+              <h2 className="font-semibold text-sm mb-4">Neighbor Reviews</h2>
+              {profile.neighborReviews.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No reviews yet.</p>
+              ) : (
+                <div className="flex flex-col gap-4">
+                  {profile.neighborReviews.map((rev) => (
+                    <div key={rev.id} className="border-b border-border pb-4 last:border-0">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-sm">{rev.author}</span>
+                        <span className="text-xs text-muted-foreground">{rev.date}</span>
+                      </div>
+                      <StarRating rating={rev.rating} />
+                      <p className="text-sm text-foreground/80 mt-2">{rev.body}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Community Stats Sidebar Card */}
+        <div className="bg-white rounded-xl border border-border p-5 shadow-sm self-start">
+          <h3 className="font-semibold text-sm mb-4">Community Stats</h3>
+          <div className="flex flex-col gap-3 text-sm">
+            <div className="flex justify-between items-center text-muted-foreground">
+              <span className="flex items-center gap-2"><Megaphone size={15} className="text-primary" /> Posts</span>
+              <span className="font-semibold text-foreground">{profile.posts}</span>
+            </div>
+            <div className="flex justify-between items-center text-muted-foreground">
+              <span className="flex items-center gap-2"><Users size={15} className="text-primary" /> Neighbors</span>
+              <span className="font-semibold text-foreground">{profile.neighbors}</span>
+            </div>
+            <div className="flex justify-between items-center text-muted-foreground">
+              <span className="flex items-center gap-2"><ThumbsUp size={15} className="text-primary" /> Helpful votes</span>
+              <span className="font-semibold text-foreground">{profile.helpfulVotes}</span>
+            </div>
+            <div className="flex justify-between items-center text-muted-foreground">
+              <span className="flex items-center gap-2"><Star size={15} className="text-primary" /> Recs given</span>
+              <span className="font-semibold text-foreground">{profile.recsGiven}</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -922,24 +1016,24 @@ export default function App() {
               <button className="bg-primary text-primary-foreground px-3 py-2 rounded-lg text-sm font-medium"><Plus size={14} /> Post</button>
             </div>
           ) : (
-            <div className="bg-card rounded-xl border border-primary/30 p-4 shadow-sm">
-              <div className="mb-3">
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">Post Category</label>
-                <select
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value as PostCategory)}
-                  className="bg-muted border border-border rounded-lg px-3 py-1.5 text-sm text-foreground focus:outline-none"
-                >
-                  <option value="general">General</option>
-                  <option value="news">Local News</option>
-                  <option value="safety">Safety Alert</option>
-                  <option value="event">Event</option>
-                  <option value="forsale">For Sale / Classifieds</option>
-                  <option value="recommendation">Recommendation</option>
-                </select>
+            <div className="bg-card rounded-xl border border-primary/30 p-4 shadow-sm flex flex-col gap-3">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Post Category</span>
+              <div className="flex flex-wrap gap-1.5">
+                {(["general", "news", "safety", "event", "forsale", "recommendation"] as PostCategory[]).map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`text-xs px-3 py-1.5 rounded-lg font-medium border transition-colors ${
+                      selectedCategory === cat ? "bg-primary text-primary-foreground border-primary" : "bg-muted text-muted-foreground border-border hover:bg-muted/80"
+                    }`}
+                  >
+                    {CATEGORY_META[cat]?.label || cat}
+                  </button>
+                ))}
               </div>
 
-              <textarea autoFocus placeholder="Share what's happening in your neighborhood..." value={newPostText} onChange={(e) => setNewPostText(e.target.value)} className="w-full bg-transparent text-sm focus:outline-none resize-none min-h-[90px] text-foreground" />
+              <textarea autoFocus placeholder="Share what's happening in your neighborhood..." value={newPostText} onChange={(e) => setNewPostText(e.target.value)} className="w-full bg-transparent text-sm focus:outline-none resize-none min-h-[90px] text-foreground mt-1" />
               <div className="flex justify-end gap-2 mt-2">
                 <button onClick={() => setComposing(false)} className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground">Cancel</button>
                 <button onClick={handleCreatePost} className="px-4 py-1.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium">Post</button>
