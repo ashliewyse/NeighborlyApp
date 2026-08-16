@@ -465,7 +465,6 @@ function UserProfileView({ profile, onBack, isOwnProfile, myAvatarUrl, onAvatarC
 
   return (
     <div className="min-h-screen bg-background font-['DM_Sans',sans-serif] pb-20">
-      {/* Cover Photo */}
       <div className="relative h-44 md:h-56 overflow-hidden bg-purple-900">
         {coverUrl ? (
           <img src={coverUrl} alt="Cover" className="w-full h-full object-cover" />
@@ -483,7 +482,6 @@ function UserProfileView({ profile, onBack, isOwnProfile, myAvatarUrl, onAvatarC
         )}
       </div>
 
-      {/* Profile Header Bar */}
       <div className="bg-white border-b border-border shadow-sm">
         <div className="max-w-4xl mx-auto px-6 pb-4">
           <div className="flex items-start justify-between -mt-10 pt-0 pb-2">
@@ -540,7 +538,6 @@ function UserProfileView({ profile, onBack, isOwnProfile, myAvatarUrl, onAvatarC
             )}
           </div>
 
-          {/* Profile Navigation Tabs */}
           <div className="flex gap-6 border-t border-border mt-6 pt-2">
             <button onClick={() => setProfileTab("about")} className={`pb-2 text-sm font-semibold border-b-2 transition-colors ${profileTab === "about" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>About</button>
             <button onClick={() => setProfileTab("photos")} className={`pb-2 text-sm font-semibold border-b-2 transition-colors ${profileTab === "photos" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>Photos ({profile.galleryPhotos.length})</button>
@@ -549,7 +546,6 @@ function UserProfileView({ profile, onBack, isOwnProfile, myAvatarUrl, onAvatarC
         </div>
       </div>
 
-      {/* Profile Body Content */}
       <div className="max-w-4xl mx-auto px-6 py-6 grid grid-cols-1 md:grid-cols-[1fr_300px] gap-6">
         <div>
           {profileTab === "about" && (
@@ -607,7 +603,6 @@ function UserProfileView({ profile, onBack, isOwnProfile, myAvatarUrl, onAvatarC
           )}
         </div>
 
-        {/* Community Stats Sidebar Card */}
         <div className="bg-white rounded-xl border border-border p-5 shadow-sm self-start">
           <h3 className="font-semibold text-sm mb-4">Community Stats</h3>
           <div className="flex flex-col gap-3 text-sm">
@@ -764,7 +759,6 @@ function MessagesView({
       </div>
 
       <div className="max-w-4xl mx-auto p-4 grid grid-cols-1 md:grid-cols-[260px_1fr] gap-4 h-[calc(100vh-120px)]">
-        {/* Contacts Sidebar */}
         <div className="bg-card text-foreground rounded-2xl border border-border overflow-hidden flex flex-col">
           <div className="p-3 border-b border-border font-semibold text-sm">Conversations</div>
           <div className="overflow-y-auto flex-1">
@@ -783,7 +777,6 @@ function MessagesView({
           </div>
         </div>
 
-        {/* Chat Window */}
         <div className="bg-card text-foreground rounded-2xl border border-border flex flex-col overflow-hidden">
           <div className="p-3 border-b border-border flex items-center gap-3 bg-secondary/30">
             <Avatar name={activeContact} size="sm" />
