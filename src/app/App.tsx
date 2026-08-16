@@ -48,6 +48,7 @@ import {
   MessageSquare,
   MapPinned,
   ExternalLink,
+  LogOut,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -628,14 +629,13 @@ function MessagesView({
   currentUser: string;
   onBack: () => void;
 }) {
-  const [activeContact, setActiveContact] = useState<string>("James Whitfield");
+  const [activeContact, setActiveContact] = useState<string>("Maria Santos");
   const [messages, setMessages] = useState<Message[]>([
-    { id: 1, sender: "James Whitfield", recipient: currentUser, text: "Hey! Are you still joining the community cleanup this weekend?", time: "10:30 AM" },
-    { id: 2, sender: currentUser, recipient: "James Whitfield", text: "Yes absolutely! Bringing supplies.", time: "10:32 AM" },
+    { id: 1, sender: "Maria Santos", recipient: currentUser, text: "Hey! Welcome to Neighborly!", time: "10:30 AM" },
   ]);
   const [inputText, setInputText] = useState("");
 
-  const contacts = ["James Whitfield", "Nadia Petrov", "Grace Okonkwo", "Maria Santos", "Martinez Plumbing"];
+  const contacts = ["Maria Santos", "James Whitfield", "Nadia Petrov", "Grace Okonkwo", "Martinez Plumbing"];
 
   const chatMessages = messages.filter(
     (m) =>
@@ -725,7 +725,7 @@ function MessagesView({
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
-              className="flex-1 bg-background border border-border rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600/30"
+              className="flex-1 bg-background border border-border rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600/30 text-foreground"
             />
             <button
               onClick={handleSend}
