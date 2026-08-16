@@ -3535,8 +3535,7 @@ export default function App() {
             {label !== "Post" && label}
           </button>
         ))}
-        <FloatingChat />
-        // ─── Floating Chat Button + Chat Window ───────────────────────────────────────
+    
 
 // ─── Floating Chat Button + Chat Window ───────────────────────────────────────
 
@@ -3644,3 +3643,5 @@ function FloatingChat() {
     </>
   );
         }
+    <FloatingChat />
+        // ─── Floating Chat Button + Chat Window ───────────────────────────────────────
