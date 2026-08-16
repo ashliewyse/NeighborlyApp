@@ -755,6 +755,7 @@ export default function App() {
   const [activeLocation, setActiveLocation] = useState<LocationName>("All Areas");
   const [locationOpen, setLocationOpen] = useState(false);
   const [currentUserName, setCurrentUserName] = useState<string>("Ashlie Wyse");
+  const [advertiseOpen, setAdvertiseOpen] = useState(false);
   const [groups, setGroups] = useState([
     { id: 1, name: "🪴 Plant & Garden Club", description: "Share tips, seeds, and local plant swaps", members: 142, joined: false, city: "Michigan City" },
     { id: 2, name: "🐾 Local Pet Owners", description: "Pet-friendly spots and vet recommendations", members: 98, joined: true, city: "Long Beach" },
@@ -915,31 +916,52 @@ export default function App() {
       <main className="max-w-screen-2xl mx-auto px-6 py-6 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
         <section className="flex flex-col gap-4 min-w-0">
           {!composing ? (
-            <div className="bg-card rounded-xl border border-border p-4 flex items-center gap-3 cursor-pointer" onClick={() => setComposing(true)}>
+            <div className="bg-card rounded-xl border border-border p-4 flex items-center gap-3 cursor-pointer shadow-sm" onClick={() => setComposing(true)}>
               <Avatar name={currentUserName} size="md" src={myAvatarUrl} />
               <div className="flex-1 bg-muted rounded-lg px-4 py-2.5 text-sm text-muted-foreground">What's happening in your neighborhood?</div>
               <button className="bg-primary text-primary-foreground px-3 py-2 rounded-lg text-sm font-medium"><Plus size={14} /> Post</button>
             </div>
           ) : (
             <div className="bg-card rounded-xl border border-primary/30 p-4 shadow-sm">
-              <textarea autoFocus placeholder="Share something..." value={newPostText} onChange={(e) => setNewPostText(e.target.value)} className="w-full bg-transparent text-sm focus:outline-none resize-none min-h-[80px]" />
+              <div className="mb-3">
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">Post Category</label>
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value as PostCategory)}
+                  className="bg-muted border border-border rounded-lg px-3 py-1.5 text-sm text-foreground focus:outline-none"
+                >
+                  <option value="general">General</option>
+                  <option value="news">Local News</option>
+                  <option value="safety">Safety Alert</option>
+                  <option value="event">Event</option>
+                  <option value="forsale">For Sale / Classifieds</option>
+                  <option value="recommendation">Recommendation</option>
+                </select>
+              </div>
+
+              <textarea autoFocus placeholder="Share what's happening in your neighborhood..." value={newPostText} onChange={(e) => setNewPostText(e.target.value)} className="w-full bg-transparent text-sm focus:outline-none resize-none min-h-[90px] text-foreground" />
               <div className="flex justify-end gap-2 mt-2">
-                <button onClick={() => setComposing(false)} className="px-3 py-1.5 text-sm">Cancel</button>
+                <button onClick={() => setComposing(false)} className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground">Cancel</button>
                 <button onClick={handleCreatePost} className="px-4 py-1.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium">Post</button>
               </div>
             </div>
           )}
 
           {filteredPosts.map((post) => (
-            <article key={post.id} className="bg-card rounded-xl border border-border p-4">
-              <div className="flex items-center gap-3">
-                <button onClick={() => goToUser(post.author)}><Avatar name={post.author} size="md" /></button>
-                <div>
-                  <button onClick={() => goToUser(post.author)} className="font-semibold text-sm">{post.author}</button>
-                  <p className="text-xs text-muted-foreground">{post.neighborhood} · {post.time}</p>
+            <article key={post.id} className="bg-card rounded-xl border border-border p-4 shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <button onClick={() => goToUser(post.author)}><Avatar name={post.author} size="md" /></button>
+                  <div>
+                    <button onClick={() => goToUser(post.author)} className="font-semibold text-sm hover:underline">{post.author}</button>
+                    <p className="text-xs text-muted-foreground">{post.neighborhood} · {post.time}</p>
+                  </div>
                 </div>
+                <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${CATEGORY_META[post.category]?.color || "bg-muted text-stone-600"}`}>
+                  {CATEGORY_META[post.category]?.label || post.category}
+                </span>
               </div>
-              <p className="text-sm text-foreground/85 mt-3">{post.body}</p>
+              <p className="text-sm text-foreground/85 leading-relaxed">{post.body}</p>
             </article>
           ))}
         </section>
@@ -963,6 +985,19 @@ export default function App() {
             </div>
           </div>
 
+          <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl p-4 text-white shadow-sm">
+            <div className="flex items-center gap-2 mb-2">
+              <Megaphone size={16} className="text-blue-200" />
+              <h3 className="font-semibold text-sm">Grow Your Business</h3>
+            </div>
+            <p className="text-xs text-blue-100 mb-3 leading-relaxed">
+              Reach thousands of neighbors in the feed. Packages start at $15/week.
+            </p>
+            <button onClick={() => setAdvertiseOpen(true)} className="w-full bg-white text-blue-700 font-semibold text-xs py-2 rounded-lg hover:bg-blue-50 transition-colors">
+              Advertise With Us
+            </button>
+          </div>
+
           <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold text-sm">Community Groups</h3>
@@ -982,7 +1017,7 @@ export default function App() {
             </div>
           </div>
 
-          <div className="bg-card rounded-xl border border-border p-4">
+          <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
             <h3 className="font-semibold text-sm mb-3">Upcoming Events</h3>
             <div className="flex flex-col gap-3">
               {EVENTS.map((ev) => (
