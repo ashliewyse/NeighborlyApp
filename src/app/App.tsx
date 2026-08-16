@@ -48,26 +48,12 @@ import {
   MessageSquare,
   MapPinned,
   ExternalLink,
-  LogOut,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type BusinessBadgeType =
-  "neighbor-fave" | "verified-pro" | "elite";
-type UserBadgeType =
-  | "champion"
-  | "helpful"
-  | "organizer"
-  | "safety-watcher"
-  | "newcomer";
-
-interface BusinessBadge {
-  type: BusinessBadgeType;
-}
-interface UserBadge {
-  type: UserBadgeType;
-}
+type BusinessBadgeType = "neighbor-fave" | "verified-pro" | "elite";
+type UserBadgeType = "champion" | "helpful" | "organizer" | "safety-watcher" | "newcomer";
 
 interface BusinessReview {
   id: number;
@@ -128,13 +114,7 @@ interface UserProfile {
   recentActivity: { type: string; text: string; time: string }[];
 }
 
-type PostCategory =
-  | "news"
-  | "safety"
-  | "event"
-  | "forsale"
-  | "recommendation"
-  | "general";
+type PostCategory = "news" | "safety" | "event" | "forsale" | "recommendation" | "general";
 type ActiveView =
   | { page: "feed" }
   | { page: "business"; id: number }
@@ -142,7 +122,8 @@ type ActiveView =
   | { page: "auth"; mode: "signin" | "signup" }
   | { page: "search" }
   | { page: "events" }
-  | { page: "classifieds" };
+  | { page: "classifieds" }
+  | { page: "messages" };
 
 interface Comment {
   id: number;
@@ -169,87 +150,33 @@ interface Post {
   liked: boolean;
 }
 
+interface Message {
+  id: number;
+  sender: string;
+  recipient: string;
+  text: string;
+  time: string;
+}
+
 // ─── Badge Meta ───────────────────────────────────────────────────────────────
 
-const BIZ_BADGE_META: Record<
-  BusinessBadgeType,
-  {
-    label: string;
-    icon: React.ReactNode;
-    color: string;
-    desc: string;
-  }
-> = {
-  "neighbor-fave": {
-    label: "Neighbor Fave",
-    icon: <Star size={10} className="fill-current" />,
-    color: "bg-amber-50 text-amber-700 border-amber-200",
-    desc: "Consistently top-rated by neighbors",
-  },
-  "verified-pro": {
-    label: "Verified Local Pro",
-    icon: <BadgeCheck size={10} />,
-    color: "bg-sky-50 text-sky-700 border-sky-200",
-    desc: "Identity and license verified by Neighborly",
-  },
-  elite: {
-    label: "Elite Business",
-    icon: <Trophy size={10} />,
-    color: "bg-violet-50 text-violet-700 border-violet-200",
-    desc: "Top 1% of businesses in the area",
-  },
+const BIZ_BADGE_META: Record<BusinessBadgeType, { label: string; icon: React.ReactNode; color: string; desc: string }> = {
+  "neighbor-fave": { label: "Neighbor Fave", icon: <Star size={10} className="fill-current" />, color: "bg-amber-50 text-amber-700 border-amber-200", desc: "Consistently top-rated by neighbors" },
+  "verified-pro": { label: "Verified Local Pro", icon: <BadgeCheck size={10} />, color: "bg-sky-50 text-sky-700 border-sky-200", desc: "Identity and license verified by Neighborly" },
+  elite: { label: "Elite Business", icon: <Trophy size={10} />, color: "bg-violet-50 text-violet-700 border-violet-200", desc: "Top 1% of businesses in the area" },
 };
 
-const USER_BADGE_META: Record<
-  UserBadgeType,
-  {
-    label: string;
-    icon: React.ReactNode;
-    color: string;
-    desc: string;
-  }
-> = {
-  champion: {
-    label: "Community Champion",
-    icon: <Award size={10} />,
-    color: "bg-purple-50 text-purple-700 border-purple-200",
-    desc: "Outstanding community contributions",
-  },
-  helpful: {
-    label: "Helpful Neighbor",
-    icon: <HandHeart size={10} />,
-    color: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    desc: "Frequently marked helpful by neighbors",
-  },
-  organizer: {
-    label: "Event Organizer",
-    icon: <CalendarCheck size={10} />,
-    color: "bg-violet-50 text-violet-700 border-violet-200",
-    desc: "Hosts and organizes community events",
-  },
-  "safety-watcher": {
-    label: "Safety Watcher",
-    icon: <Shield size={10} />,
-    color: "bg-red-50 text-red-700 border-red-200",
-    desc: "Active in keeping the neighborhood safe",
-  },
-  newcomer: {
-    label: "New Neighbor",
-    icon: <Leaf size={10} />,
-    color: "bg-teal-50 text-teal-700 border-teal-200",
-    desc: "Joined within the past 6 months",
-  },
+const USER_BADGE_META: Record<UserBadgeType, { label: string; icon: React.ReactNode; color: string; desc: string }> = {
+  champion: { label: "Community Champion", icon: <Award size={10} />, color: "bg-purple-50 text-purple-700 border-purple-200", desc: "Outstanding community contributions" },
+  helpful: { label: "Helpful Neighbor", icon: <HandHeart size={10} />, color: "bg-emerald-50 text-emerald-700 border-emerald-200", desc: "Frequently marked helpful by neighbors" },
+  organizer: { label: "Event Organizer", icon: <CalendarCheck size={10} />, color: "bg-violet-50 text-violet-700 border-violet-200", desc: "Hosts and organizes community events" },
+  "safety-watcher": { label: "Safety Watcher", icon: <Shield size={10} />, color: "bg-red-50 text-red-700 border-red-200", desc: "Active in keeping the neighborhood safe" },
+  newcomer: { label: "New Neighbor", icon: <Leaf size={10} />, color: "bg-teal-50 text-teal-700 border-teal-200", desc: "Joined within the past 6 months" },
 };
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
-const LOCATIONS = [
-  "All Areas",
-  "Michigan City",
-  "La Porte",
-  "New Buffalo",
-  "Long Beach",
-] as const;
+const LOCATIONS = ["All Areas", "Michigan City", "La Porte", "New Buffalo", "Long Beach"] as const;
 type LocationName = (typeof LOCATIONS)[number];
 
 const BUSINESSES: Business[] = [
@@ -263,163 +190,16 @@ const BUSINESSES: Business[] = [
     badges: ["neighbor-fave", "verified-pro"],
     owner: "Rafael Martinez",
     founded: "2011",
-    description:
-      "Family-owned plumbing company serving Maplewood Heights and surrounding neighborhoods for over 13 years. Rafael and his team specialize in emergency repairs, full remodels, and commercial work. We believe in transparent pricing, clean job sites, and treating your home like our own. Licensed and insured — all work is fully guaranteed.",
-    services: [
-      "Emergency Repairs",
-      "Pipe Installation",
-      "Water Heater Service",
-      "Drain Cleaning",
-      "Bathroom Remodels",
-      "Kitchen Plumbing",
-      "Sewer Line Inspection",
-      "Leak Detection",
-      "Commercial Plumbing",
-      "Water Softeners",
-    ],
-    photos: [
-      {
-        url: "https://images.unsplash.com/photo-1676210134188-4c05dd172f89?w=600&h=400&fit=crop&auto=format",
-        alt: "Plumber working on pipe in wall",
-      },
-      {
-        url: "https://images.unsplash.com/photo-1542013936693-884638332954?w=600&h=400&fit=crop&auto=format",
-        alt: "Kitchen faucet close-up",
-      },
-      {
-        url: "https://images.unsplash.com/photo-1620653713380-7a34b773fef8?w=600&h=400&fit=crop&auto=format",
-        alt: "Plumbing tools and fittings",
-      },
-      {
-        url: "https://images.unsplash.com/photo-1676210133055-eab6ef033ce3?w=600&h=400&fit=crop&auto=format",
-        alt: "Plumber working under cabinet",
-      },
-      {
-        url: "https://images.unsplash.com/photo-1472851294608-062f824d29cc?w=600&h=400&fit=crop&auto=format",
-        alt: "Business open sign",
-      },
-      {
-        url: "https://images.unsplash.com/photo-1761783536272-2fb78dd52c76?w=600&h=400&fit=crop&auto=format",
-        alt: "Support local businesses sign",
-      },
-    ],
+    description: "Family-owned plumbing company serving Maplewood Heights and surrounding neighborhoods for over 13 years.",
+    services: ["Emergency Repairs", "Pipe Installation", "Water Heater Service", "Drain Cleaning"],
+    photos: [{ url: "https://images.unsplash.com/photo-1676210134188-4c05dd172f89?w=600&h=400&fit=crop&auto=format", alt: "Plumber working" }],
     phone: "(555) 842-3901",
     email: "rafael@martinezplumbing.com",
     website: "martinezplumbing.com",
     address: "112 Cedar Ave, Maplewood Heights",
-    hours: [
-      { day: "Mon – Fri", time: "7:00 AM – 6:00 PM" },
-      { day: "Saturday", time: "8:00 AM – 4:00 PM" },
-      { day: "Sunday", time: "Emergency calls only" },
-    ],
+    hours: [{ day: "Mon – Fri", time: "7:00 AM – 6:00 PM" }],
     reviews: [
-      {
-        id: 1,
-        author: "Grace Okonkwo",
-        authorBadges: ["helpful"],
-        rating: 5,
-        date: "Aug 2, 2026",
-        body: "Had a burst pipe emergency and they arrived in under 2 hours. Rafael and his team were professional, fast, and left the place spotless. Pricing was exactly what they quoted — no surprises. Will absolutely call them again.",
-        helpful: 14,
-      },
-      {
-        id: 2,
-        author: "Tom Briggs",
-        authorBadges: ["champion"],
-        rating: 5,
-        date: "Jul 18, 2026",
-        body: "Used Martinez for a full bathroom remodel. The attention to detail was incredible and they finished ahead of schedule. Rafael personally followed up a week later to make sure everything was still working perfectly.",
-        helpful: 9,
-      },
-      {
-        id: 3,
-        author: "Linda Kim",
-        authorBadges: ["organizer"],
-        rating: 4,
-        date: "Jun 30, 2026",
-        body: "Great work on our water heater replacement. Only minor issue was scheduling took a few days, but once they were there the job was done in 90 minutes and everything works perfectly.",
-        helpful: 6,
-      },
-      {
-        id: 4,
-        author: "Ben Cho",
-        authorBadges: [],
-        rating: 5,
-        date: "Jun 14, 2026",
-        body: "Family business done right. They've been serving this neighborhood for years and it shows. Fair prices and genuine care for the community.",
-        helpful: 4,
-      },
-    ],
-  },
-  {
-    id: 2,
-    name: "Corner Market Deli",
-    category: "Food & Grocery",
-    city: "La Porte",
-    rating: 4.7,
-    reviewCount: 203,
-    badges: ["neighbor-fave", "elite"],
-    owner: "Yolanda Reyes",
-    founded: "1998",
-    description:
-      "A neighborhood institution since 1998. Yolanda and her family run this beloved corner market with fresh deli sandwiches, daily soups, specialty groceries, and a curated selection of local products. We stock items from over 20 local producers and bake fresh bread and pastries every morning.",
-    services: [
-      "Deli Sandwiches",
-      "Fresh Daily Soups",
-      "Local Produce",
-      "Artisan Bread & Pastries",
-      "Beer & Wine",
-      "Catering Orders",
-      "Online Pre-Order",
-      "Senior Discount (Tues/Thurs)",
-      "Dog Treats",
-    ],
-    photos: [
-      {
-        url: "https://images.unsplash.com/photo-1453614512568-c4024d13c247?w=600&h=400&fit=crop&auto=format",
-        alt: "Warm cafe interior",
-      },
-      {
-        url: "https://images.unsplash.com/photo-1600093463592-8e36ae95ef56?w=600&h=400&fit=crop&auto=format",
-        alt: "Deli seating area",
-      },
-      {
-        url: "https://images.unsplash.com/photo-1511081692775-05d0f180a065?w=600&h=400&fit=crop&auto=format",
-        alt: "Market interior with pendant lights",
-      },
-      {
-        url: "https://images.unsplash.com/photo-1521017432531-fbd92d768814?w=600&h=400&fit=crop&auto=format",
-        alt: "Customers at the market",
-      },
-    ],
-    phone: "(555) 214-6672",
-    email: "hello@cornermarketdeli.com",
-    website: "cornermarketdeli.com",
-    address: "45 Main Street, Maplewood Heights",
-    hours: [
-      { day: "Mon – Fri", time: "6:30 AM – 8:00 PM" },
-      { day: "Saturday", time: "7:00 AM – 7:00 PM" },
-      { day: "Sunday", time: "8:00 AM – 4:00 PM" },
-    ],
-    reviews: [
-      {
-        id: 5,
-        author: "Nadia Petrov",
-        authorBadges: ["champion", "helpful"],
-        rating: 5,
-        date: "Aug 5, 2026",
-        body: "The turkey avocado sandwich on their house sourdough is the best thing within 5 miles. Yolanda remembers everyone's name and order — this place is the heart of our neighborhood.",
-        helpful: 31,
-      },
-      {
-        id: 6,
-        author: "Sam Lau",
-        authorBadges: [],
-        rating: 5,
-        date: "Jul 22, 2026",
-        body: "Incredible selection of local products. I love that I can get honey, jam, and eggs all from farms within 50 miles. Worth every penny over the big chain grocery.",
-        helpful: 19,
-      },
+      { id: 1, author: "Grace Okonkwo", authorBadges: ["helpful"], rating: 5, date: "Aug 2, 2026", body: "Had a burst pipe emergency and they arrived in under 2 hours.", helpful: 14 }
     ],
   },
 ];
@@ -430,138 +210,38 @@ const USER_PROFILES: Record<string, UserProfile> = {
     neighborhood: "Michigan City",
     city: "Michigan City",
     joinDate: "March 2019",
-    bio: "Born and raised in Maplewood Heights. Passionate about neighborhood safety, local schools, and getting to know my neighbors. Mom of two, dog owner (Biscuit says hi), and avid gardener.",
+    bio: "Born and raised in Maplewood Heights. Passionate about neighborhood safety.",
     badges: ["champion", "safety-watcher", "helpful"],
     posts: 84, neighbors: 231, helpfulVotes: 347, recsGiven: 29,
     rating: 4.8, ratingCount: 36,
-    neighborReviews: [
-      { id: 1, author: "James Whitfield", authorBadges: ["organizer"], rating: 5, date: "Aug 3, 2026", body: "Maria is the heart of this neighborhood. Always first to alert us about safety and organizes incredible community events. A true champion.", helpful: 18 },
-      { id: 2, author: "Nadia Petrov", authorBadges: ["champion"], rating: 5, date: "Jul 20, 2026", body: "When I moved here Maria was the first neighbor to welcome me. Incredibly helpful and always in the know.", helpful: 11 },
-      { id: 3, author: "Ben Cho", authorBadges: [], rating: 4, date: "Jun 15, 2026", body: "Very engaged and thoughtful neighbor. Her safety alerts have kept our street safer more than once.", helpful: 7 },
-    ],
-    galleryPhotos: [
-      { url: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=600&h=400&fit=crop&auto=format", alt: "Riverside Park" },
-      { url: "https://images.unsplash.com/photo-1560472355-536de3962603?w=600&h=400&fit=crop&auto=format", alt: "Neighborhood street" },
-      { url: "https://images.unsplash.com/photo-1598300042247-d088f8ab3a91?w=600&h=400&fit=crop&auto=format", alt: "Garden in bloom" },
-    ],
-    recentActivity: [
-      { type: "post", text: "Posted a safety alert about car break-ins on Elm & 4th", time: "2 hours ago" },
-      { type: "comment", text: "Commented on Community Cleanup event", time: "1 day ago" },
-      { type: "rec", text: "Recommended Maplewood Pediatrics", time: "3 days ago" },
-      { type: "post", text: "Posted about suspicious activity near the park", time: "1 week ago" },
-    ],
+    neighborReviews: [],
+    galleryPhotos: [],
+    recentActivity: [{ type: "post", text: "Posted a safety alert", time: "2 hours ago" }],
   },
-  "James Whitfield": {
-    name: "James Whitfield",
-    neighborhood: "La Porte",
-    city: "La Porte",
-    joinDate: "January 2021",
-    bio: "Retired teacher, now full-time community volunteer. I run the annual block party, organize the farmers market committee, and coach youth soccer on weekends. Ask me anything about our neighborhood's history!",
-    badges: ["organizer", "champion"],
-    posts: 52, neighbors: 189, helpfulVotes: 203, recsGiven: 17,
-    rating: 4.9, ratingCount: 51,
-    neighborReviews: [
-      { id: 4, author: "Maria Santos", authorBadges: ["champion", "helpful"], rating: 5, date: "Aug 1, 2026", body: "James is the backbone of our community. He organized the cleanup, runs the farmers market committee, and coaches kids. Absolutely incredible.", helpful: 22 },
-      { id: 5, author: "Linda Kim", authorBadges: ["organizer"], rating: 5, date: "Jul 10, 2026", body: "James knows everything about this neighborhood's history and is always ready to help new residents get settled.", helpful: 9 },
-    ],
-    galleryPhotos: [
-      { url: "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=600&h=400&fit=crop&auto=format", alt: "Community gathering" },
-      { url: "https://images.unsplash.com/photo-1508980880eba-12e4e6f68928?w=600&h=400&fit=crop&auto=format", alt: "Farmers market" },
-    ],
-    recentActivity: [
-      { type: "post", text: "Organized the Community Cleanup event", time: "4 hours ago" },
-      { type: "event", text: "Created Block Party Planning meetup", time: "2 days ago" },
-      { type: "comment", text: "Commented on local news about new coffee shop", time: "3 days ago" },
-    ],
-  },
-  "Nadia Petrov": {
-    name: "Nadia Petrov",
-    neighborhood: "Long Beach",
-    city: "Long Beach",
-    joinDate: "September 2022",
-    bio: "Urban journalist and neighborhood enthusiast. I cover local news and love digging into what makes Maplewood Heights tick. If you see something newsworthy, tip me off!",
-    badges: ["champion", "helpful"],
-    posts: 61, neighbors: 144, helpfulVotes: 412, recsGiven: 38,
-    rating: 4.7, ratingCount: 28,
-    neighborReviews: [
-      { id: 6, author: "Sam Lau", authorBadges: [], rating: 5, date: "Aug 4, 2026", body: "Nadia broke the news about the new coffee shop before anyone else knew. She has her finger on the pulse of this neighborhood.", helpful: 14 },
-      { id: 7, author: "Yvette Morgan", authorBadges: [], rating: 4, date: "Jul 28, 2026", body: "Great neighbor and very informative posts. Always replies to questions and follows up with more info.", helpful: 8 },
-    ],
-    galleryPhotos: [
-      { url: "https://images.unsplash.com/photo-1453614512568-c4024d13c247?w=600&h=400&fit=crop&auto=format", alt: "Local coffee shop" },
-    ],
-    recentActivity: [
-      { type: "post", text: "Broke the news about Morning Ritual coffee shop", time: "Yesterday" },
-      { type: "comment", text: "Replied to questions about the new coffee shop", time: "Yesterday" },
-      { type: "rec", text: "Recommended Corner Market Deli", time: "5 days ago" },
-    ],
-  },
-  "Grace Okonkwo": {
-    name: "Grace Okonkwo",
-    neighborhood: "New Buffalo",
-    city: "New Buffalo",
-    joinDate: "June 2023",
-    bio: "Interior designer and proud homeowner. Love sharing tips about home improvement, local contractors I trust, and the best spots to find vintage furniture in the area.",
-    badges: ["helpful", "newcomer"],
-    posts: 18, neighbors: 67, helpfulVotes: 89, recsGiven: 12,
-    rating: 4.6, ratingCount: 14,
-    neighborReviews: [
-      { id: 8, author: "Tom Briggs", authorBadges: ["champion"], rating: 5, date: "Jul 30, 2026", body: "Grace recommended Martinez Plumbing and it was spot on — saved us during a burst pipe situation. She clearly vets her recommendations carefully.", helpful: 6 },
-    ],
-    galleryPhotos: [
-      { url: "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=600&h=400&fit=crop&auto=format", alt: "Interior design" },
-      { url: "https://images.unsplash.com/photo-1618220179428-22790b461013?w=600&h=400&fit=crop&auto=format", alt: "Renovated room" },
-    ],
-    recentActivity: [
-      { type: "rec", text: "Recommended Martinez Plumbing with 5 stars", time: "6 hours ago" },
-      { type: "comment", text: "Commented on moving sale post", time: "2 days ago" },
-    ],
+  "Ashlie Wyse": {
+    name: "Ashlie Wyse",
+    neighborhood: "Michigan City",
+    city: "Michigan City",
+    joinDate: "August 2026",
+    bio: "Owner of Beachside Cleaners. Local resident in Michigan City.",
+    badges: ["newcomer"],
+    posts: 1, neighbors: 1, helpfulVotes: 0, recsGiven: 0,
+    rating: 5.0, ratingCount: 1,
+    neighborReviews: [],
+    galleryPhotos: [],
+    recentActivity: [{ type: "post", text: "Joined Neighborly", time: "Just now" }],
   },
 };
 
-const AVATAR_COLORS = [
-  "bg-emerald-700",
-  "bg-amber-600",
-  "bg-sky-700",
-  "bg-rose-600",
-  "bg-violet-700",
-  "bg-teal-700",
-];
+const AVATAR_COLORS = ["bg-emerald-700", "bg-amber-600", "bg-sky-700", "bg-rose-600", "bg-violet-700", "bg-teal-700"];
 
-const CATEGORY_META: Record<
-  PostCategory,
-  { label: string; color: string; icon: React.ReactNode }
-> = {
-  news: {
-    label: "Local News",
-    color: "text-sky-700 bg-sky-50 border-sky-200",
-    icon: <Megaphone size={11} />,
-  },
-  safety: {
-    label: "Safety",
-    color: "text-red-700 bg-red-50 border-red-200",
-    icon: <ShieldAlert size={11} />,
-  },
-  event: {
-    label: "Event",
-    color: "text-violet-700 bg-violet-50 border-violet-200",
-    icon: <CalendarDays size={11} />,
-  },
-  forsale: {
-    label: "For Sale",
-    color: "text-amber-700 bg-amber-50 border-amber-200",
-    icon: <ShoppingBag size={11} />,
-  },
-  recommendation: {
-    label: "Recommendation",
-    color: "text-emerald-700 bg-emerald-50 border-emerald-200",
-    icon: <Star size={11} />,
-  },
-  general: {
-    label: "General",
-    color: "text-stone-600 bg-stone-50 border-stone-200",
-    icon: <Leaf size={11} />,
-  },
+const CATEGORY_META: Record<PostCategory, { label: string; color: string; icon: React.ReactNode }> = {
+  news: { label: "Local News", color: "text-sky-700 bg-sky-50 border-sky-200", icon: <Megaphone size={11} /> },
+  safety: { label: "Safety", color: "text-red-700 bg-red-50 border-red-200", icon: <ShieldAlert size={11} /> },
+  event: { label: "Event", color: "text-violet-700 bg-violet-50 border-violet-200", icon: <CalendarDays size={11} /> },
+  forsale: { label: "For Sale", color: "text-amber-700 bg-amber-50 border-amber-200", icon: <ShoppingBag size={11} /> },
+  recommendation: { label: "Recommendation", color: "text-emerald-700 bg-emerald-50 border-emerald-200", icon: <Star size={11} /> },
+  general: { label: "General", color: "text-stone-600 bg-stone-50 border-stone-200", icon: <Leaf size={11} /> },
 };
 
 const INITIAL_POSTS: Post[] = [
@@ -574,355 +254,130 @@ const INITIAL_POSTS: Post[] = [
     time: "2 hours ago",
     category: "safety",
     title: "Heads up: Car break-ins on Elm & 4th",
-    body: "There were two car break-ins last night on Elm Street near 4th Ave. Both vehicles had windows smashed. Please don't leave anything visible in your cars. I've filed a report with the non-emergency police line.",
+    body: "There were two car break-ins last night on Elm Street near 4th Ave.",
     likes: 47,
-    comments: [
-      {
-        id: 1,
-        author: "Tom Briggs",
-        authorBadges: ["champion"],
-        body: "Thanks for the warning! Same thing happened on Oak St last week.",
-        time: "1h ago",
-        likes: 8,
-      },
-      {
-        id: 2,
-        author: "Priya Nair",
-        authorBadges: [],
-        body: "Saw a suspicious white sedan circling around 10pm. Reported to police too.",
-        time: "45m ago",
-        likes: 12,
-      },
-    ],
+    comments: [],
     bookmarked: false,
     liked: false,
-  },
-  {
-    id: 2,
-    author: "James Whitfield",
-    authorBadges: ["organizer", "champion"],
-    neighborhood: "La Porte",
-    city: "La Porte",
-    time: "4 hours ago",
-    category: "event",
-    title: "Community Cleanup — This Saturday 9am",
-    body: "Organizing a neighborhood cleanup this Saturday starting at 9am at Riverside Park. Gloves and bags provided. Come meet your neighbors and help keep our streets beautiful!",
-    image:
-      "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&h=400&fit=crop&auto=format",
-    likes: 82,
-    comments: [
-      {
-        id: 3,
-        author: "Linda Kim",
-        authorBadges: ["organizer"],
-        body: "We'll be there! Bringing my daughter and her Girl Scout troop.",
-        time: "3h ago",
-        likes: 14,
-      },
-      {
-        id: 4,
-        author: "Roberto Fuentes",
-        authorBadges: [],
-        body: "Can we focus on the trail behind the park too? It's overgrown.",
-        time: "2h ago",
-        likes: 6,
-      },
-    ],
-    bookmarked: true,
-    liked: true,
-  },
-  {
-    id: 3,
-    author: "Grace Okonkwo",
-    authorBadges: ["helpful"],
-    neighborhood: "New Buffalo",
-    city: "New Buffalo",
-    time: "6 hours ago",
-    category: "recommendation",
-    title: "Best plumber in the area — highly recommend!",
-    body: "Had a burst pipe emergency last week and called Martinez Plumbing on Cedar Ave. They arrived within 2 hours, fixed everything, and charged a very fair price. Rafael and his team were professional and respectful. 10/10.",
-    likes: 31,
-    comments: [
-      {
-        id: 5,
-        author: "Ben Cho",
-        authorBadges: [],
-        body: "We've used Martinez too — great family business!",
-        time: "5h ago",
-        likes: 5,
-      },
-    ],
-    bookmarked: false,
-    liked: false,
-  },
-  {
-    id: 4,
-    author: "Nadia Petrov",
-    authorBadges: ["champion", "helpful"],
-    neighborhood: "Long Beach",
-    city: "Long Beach",
-    time: "Yesterday",
-    category: "news",
-    title: "New coffee shop opening on Main Street next month",
-    body: 'Spotted a permit for "Morning Ritual" at the old florist space on Main & 7th. Opening expected mid-September. The neighborhood has needed this!',
-    likes: 128,
-    comments: [
-      {
-        id: 6,
-        author: "Sam Lau",
-        authorBadges: [],
-        body: "Finally! That corner has been empty for two years.",
-        time: "23h ago",
-        likes: 21,
-      },
-    ],
-    bookmarked: false,
-    liked: true,
   },
 ];
 
 const EVENTS = [
-  {
-    id: 1,
-    title: "Community Cleanup",
-    date: "Sat Aug 10",
-    time: "9:00 AM",
-    going: 34,
-    icon: <Leaf size={14} />,
-  },
-  {
-    id: 2,
-    title: "Farmer's Market",
-    date: "Sun Aug 11",
-    time: "8:00 AM",
-    going: 87,
-    icon: <ShoppingBag size={14} />,
-  },
-  {
-    id: 3,
-    title: "Block Party Planning",
-    date: "Tue Aug 13",
-    time: "7:00 PM",
-    going: 22,
-    icon: <Users size={14} />,
-  },
+  { id: 1, title: "Community Cleanup", date: "Sat Aug 10", time: "9:00 AM", going: 34, icon: <Leaf size={14} /> },
+  { id: 2, title: "Farmer's Market", date: "Sun Aug 11", time: "8:00 AM", going: 87, icon: <ShoppingBag size={14} /> },
+  { id: 3, title: "Block Party Planning", date: "Tue Aug 13", time: "7:00 PM", going: 22, icon: <Users size={14} /> },
 ];
 
 // ─── Shared Components ────────────────────────────────────────────────────────
 
-function Avatar({
-  name,
-  size = "md",
-  src,
-}: {
-  name: string;
-  size?: "sm" | "md" | "lg" | "xl";
-  src?: string | null;
-}) {
-  const initials = name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-  const color =
-    AVATAR_COLORS[
-      name.split("").reduce((a, c) => a + c.charCodeAt(0), 0) %
-        AVATAR_COLORS.length
-    ];
-  const sz = {
-    sm: "w-7 h-7 text-xs",
-    md: "w-9 h-9 text-sm",
-    lg: "w-11 h-11 text-base",
-    xl: "w-16 h-16 text-xl",
-  }[size];
-  if (src) {
-    return (
-      <img
-        src={src}
-        alt={name}
-        className={`${sz} rounded-full object-cover flex-shrink-0`}
-      />
-    );
-  }
-  return (
-    <div
-      className={`${sz} ${color} rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0`}
-    >
-      {initials}
-    </div>
-  );
+function Avatar({ name, size = "md", src }: { name: string; size?: "sm" | "md" | "lg" | "xl"; src?: string | null }) {
+  const initials = name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+  const color = AVATAR_COLORS[name.split("").reduce((a, c) => a + c.charCodeAt(0), 0) % AVATAR_COLORS.length];
+  const sz = { sm: "w-7 h-7 text-xs", md: "w-9 h-9 text-sm", lg: "w-11 h-11 text-base", xl: "w-16 h-16 text-xl" }[size];
+  if (src) return <img src={src} alt={name} className={`${sz} rounded-full object-cover flex-shrink-0`} />;
+  return <div className={`${sz} ${color} rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0`}>{initials}</div>;
 }
 
-function BizBadgePill({ type }: { type: BusinessBadgeType }) {
-  const m = BIZ_BADGE_META[type];
-  return (
-    <span
-      className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border font-medium ${m.color}`}
-      title={m.desc}
-    >
-      {m.icon} {m.label}
-    </span>
-  );
-}
-
-function UserBadgePill({
-  type,
-  compact,
-}: {
-  type: UserBadgeType;
-  compact?: boolean;
-}) {
-  const m = USER_BADGE_META[type];
-  if (compact)
-    return (
-      <span
-        className={`inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full border font-medium ${m.color}`}
-        title={m.desc}
-      >
-        {m.icon}
-      </span>
-    );
-  return (
-    <span
-      className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border font-medium ${m.color}`}
-      title={m.desc}
-    >
-      {m.icon} {m.label}
-    </span>
-  );
-}
-
-function StarRating({
-  rating,
-  size = "sm",
-}: {
-  rating: number;
-  size?: "sm" | "lg";
-}) {
-  const starSize = size === "lg" ? 16 : 12;
+function StarRating({ rating }: { rating: number }) {
   return (
     <div className="flex items-center gap-0.5">
       {[1, 2, 3, 4, 5].map((s) => (
-        <Star
-          key={s}
-          size={starSize}
-          className={
-            s <= Math.round(rating)
-              ? "fill-amber-400 text-amber-400"
-              : "text-stone-200"
-          }
-        />
+        <Star key={s} size={12} className={s <= Math.round(rating) ? "fill-amber-400 text-amber-400" : "text-stone-200"} />
       ))}
     </div>
   );
 }
 
 // ─── Auth View ────────────────────────────────────────────────────────────────
-
-function AuthView({
-  mode,
-  onSwitchMode,
-  onSuccess,
-}: {
-  mode: "signin" | "signup";
-  onSwitchMode: (m: "signin" | "signup") => void;
-  onSuccess: () => void;
-}) {
+function AuthView({ mode, onSwitchMode, onSuccess }: { mode: "signin" | "signup"; onSwitchMode: (m: "signin" | "signup") => void; onSuccess: (name: string) => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
+  const [accountType, setAccountType] = useState<"person" | "business">("person");
+  const [username, setUsername] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [businessName, setBusinessName] = useState("");
+
+  const handleSubmit = () => {
+    const displayName = fullName.trim() || businessName.trim() || username.trim() || email.split("@")[0] || "Ashlie Wyse";
+    onSuccess(displayName);
+  };
 
   return (
-    <div className="min-h-screen bg-purple-950 flex items-center justify-center p-4 font-['DM_Sans',sans-serif]">
+    <div className="min-h-screen bg-purple-950 flex items-center justify-center p-4 font-['DM_Sans',sans-serif] overflow-y-auto py-10">
       <div className="max-w-md w-full bg-white rounded-2xl border border-border p-8 shadow-sm">
         <div className="text-center mb-6">
           <div className="w-36 mx-auto mb-4">
-            <ImageWithFallback
-              src={neighborlyLogo}
-              alt="Neighborly App"
-              className="w-full h-auto object-contain"
-            />
+            <ImageWithFallback src={neighborlyLogo} alt="Neighborly App" className="w-full h-auto object-contain" />
           </div>
           <h1 className="font-['Playfair_Display',serif] font-bold text-2xl text-foreground">
-            {mode === "signin"
-              ? "Welcome back"
-              : "Join your neighborhood"}
+            {mode === "signin" ? "Welcome back" : "Join your neighborhood"}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {mode === "signin"
-              ? "Sign in to connect with your community"
-              : "Create an account to connect with neighbors"}
+            {mode === "signin" ? "Sign in with your email to connect with your community" : "Create a personal or business profile"}
           </p>
         </div>
 
         <div className="flex flex-col gap-4">
           {mode === "signup" && (
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">
-                Full Name
-              </label>
-              <input
-                type="text"
-                placeholder="Maria Santos"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full bg-muted rounded-lg px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-blue-600/30 border border-transparent focus:border-blue-600/20"
-              />
+            <div className="mb-2">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-2">Account Type</label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAccountType("person")}
+                  className={`flex-1 py-2 text-sm rounded-lg font-medium border transition-colors ${accountType === "person" ? "bg-blue-600 text-white border-blue-600" : "bg-muted text-muted-foreground border-border"}`}
+                >
+                  Personal Profile
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAccountType("business")}
+                  className={`flex-1 py-2 text-sm rounded-lg font-medium border transition-colors ${accountType === "business" ? "bg-blue-600 text-white border-blue-600" : "bg-muted text-muted-foreground border-border"}`}
+                >
+                  Business Profile
+                </button>
+              </div>
             </div>
           )}
+
           <div>
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">
-              Email
-            </label>
-            <input
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-muted rounded-lg px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-blue-600/30 border border-transparent focus:border-blue-600/20"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">
-              Password
-            </label>
-            <input
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-muted rounded-lg px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-blue-600/30 border border-transparent focus:border-blue-600/20"
-            />
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">Email (Login)</label>
+            <input type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-muted rounded-lg px-3 py-2 text-sm focus:outline-none" />
           </div>
 
-          <button
-            onClick={onSuccess}
-            className="w-full mt-2 bg-blue-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-          >
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">Password</label>
+            <input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-muted rounded-lg px-3 py-2 text-sm focus:outline-none" />
+          </div>
+
+          {mode === "signup" && (
+            <>
+              {accountType === "person" ? (
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">Full Name</label>
+                  <input type="text" placeholder="Ashlie Wyse" value={fullName} onChange={(e) => setFullName(e.target.value)} className="w-full bg-muted rounded-lg px-3 py-2 text-sm focus:outline-none" />
+                </div>
+              ) : (
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">Business Name</label>
+                  <input type="text" placeholder="Beachside Cleaners" value={businessName} onChange={(e) => setBusinessName(e.target.value)} className="w-full bg-muted rounded-lg px-3 py-2 text-sm focus:outline-none" />
+                </div>
+              )}
+            </>
+          )}
+
+          <button onClick={handleSubmit} className="w-full mt-2 bg-blue-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
             {mode === "signin" ? "Sign In" : "Create Account"}
           </button>
 
           <div className="text-center mt-4">
             {mode === "signin" ? (
               <p className="text-sm text-muted-foreground">
-                Don't have an account?{" "}
-                <button
-                  onClick={() => onSwitchMode("signup")}
-                  className="text-blue-600 font-medium hover:underline"
-                >
-                  Sign up
-                </button>
+                Don't have an account? <button onClick={() => onSwitchMode("signup")} className="text-blue-600 font-medium hover:underline">Sign up</button>
               </p>
             ) : (
               <p className="text-sm text-muted-foreground">
-                Already have an account?{" "}
-                <button
-                  onClick={() => onSwitchMode("signin")}
-                  className="text-blue-600 font-medium hover:underline"
-                >
-                  Sign in
-                </button>
+                Already have an account? <button onClick={() => onSwitchMode("signin")} className="text-blue-600 font-medium hover:underline">Sign in</button>
               </p>
             )}
           </div>
@@ -932,940 +387,97 @@ function AuthView({
   );
 }
 
-// ─── Business Profile ─────────────────────────────────────────────────────────
-
-function BusinessProfileView({
-  biz,
-  onBack,
-  onUserClick,
-}: {
-  biz: Business;
-  onBack: () => void;
-  onUserClick: (name: string) => void;
-}) {
-  const [tab, setTab] = useState<
-    "about" | "services" | "photos" | "contact" | "reviews"
-  >("about");
-  const [photosExpanded, setPhotosExpanded] = useState(false);
-  const [reviewHelpful, setReviewHelpful] = useState<
-    Record<number, boolean>
-  >({});
-
-  const visiblePhotos = photosExpanded
-    ? biz.photos
-    : biz.photos.slice(0, 4);
-
+// ─── Business Profile View ────────────────────────────────────────────────────
+function BusinessProfileView({ biz, onBack }: { biz: Business; onBack: () => void }) {
   return (
-    <div className="min-h-screen bg-purple-950">
-      {/* Profile header */}
-      <div className="bg-white border-b border-border">
-        <div className="max-w-4xl mx-auto px-4">
-          <button
-            onClick={onBack}
-            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors py-4 font-['DM_Sans',sans-serif]"
-          >
-            <ChevronLeft size={16} /> Back to feed
-          </button>
-
-          {/* Hero area */}
-          <div className="pb-0">
-            <div className="flex items-end gap-4 pb-4">
-              <div className="w-20 h-20 rounded-2xl bg-card border-4 border-card shadow-md flex items-center justify-center text-primary flex-shrink-0">
-                <Briefcase size={28} />
-              </div>
-              <div className="flex-1 pb-1">
-                <div className="flex flex-wrap items-center gap-2 mb-1">
-                  <h1 className="font-['Playfair_Display',serif] font-bold text-xl">
-                    {biz.name}
-                  </h1>
-                  {biz.badges.map((b) => (
-                    <BizBadgePill key={b} type={b} />
-                  ))}
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  {biz.category} · Est. {biz.founded} · Owned by{" "}
-                  {biz.owner}
-                </p>
-                <div className="flex items-center gap-2 mt-1">
-                  <StarRating rating={biz.rating} />
-                  <span className="text-sm font-semibold">
-                    {biz.rating}
-                  </span>
-                  <span className="text-sm text-muted-foreground">
-                    ({biz.reviewCount} reviews)
-                  </span>
-                </div>
-              </div>
-              <div className="flex gap-2 pb-1 flex-shrink-0">
-                <a
-                  href={`tel:${biz.phone}`}
-                  className="flex items-center gap-1.5 bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity font-['DM_Sans',sans-serif]"
-                >
-                  <Phone size={13} /> Call
-                </a>
-                <button className="flex items-center gap-1.5 border border-border bg-card px-4 py-2 rounded-lg text-sm font-medium hover:bg-secondary transition-colors font-['DM_Sans',sans-serif]">
-                  <MessageSquare size={13} /> Message
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Tabs */}
-          <div className="flex border-t border-border">
-            {(
-              [
-                "about",
-                "services",
-                "photos",
-                "contact",
-                "reviews",
-              ] as const
-            ).map((t) => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={`px-5 py-3 text-sm font-medium capitalize transition-colors border-b-2 -mb-px font-['DM_Sans',sans-serif] ${
-                  tab === t
-                    ? "border-primary text-primary"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {t === "reviews"
-                  ? `Reviews (${biz.reviews.length})`
-                  : t === "photos"
-                    ? `Photos (${biz.photos.length})`
-                    : t.charAt(0).toUpperCase() + t.slice(1)}
-              </button>
-            ))}
-          </div>
+    <div className="min-h-screen bg-purple-950 p-6 text-white font-['DM_Sans',sans-serif]">
+      <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-purple-300 hover:text-white mb-4">
+        <ChevronLeft size={16} /> Back to feed
+      </button>
+      <div className="bg-card text-foreground rounded-2xl p-6 max-w-2xl mx-auto">
+        <h1 className="text-2xl font-bold">{biz.name}</h1>
+        <p className="text-sm text-muted-foreground mt-1">{biz.category} · {biz.city}</p>
+        <div className="flex items-center gap-2 mt-2">
+          <StarRating rating={biz.rating} />
+          <span className="text-sm font-semibold">{biz.rating}</span>
+          <span className="text-xs text-muted-foreground">({biz.reviewCount} reviews)</span>
         </div>
-      </div>
-
-      {/* Tab content */}
-      <div className="max-w-4xl mx-auto px-4 py-6">
-        {tab === "about" && (
-          <div className="grid grid-cols-1 md:grid-cols-[1fr_280px] gap-6">
-            <div className="bg-white rounded-xl border border-border p-6">
-              <h2 className="font-semibold mb-3">
-                About {biz.name}
-              </h2>
-              <p className="text-sm text-foreground/80 leading-relaxed">
-                {biz.description}
-              </p>
-
-              <div className="mt-6 pt-6 border-t border-border">
-                <h3 className="font-semibold text-sm mb-3">
-                  Trust & Credentials
-                </h3>
-                <div className="flex flex-col gap-2.5">
-                  {biz.badges.map((b) => {
-                    const m = BIZ_BADGE_META[b];
-                    return (
-                      <div
-                        key={b}
-                        className={`flex items-start gap-3 p-3 rounded-lg border ${m.color}`}
-                      >
-                        <div className="mt-0.5">
-                          {React.cloneElement(
-                            m.icon as React.ReactElement,
-                            { size: 16 },
-                          )}
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold">
-                            {m.label}
-                          </p>
-                          <p className="text-xs opacity-80 mt-0.5">
-                            {m.desc}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  <div className="flex items-start gap-3 p-3 rounded-lg border bg-stone-50 text-stone-700 border-stone-200">
-                    <CheckCircle2
-                      size={16}
-                      className="mt-0.5 flex-shrink-0"
-                    />
-                    <div>
-                      <p className="text-sm font-semibold">
-                        Licensed & Insured
-                      </p>
-                      <p className="text-xs opacity-80 mt-0.5">
-                        All work is fully bonded and guaranteed
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Sidebar quick info */}
-            <div className="flex flex-col gap-4">
-              <div className="bg-white rounded-xl border border-border p-4">
-                <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
-                  <Clock size={14} className="text-blue-600" />{" "}
-                  Business Hours
-                </h3>
-                <div className="flex flex-col gap-2">
-                  {biz.hours.map((h) => (
-                    <div
-                      key={h.day}
-                      className="flex justify-between text-sm"
-                    >
-                      <span className="text-muted-foreground">
-                        {h.day}
-                      </span>
-                      <span className="font-medium">
-                        {h.time}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="bg-white rounded-xl border border-border p-4">
-                <h3 className="font-semibold text-sm mb-3">
-                  Quick Stats
-                </h3>
-                <div className="grid grid-cols-2 gap-3 text-center">
-                  {[
-                    {
-                      label: "Reviews",
-                      value: biz.reviewCount,
-                    },
-                    {
-                      label: "Years Open",
-                      value: `${2026 - parseInt(biz.founded)}+`,
-                    },
-                    {
-                      label: "Rating",
-                      value: `${biz.rating}★`,
-                    },
-                    {
-                      label: "Badges",
-                      value: biz.badges.length,
-                    },
-                  ].map((s) => (
-                    <div
-                      key={s.label}
-                      className="bg-secondary rounded-lg py-2"
-                    >
-                      <p className="font-bold text-blue-600 text-sm">
-                        {s.value}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {s.label}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {tab === "services" && (
-          <div className="bg-white rounded-xl border border-border p-6">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="font-semibold">
-                Services Offered
-              </h2>
-              <span className="text-xs text-muted-foreground bg-secondary px-2 py-1 rounded-full">
-                {biz.services.length} services
-              </span>
-            </div>
-            <div className="flex flex-wrap gap-2.5 mb-8">
-              {biz.services.map((s) => (
-                <div
-                  key={s}
-                  className="flex items-center gap-2 bg-secondary border border-border rounded-xl px-4 py-2.5 hover:border-blue-600/30 transition-colors cursor-default group"
-                >
-                  <CheckCircle2
-                    size={14}
-                    className="text-blue-600 flex-shrink-0"
-                  />
-                  <span className="text-sm font-medium">
-                    {s}
-                  </span>
-                </div>
-              ))}
-            </div>
-            <div className="border-t border-border pt-5">
-              <h3 className="font-semibold text-sm mb-3">
-                Request a Quote
-              </h3>
-              <div className="bg-secondary/60 rounded-xl p-4 flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium">
-                    Need one of these services?
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Send a message directly to {biz.owner} for a
-                    free estimate.
-                  </p>
-                </div>
-                <button className="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity flex-shrink-0 font-['DM_Sans',sans-serif]">
-                  Get a Quote
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {tab === "photos" && (
-          <div className="bg-white rounded-xl border border-border p-6">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="font-semibold">Photo Gallery</h2>
-              <span className="text-xs text-muted-foreground bg-secondary px-2 py-1 rounded-full flex items-center gap-1.5">
-                <Camera size={11} /> {biz.photos.length} photos
-              </span>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {visiblePhotos.map((photo, i) => (
-                <div
-                  key={i}
-                  className="relative group overflow-hidden rounded-xl bg-muted aspect-[4/3]"
-                >
-                  <img
-                    src={photo.url}
-                    alt={photo.alt}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                    <Eye
-                      size={20}
-                      className="text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-            {biz.photos.length > 4 && (
-              <button
-                onClick={() =>
-                  setPhotosExpanded(!photosExpanded)
-                }
-                className="mt-4 w-full py-2.5 border border-border rounded-xl text-sm font-medium text-muted-foreground hover:text-blue-600 hover:border-blue-600/30 transition-colors flex items-center justify-center gap-2"
-              >
-                {photosExpanded ? (
-                  <>
-                    <ChevronRight
-                      size={14}
-                      className="-rotate-90"
-                    />{" "}
-                    Show fewer photos
-                  </>
-                ) : (
-                  <>
-                    <Camera size={14} /> View{" "}
-                    {biz.photos.length - 4} more photos
-                  </>
-                )}
-              </button>
-            )}
-          </div>
-        )}
-
-        {tab === "contact" && (
-          <div className="grid grid-cols-1 md:grid-cols-[1fr_280px] gap-6">
-            <div className="bg-white rounded-xl border border-border p-6">
-              <h2 className="font-semibold mb-5">
-                Contact Information
-              </h2>
-              <div className="flex flex-col gap-4">
-                {[
-                  {
-                    icon: (
-                      <Phone
-                        size={16}
-                        className="text-blue-600"
-                      />
-                    ),
-                    label: "Phone",
-                    value: biz.phone,
-                    href: `tel:${biz.phone}`,
-                    action: "Call now",
-                  },
-                  {
-                    icon: (
-                      <Mail
-                        size={16}
-                        className="text-blue-600"
-                      />
-                    ),
-                    label: "Email",
-                    value: biz.email,
-                    href: `mailto:${biz.email}`,
-                    action: "Send email",
-                  },
-                  {
-                    icon: (
-                      <Globe
-                        size={16}
-                        className="text-blue-600"
-                      />
-                    ),
-                    label: "Website",
-                    value: biz.website,
-                    href: `https://${biz.website}`,
-                    action: "Visit site",
-                  },
-                  {
-                    icon: (
-                      <MapPinned
-                        size={16}
-                        className="text-blue-600"
-                      />
-                    ),
-                    label: "Address",
-                    value: biz.address,
-                    href: "#",
-                    action: "Get directions",
-                  },
-                ].map((item) => (
-                  <div
-                    key={item.label}
-                    className="flex items-start gap-4 p-4 bg-secondary/40 rounded-xl border border-border hover:border-blue-600/20 transition-colors group"
-                  >
-                    <div className="w-9 h-9 rounded-lg bg-white border border-border flex items-center justify-center flex-shrink-0 shadow-sm">
-                      {item.icon}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
-                        {item.label}
-                      </p>
-                      <p className="text-sm font-medium mt-0.5 truncate">
-                        {item.value}
-                      </p>
-                    </div>
-                    <a
-                      href={item.href}
-                      className="text-xs text-blue-600 font-medium opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 flex-shrink-0"
-                    >
-                      {item.action} <ExternalLink size={10} />
-                    </a>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="bg-white rounded-xl border border-border p-4">
-              <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
-                <Clock size={14} className="text-blue-600" />{" "}
-                Hours
-              </h3>
-              <div className="flex flex-col gap-2.5">
-                {biz.hours.map((h) => (
-                  <div
-                    key={h.day}
-                    className="flex justify-between items-baseline text-sm border-b border-border pb-2 last:border-0 last:pb-0"
-                  >
-                    <span className="text-muted-foreground">
-                      {h.day}
-                    </span>
-                    <span className="font-medium text-xs">
-                      {h.time}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-4 pt-4 border-t border-border">
-                <div className="flex items-center gap-2 text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-xs font-medium">
-                    Open now
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {tab === "reviews" && (
-          <div className="flex flex-col gap-4">
-            {/* Summary */}
-            <div className="bg-white rounded-xl border border-border p-6">
-              <div className="grid grid-cols-1 md:grid-cols-[auto_1fr] gap-8 items-center">
-                <div className="text-center">
-                  <p className="font-['Playfair_Display',serif] font-bold text-5xl text-blue-600">
-                    {biz.rating}
-                  </p>
-                  <StarRating rating={biz.rating} size="lg" />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {biz.reviewCount} reviews
-                  </p>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  {[5, 4, 3, 2, 1].map((star) => {
-                    const count = biz.reviews.filter(
-                      (r) => Math.round(r.rating) === star,
-                    ).length;
-                    const pct = biz.reviews.length
-                      ? (count / biz.reviews.length) * 100
-                      : 0;
-                    return (
-                      <div
-                        key={star}
-                        className="flex items-center gap-2"
-                      >
-                        <span className="text-xs text-muted-foreground w-4 text-right">
-                          {star}
-                        </span>
-                        <Star
-                          size={10}
-                          className="text-amber-400 fill-amber-400"
-                        />
-                        <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-amber-400 rounded-full"
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                        <span className="text-xs text-muted-foreground w-4">
-                          {count}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
-            {biz.reviews.map((r) => (
-              <div
-                key={r.id}
-                className="bg-white rounded-xl border border-border p-5"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-3">
-                    <Avatar name={r.author} size="md" />
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <button
-                          onClick={() => onUserClick(r.author)}
-                          className="font-semibold text-sm hover:text-blue-600 transition-colors"
-                        >
-                          {r.author}
-                        </button>
-                        {r.authorBadges.map((b) => (
-                          <UserBadgePill key={b} type={b} />
-                        ))}
-                      </div>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <StarRating rating={r.rating} />
-                        <span className="text-xs text-muted-foreground">
-                          {r.date}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <p className="text-sm text-foreground/80 leading-relaxed mt-3">
-                  {r.body}
-                </p>
-                <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border">
-                  <button
-                    onClick={() =>
-                      setReviewHelpful((p) => ({
-                        ...p,
-                        [r.id]: !p[r.id],
-                      }))
-                    }
-                    className={`flex items-center gap-1.5 text-xs font-medium transition-colors font-['DM_Sans',sans-serif] ${reviewHelpful[r.id] ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
-                  >
-                    <ThumbsUp
-                      size={12}
-                      className={
-                        reviewHelpful[r.id]
-                          ? "fill-primary text-primary"
-                          : ""
-                      }
-                    />
-                    Helpful (
-                    {r.helpful + (reviewHelpful[r.id] ? 1 : 0)})
-                  </button>
-                  <button className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
-                    <Flag size={11} /> Report
-                  </button>
-                </div>
-              </div>
-            ))}
-
-            <div className="bg-white rounded-xl border border-border p-5">
-              <h3 className="font-semibold text-sm mb-3">
-                Write a Review
-              </h3>
-              <div className="flex gap-1 mb-3">
-                {[1, 2, 3, 4, 5].map((s) => (
-                  <button key={s}>
-                    <Star
-                      size={20}
-                      className="text-stone-200 hover:text-amber-400 hover:fill-amber-400 transition-colors"
-                    />
-                  </button>
-                ))}
-              </div>
-              <textarea
-                placeholder={`How was your experience with ${biz.name}?`}
-                rows={3}
-                className="w-full bg-muted rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600/20 resize-none"
-              />
-              <button className="mt-2 bg-primary text-primary-foreground px-5 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity font-['DM_Sans',sans-serif]">
-                Submit Review
-              </button>
-            </div>
-          </div>
-        )}
+        <p className="mt-4 text-sm">{biz.description}</p>
       </div>
     </div>
   );
 }
 
-// ─── User Profile ─────────────────────────────────────────────────────────────
-
-// ─── Canvas crop helper ───────────────────────────────────────────────────────
-async function getCanvasCrop(
-  imgEl: HTMLImageElement,
-  centerX: number,
-  centerY: number,
-  displayScale: number,
-  cropW: number,
-  cropH: number,
-  outW: number,
-  outH: number,
-): Promise<string> {
-  const canvas = document.createElement("canvas");
-  canvas.width = outW;
-  canvas.height = outH;
-  const ctx = canvas.getContext("2d")!;
-  const srcX = centerX - cropW / (2 * displayScale);
-  const srcY = centerY - cropH / (2 * displayScale);
-  const srcW = cropW / displayScale;
-  const srcH = cropH / displayScale;
-  ctx.drawImage(imgEl, srcX, srcY, srcW, srcH, 0, 0, outW, outH);
-  return new Promise((resolve) =>
-    canvas.toBlob((b) => resolve(URL.createObjectURL(b!)), "image/jpeg", 0.92),
-  );
-}
-
-// ─── Crop Modal ───────────────────────────────────────────────────────────────
-const CROP_CFG = {
-  avatar: { w: 340, h: 340, outW: 480,  outH: 480,  label: "Profile Photo" },
-  cover:  { w: 680, h: 213, outW: 1200, outH: 375,  label: "Cover Photo"   },
-} as const;
-
-function CropModal({
-  src,
-  mode,
-  onApply,
-  onClose,
-}: {
-  src: string;
-  mode: "avatar" | "cover";
-  onApply: (url: string) => void;
-  onClose: () => void;
-}) {
-  const cfg = CROP_CFG[mode];
-  const imgRef = useRef<HTMLImageElement>(null);
-  const [zoom, setZoom] = useState(1);
-  const [cx, setCx] = useState(0);
-  const [cy, setCy] = useState(0);
-  const [natW, setNatW] = useState(0);
-  const [natH, setNatH] = useState(0);
-  const [baseScale, setBaseScale] = useState(1);
-  const [applying, setApplying] = useState(false);
-  const drag = useRef<{ sx: number; sy: number; scx: number; scy: number } | null>(null);
-
-  const displayScale = baseScale * zoom;
-
-  function onImgLoad() {
-    const img = imgRef.current!;
-    const nW = img.naturalWidth;
-    const nH = img.naturalHeight;
-    setNatW(nW);
-    setNatH(nH);
-    const bs = Math.max(cfg.w / nW, cfg.h / nH);
-    setBaseScale(bs);
-    setZoom(1);
-    setCx(nW / 2);
-    setCy(nH / 2);
-  }
-
-  function clamp(nx: number, ny: number, z: number) {
-    const ds = baseScale * z;
-    const hW = cfg.w / (2 * ds);
-    const hH = cfg.h / (2 * ds);
-    const cx = hW >= natW / 2 ? Math.max(0, Math.min(natW, nx)) : Math.max(hW, Math.min(natW - hW, nx));
-    const cy = hH >= natH / 2 ? Math.max(0, Math.min(natH, ny)) : Math.max(hH, Math.min(natH - hH, ny));
-    return { cx, cy };
-  }
-
-  function onMouseDown(e: React.MouseEvent) {
-    e.preventDefault();
-    drag.current = { sx: e.clientX, sy: e.clientY, scx: cx, scy: cy };
-  }
-  function onMouseMove(e: React.MouseEvent) {
-    if (!drag.current) return;
-    const dx = e.clientX - drag.current.sx;
-    const dy = e.clientY - drag.current.sy;
-    const { cx: ncx, cy: ncy } = clamp(
-      drag.current.scx - dx / displayScale,
-      drag.current.scy - dy / displayScale,
-      zoom,
-    );
-    setCx(ncx);
-    setCy(ncy);
-  }
-  function onMouseUp() { drag.current = null; }
-
-  function onWheel(e: React.WheelEvent) {
-    e.preventDefault();
-    const next = Math.max(0.5, Math.min(5, zoom + (e.deltaY < 0 ? 0.1 : -0.1)));
-    setZoom(next);
-    const { cx: ncx, cy: ncy } = clamp(cx, cy, next);
-    setCx(ncx);
-    setCy(ncy);
-  }
-
-  async function apply() {
-    if (!imgRef.current || !natW) return;
-    setApplying(true);
-    const url = await getCanvasCrop(
-      imgRef.current, cx, cy, displayScale,
-      cfg.w, cfg.h, cfg.outW, cfg.outH,
-    );
-    onApply(url);
-    setApplying(false);
-  }
-
-  const imgL = cfg.w / 2 - cx * displayScale;
-  const imgT = cfg.h / 2 - cy * displayScale;
-
-  return (
-    <Dialog.Root open onOpenChange={(o) => { if (!o) onClose(); }}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/75 z-[60] backdrop-blur-sm animate-in fade-in-0 duration-200" />
-        <Dialog.Content
-          className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[61] bg-white rounded-2xl shadow-2xl overflow-hidden animate-in fade-in-0 zoom-in-95 duration-200"
-          style={{ width: `min(95vw, ${cfg.w + 64}px)` }}
-          aria-describedby={undefined}
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
-            <Dialog.Title className="font-semibold text-sm">
-              Crop {cfg.label}
-            </Dialog.Title>
-            <Dialog.Close
-              onClick={onClose}
-              className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground"
-            >
-              <X size={15} />
-            </Dialog.Close>
-          </div>
-
-          {/* Viewport */}
-          <div className="flex flex-col items-center gap-4 p-5">
-            <div
-              className="relative overflow-hidden rounded-xl bg-stone-900 select-none"
-              style={{
-                width: cfg.w,
-                height: cfg.h,
-                maxWidth: "100%",
-                cursor: drag.current ? "grabbing" : "grab",
-              }}
-              onMouseDown={onMouseDown}
-              onMouseMove={onMouseMove}
-              onMouseUp={onMouseUp}
-              onMouseLeave={onMouseUp}
-              onWheel={onWheel}
-            >
-              {/* Image */}
-              <img
-                ref={imgRef}
-                src={src}
-                alt=""
-                onLoad={onImgLoad}
-                draggable={false}
-                style={{
-                  position: "absolute",
-                  left: imgL,
-                  top: imgT,
-                  width: natW * displayScale,
-                  height: natH * displayScale,
-                  maxWidth: "none",
-                  userSelect: "none",
-                  pointerEvents: "none",
-                }}
-              />
-              {/* Crop frame */}
-              <div className="absolute inset-0 border-2 border-white/70 rounded-xl pointer-events-none" />
-              {/* Rule-of-thirds grid */}
-              <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ opacity: 0.25 }}>
-                <line x1="33.33%" y1="0" x2="33.33%" y2="100%" stroke="white" strokeWidth="1" />
-                <line x1="66.66%" y1="0" x2="66.66%" y2="100%" stroke="white" strokeWidth="1" />
-                <line x1="0" y1="33.33%" x2="100%" y2="33.33%" stroke="white" strokeWidth="1" />
-                <line x1="0" y1="66.66%" x2="100%" y2="66.66%" stroke="white" strokeWidth="1" />
-              </svg>
-            </div>
-
-            {/* Zoom control */}
-            <div className="flex items-center gap-3 w-full" style={{ maxWidth: cfg.w }}>
-              <Camera size={12} className="text-muted-foreground flex-shrink-0" />
-              <SliderPrimitive.Root
-                className="relative flex flex-1 items-center select-none touch-none h-5"
-                min={0.5} max={5} step={0.05}
-                value={[zoom]}
-                onValueChange={([v]) => {
-                  setZoom(v);
-                  const { cx: ncx, cy: ncy } = clamp(cx, cy, v);
-                  setCx(ncx);
-                  setCy(ncy);
-                }}
-              >
-                <SliderPrimitive.Track className="relative grow rounded-full h-1.5 bg-muted">
-                  <SliderPrimitive.Range className="absolute bg-primary rounded-full h-full" />
-                </SliderPrimitive.Track>
-                <SliderPrimitive.Thumb className="block w-4 h-4 rounded-full bg-white border-2 border-primary shadow focus:outline-none cursor-pointer" />
-              </SliderPrimitive.Root>
-              <span className="text-xs text-muted-foreground tabular-nums w-9 text-right">{zoom.toFixed(2)}×</span>
-            </div>
-            <p className="text-xs text-muted-foreground -mt-2">
-              Drag to reposition · Scroll or slide to zoom
-            </p>
-          </div>
-
-          {/* Footer */}
-          <div className="flex justify-end gap-2.5 px-5 py-3.5 border-t border-border bg-muted/30">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-sm rounded-lg border border-border hover:bg-muted transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={apply}
-              disabled={applying || !natW}
-              className="px-5 py-2 text-sm rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 font-medium"
-            >
-              {applying ? "Applying…" : "Apply Crop"}
-            </button>
-          </div>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
-  );
-}
-
-// ─── Profile theme definitions ────────────────────────────────────────────────
-const PROFILE_THEMES = {
-  "Classic Blue":   { cover: "from-blue-700 to-blue-400",     btn: "bg-blue-600 hover:bg-blue-700",       accent: "text-blue-600",   bar: "bg-blue-600",    scrollbarColor: "#2563eb", tint: "bg-blue-50"    },
-  "Ocean Breeze":   { cover: "from-cyan-700 to-teal-400",     btn: "bg-teal-600 hover:bg-teal-700",       accent: "text-teal-600",   bar: "bg-teal-600",    scrollbarColor: "#0d9488", tint: "bg-teal-50"    },
-  "Sunset Glow":    { cover: "from-orange-500 to-rose-400",   btn: "bg-orange-500 hover:bg-orange-600",   accent: "text-orange-500", bar: "bg-orange-500",  scrollbarColor: "#f97316", tint: "bg-orange-50"  },
-  "Emerald Forest": { cover: "from-emerald-800 to-green-500", btn: "bg-emerald-700 hover:bg-emerald-800", accent: "text-emerald-700",bar: "bg-emerald-700", scrollbarColor: "#059669", tint: "bg-emerald-50" },
-  "Royal Purple":   { cover: "from-purple-800 to-violet-500", btn: "bg-purple-700 hover:bg-purple-800",   accent: "text-purple-700", bar: "bg-purple-700",  scrollbarColor: "#7c3aed", tint: "bg-purple-50"  },
-  "Midnight Dark":  { cover: "from-slate-900 to-slate-600",   btn: "bg-slate-700 hover:bg-slate-800",     accent: "text-slate-700",  bar: "bg-slate-700",   scrollbarColor: "#475569", tint: "bg-slate-100"  },
-} as const;
-type ThemeName = keyof typeof PROFILE_THEMES;
-
-function UserProfileView({
-  profile,
-  onBack,
-  isOwnProfile = false,
-  myAvatarUrl = null,
-  onAvatarChange,
-}: {
+// ─── User Profile View ────────────────────────────────────────────────────────
+function UserProfileView({ profile, onBack, isOwnProfile, myAvatarUrl, onAvatarChange, onProfileUpdate }: {
   profile: UserProfile;
   onBack: () => void;
   isOwnProfile?: boolean;
   myAvatarUrl?: string | null;
   onAvatarChange?: (url: string) => void;
+  onProfileUpdate?: (updated: Partial<UserProfile>) => void;
 }) {
-  const [tab, setTab] = useState<"about" | "photos" | "reviews">("about");
-  const [theme, setTheme] = useState<ThemeName>("Classic Blue");
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState(profile.name);
+  const [editNeighborhood, setEditNeighborhood] = useState(profile.neighborhood);
+  const [editBio, setEditBio] = useState(profile.bio);
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(myAvatarUrl);
-  const [gallery, setGallery] = useState(profile.galleryPhotos);
-  const [reviews, setReviews] = useState<NeighborReview[]>(profile.neighborReviews);
-  const [hoverStar, setHoverStar] = useState(0);
-  const [pickedStar, setPickedStar] = useState(0);
-  const [reviewText, setReviewText] = useState("");
-  const [reviewSubmitted, setReviewSubmitted] = useState(false);
-  const [helpfulMap, setHelpfulMap] = useState<Record<number, boolean>>({});
-  const [themeOpen, setThemeOpen] = useState(false);
-  const [cropSrc, setCropSrc] = useState<string | null>(null);
-  const [cropMode, setCropMode] = useState<"avatar" | "cover">("avatar");
 
-  const T = PROFILE_THEMES[theme];
-
-  useEffect(() => {
-    document.documentElement.style.setProperty("--scrollbar-thumb", T.scrollbarColor);
-    return () => {
-      document.documentElement.style.setProperty("--scrollbar-thumb", "#3b82f6");
-    };
-  }, [theme]);
-
-  const avgRating = reviews.length
-    ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length
-    : profile.rating;
-  const displayRating = avgRating.toFixed(1);
-
-  function openCrop(file: File, mode: "avatar" | "cover") {
-    setCropMode(mode);
-    setCropSrc(URL.createObjectURL(file));
-  }
   function handleCoverUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
-    if (f) { openCrop(f, "cover"); e.target.value = ""; }
+    if (f && isOwnProfile) {
+      setCoverUrl(URL.createObjectURL(f));
+    }
   }
+
   function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
-    if (f) { openCrop(f, "avatar"); e.target.value = ""; }
+    if (f && isOwnProfile) {
+      const url = URL.createObjectURL(f);
+      setAvatarUrl(url);
+      onAvatarChange?.(url);
+    }
   }
-  function applyAvatar(url: string) {
-    setAvatarUrl(url);
-    onAvatarChange?.(url);
-  }
-  function handleGalleryUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    Array.from(e.target.files || []).forEach((f) => {
-      setGallery((prev) => [
-        ...prev,
-        { url: URL.createObjectURL(f), alt: f.name },
-      ]);
+
+  function handleSaveProfile() {
+    onProfileUpdate?.({
+      name: editName,
+      neighborhood: editNeighborhood,
+      bio: editBio,
     });
-  }
-  function submitReview() {
-    if (!pickedStar || !reviewText.trim()) return;
-    setReviews((prev) => [
-      { id: Date.now(), author: "You", authorBadges: [], rating: pickedStar, date: "Just now", body: reviewText.trim(), helpful: 0 },
-      ...prev,
-    ]);
-    setReviewSubmitted(true);
-    setPickedStar(0);
-    setReviewText("");
+    setIsEditing(false);
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="relative h-44 md:h-56 overflow-hidden">
-        {coverUrl
-          ? <img src={coverUrl} alt="Cover" className="w-full h-full object-cover" />
-          : <div className={`w-full h-full bg-gradient-to-br ${T.cover}`} />
-        }
-        <label className="absolute bottom-3 right-3 flex items-center gap-1.5 bg-black/40 hover:bg-black/60 text-white text-xs font-medium px-3 py-1.5 rounded-lg cursor-pointer transition-colors backdrop-blur-sm">
-          <Camera size={13} /> Change Cover
-          <input type="file" accept="image/*" className="hidden" onChange={handleCoverUpload} />
-        </label>
+    <div className="min-h-screen bg-background font-['DM_Sans',sans-serif] pb-20">
+      <div className="relative h-44 md:h-56 overflow-hidden bg-purple-900">
+        {coverUrl ? (
+          <img src={coverUrl} alt="Cover" className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-blue-700 to-blue-400" />
+        )}
+        <button onClick={onBack} className="absolute top-4 left-4 flex items-center gap-1.5 text-sm bg-black/40 text-white px-3 py-1.5 rounded-lg hover:bg-black/60 transition-colors backdrop-blur-sm">
+          <ChevronLeft size={16} /> Back to feed
+        </button>
+        {isOwnProfile && (
+          <label className="absolute bottom-3 right-3 flex items-center gap-1.5 bg-black/40 hover:bg-black/60 text-white text-xs font-medium px-3 py-1.5 rounded-lg cursor-pointer transition-colors backdrop-blur-sm">
+            <Camera size={13} /> Change Cover
+            <input type="file" accept="image/*" className="hidden" onChange={handleCoverUpload} />
+          </label>
+        )}
       </div>
 
-      <div className={`${isOwnProfile ? T.tint : "bg-white"} border-b border-border`}>
-        <div className="max-w-3xl mx-auto px-4">
-          {/* Avatar row + action buttons */}
+      <div className="bg-white border-b border-border">
+        <div className="max-w-3xl mx-auto px-4 pb-4">
           <div className="flex items-start justify-between -mt-10 pt-0 pb-2">
             <div className="relative flex-shrink-0 mt-1">
               <div className="w-20 h-20 rounded-full border-4 border-white shadow-lg overflow-hidden bg-muted">
-                {avatarUrl
-                  ? <img src={avatarUrl} alt={profile.name} className="w-full h-full object-cover" />
-                  : <Avatar name={profile.name} size="xl" />
-                }
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt={profile.name} className="w-full h-full object-cover" />
+                ) : (
+                  <Avatar name={profile.name} size="xl" />
+                )}
               </div>
               {isOwnProfile && (
                 <label className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-white border border-border shadow flex items-center justify-center cursor-pointer hover:bg-muted transition-colors">
@@ -1875,552 +487,112 @@ function UserProfileView({
               )}
             </div>
 
-            {/* Action buttons — pushed down past avatar */}
-            <div className="flex items-center gap-2 mt-12 flex-shrink-0 relative">
-              {isOwnProfile && (
-                <div className="relative">
-                  <button
-                    onClick={() => setThemeOpen((o) => !o)}
-                    className="flex items-center gap-1.5 border border-border bg-white px-3 py-2 rounded-lg text-xs font-medium hover:bg-muted transition-colors"
-                  >
-                    <span className={`w-3 h-3 rounded-full bg-gradient-to-br ${T.cover} inline-block`} />
-                    {theme}
-                    <ChevronDown size={12} />
-                  </button>
-                  {themeOpen && (
-                    <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-border rounded-xl shadow-xl z-50 overflow-hidden">
-                      {(Object.keys(PROFILE_THEMES) as ThemeName[]).map((t) => (
-                        <button
-                          key={t}
-                          onClick={() => { setTheme(t); setThemeOpen(false); }}
-                          className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-muted transition-colors ${t === theme ? "font-semibold" : ""}`}
-                        >
-                          <span className={`w-4 h-4 rounded-full bg-gradient-to-br ${PROFILE_THEMES[t].cover} flex-shrink-0`} />
-                          {t}
-                          {t === theme && <CheckCircle2 size={13} className="ml-auto text-primary" />}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-              {!isOwnProfile && (
-                <button className={`flex items-center gap-1.5 ${T.btn} text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors`}>
-                  <Users size={13} /> Follow
+            <div className="flex items-center gap-2 mt-12">
+              {isOwnProfile && !isEditing && (
+                <button onClick={() => setIsEditing(true)} className="border border-border bg-white px-3 py-2 rounded-lg text-xs font-medium hover:bg-muted transition-colors">
+                  Edit Profile
                 </button>
               )}
             </div>
           </div>
 
-          {/* Name, stars, location — always full width */}
-          <div className="pb-3">
-            <h1 className="font-['Playfair_Display',serif] font-bold text-xl leading-tight">
-              {profile.name}
-            </h1>
-            <div className="flex items-center gap-1.5 mt-1">
-              {[1,2,3,4,5].map((s) => (
-                <Star key={s} size={14}
-                  className={s <= Math.round(avgRating) ? "fill-amber-400 text-amber-400" : "text-stone-200"} />
-              ))}
-              <span className="text-sm font-semibold ml-0.5">{displayRating}</span>
-              <span className="text-xs text-muted-foreground">({reviews.length} ratings)</span>
-            </div>
-            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-              <MapPin size={10} /> {profile.neighborhood} · Member since {profile.joinDate}
-            </p>
-          </div>
-
-          {profile.badges.length > 0 && (
-            <div className="flex flex-wrap gap-2 pb-3">
-              {profile.badges.map((b) => <UserBadgePill key={b} type={b} />)}
-            </div>
-          )}
-
-          <div className="flex border-t border-border">
-            {(["about", "photos", "reviews"] as const).map((t) => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={`px-5 py-3 text-sm font-medium capitalize transition-colors border-b-2 -mb-px ${
-                  tab === t
-                    ? `border-current ${T.accent}`
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {t === "reviews" ? `Reviews (${reviews.length})` : t.charAt(0).toUpperCase() + t.slice(1)}
-              </button>
-            ))}
+          <div>
+            {isEditing ? (
+              <div className="flex flex-col gap-2 max-w-sm mt-2">
+                <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Full Name" className="border border-border rounded-lg px-3 py-1.5 text-sm font-medium text-foreground" />
+                <input type="text" value={editNeighborhood} onChange={(e) => setEditNeighborhood(e.target.value)} placeholder="Neighborhood / City" className="border border-border rounded-lg px-3 py-1.5 text-sm text-foreground" />
+              </div>
+            ) : (
+              <>
+                <h1 className="font-['Playfair_Display',serif] font-bold text-xl leading-tight">{profile.name}</h1>
+                <div className="flex items-center gap-1.5 mt-1">
+                  <StarRating rating={profile.rating} />
+                  <span className="text-sm font-semibold ml-0.5">{profile.rating.toFixed(1)}</span>
+                  <span className="text-xs text-muted-foreground">({profile.ratingCount} ratings)</span>
+                </div>
+                <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                  <MapPin size={10} /> {profile.neighborhood} · Member since {profile.joinDate}
+                </p>
+              </>
+            )}
           </div>
         </div>
       </div>
 
-      <div className="max-w-3xl mx-auto px-4 py-6 pb-24">
-        {tab === "about" && (
-          <div className="grid grid-cols-1 md:grid-cols-[1fr_200px] gap-5">
-            <div className="flex flex-col gap-4">
-              <div className="bg-white rounded-xl border border-border p-5">
-                <h2 className={`font-semibold text-sm mb-3 flex items-center gap-2 ${T.accent}`}>
-                  <Smile size={14} /> About
-                </h2>
-                <p className="text-sm text-foreground/80 leading-relaxed">{profile.bio || "No bio yet."}</p>
-              </div>
-
-              <div className="bg-white rounded-xl border border-border p-5">
-                <h2 className={`font-semibold text-sm mb-3 flex items-center gap-2 ${T.accent}`}>
-                  <Award size={14} /> Community Badges
-                </h2>
-                <div className="flex flex-col gap-2.5">
-                  {profile.badges.map((b) => {
-                    const m = USER_BADGE_META[b];
-                    return (
-                      <div key={b} className={`flex items-center gap-3 p-3 rounded-xl border ${m.color}`}>
-                        <div className="w-8 h-8 rounded-lg bg-white/60 flex items-center justify-center flex-shrink-0">
-                          {React.cloneElement(m.icon as React.ReactElement, { size: 16 })}
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold">{m.label}</p>
-                          <p className="text-xs opacity-75 mt-0.5">{m.desc}</p>
-                        </div>
-                        <Zap size={13} className="ml-auto opacity-30" />
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="bg-white rounded-xl border border-border p-5">
-                <h2 className={`font-semibold text-sm mb-3 flex items-center gap-2 ${T.accent}`}>
-                  <Zap size={14} /> Recent Activity
-                </h2>
-                <div className="flex flex-col">
-                  {profile.recentActivity.map((a, i) => {
-                    const icons: Record<string, React.ReactNode> = { post: <Megaphone size={11} />, comment: <MessageCircle size={11} />, rec: <Star size={11} />, event: <CalendarDays size={11} /> };
-                    const colors: Record<string, string> = { post: "bg-sky-50 text-sky-700", comment: "bg-stone-50 text-stone-600", rec: "bg-emerald-50 text-emerald-700", event: "bg-violet-50 text-violet-700" };
-                    return (
-                      <div key={i} className="flex items-start gap-3 py-3 border-b border-border last:border-0">
-                        <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${colors[a.type] || "bg-muted"}`}>{icons[a.type]}</div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm text-foreground/85">{a.text}</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">{a.time}</p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+      <div className="max-w-3xl mx-auto px-4 py-6">
+        <div className="bg-white rounded-xl border border-border p-5">
+          <h2 className="font-semibold text-sm mb-3 flex items-center gap-2">About</h2>
+          {isEditing ? (
+            <div className="flex flex-col gap-3">
+              <textarea rows={3} value={editBio} onChange={(e) => setEditBio(e.target.value)} placeholder="Write your bio..." className="w-full bg-muted border border-border rounded-lg p-2.5 text-sm resize-none text-foreground" />
+              <div className="flex gap-2">
+                <button onClick={handleSaveProfile} className="px-4 py-1.5 bg-primary text-primary-foreground text-xs font-medium rounded-lg">Save Changes</button>
+                <button onClick={() => setIsEditing(false)} className="px-3 py-1.5 border border-border rounded-lg text-xs">Cancel</button>
               </div>
             </div>
-
-            <div className="flex flex-col gap-4">
-              <div className="bg-white rounded-xl border border-border p-4">
-                <h3 className="font-semibold text-sm mb-3">Community Stats</h3>
-                {[
-                  { label: "Posts", value: profile.posts, icon: <Megaphone size={13} className="text-sky-600" /> },
-                  { label: "Neighbors", value: profile.neighbors, icon: <Users size={13} className="text-emerald-600" /> },
-                  { label: "Helpful votes", value: profile.helpfulVotes, icon: <ThumbsUp size={13} className="text-amber-600" /> },
-                  { label: "Recs given", value: profile.recsGiven, icon: <Star size={13} className="text-violet-600" /> },
-                ].map((s) => (
-                  <div key={s.label} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">{s.icon} {s.label}</div>
-                    <span className={`font-bold text-sm ${T.accent}`}>{s.value}</span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="bg-secondary/50 rounded-xl border border-border p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Trophy size={14} className={T.accent} />
-                  <h3 className="font-semibold text-sm">Neighborhood Rank</h3>
-                </div>
-                <p className={`font-['Playfair_Display',serif] font-bold text-2xl ${T.accent}`}>Top 5%</p>
-                <p className="text-xs text-muted-foreground mt-0.5">contributor in {profile.neighborhood}</p>
-                <div className="mt-3 h-1.5 bg-border rounded-full overflow-hidden">
-                  <div className={`h-full ${T.bar} rounded-full`} style={{ width: "95%" }} />
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {tab === "photos" && (
-          <div className="bg-white rounded-xl border border-border p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className={`font-semibold text-sm flex items-center gap-2 ${T.accent}`}>
-                <Camera size={14} /> Photo Gallery ({gallery.length})
-              </h2>
-              <label className={`flex items-center gap-1.5 ${T.btn} text-white text-xs font-medium px-3 py-2 rounded-lg cursor-pointer transition-colors`}>
-                <Plus size={13} /> Upload Photos
-                <input type="file" accept="image/*" multiple className="hidden" onChange={handleGalleryUpload} />
-              </label>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {gallery.map((p, i) => (
-                <div key={i} className="relative group aspect-[4/3] rounded-xl overflow-hidden bg-muted">
-                  <img src={p.url} alt={p.alt} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                </div>
-              ))}
-              <label className="aspect-[4/3] rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:border-primary/40 transition-colors text-muted-foreground">
-                <Plus size={20} className="mb-1 opacity-50" />
-                <span className="text-xs">Add more</span>
-                <input type="file" accept="image/*" multiple className="hidden" onChange={handleGalleryUpload} />
-              </label>
-            </div>
-          </div>
-        )}
-
-        {tab === "reviews" && (
-          <div className="flex flex-col gap-4">
-            <div className="bg-white rounded-xl border border-border p-5">
-              <h2 className={`font-semibold text-sm mb-4 flex items-center gap-2 ${T.accent}`}>
-                <Star size={14} /> Neighbor Ratings
-              </h2>
-              <div className="grid grid-cols-[auto_1fr] gap-6 items-center">
-                <div className="text-center">
-                  <p className={`font-['Playfair_Display',serif] font-bold text-5xl ${T.accent}`}>{displayRating}</p>
-                  <div className="flex items-center gap-0.5 mt-1 justify-center">
-                    {[1,2,3,4,5].map((s) => (
-                      <Star key={s} size={16} className={s <= Math.round(avgRating) ? "fill-amber-400 text-amber-400" : "text-stone-200"} />
-                    ))}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">{reviews.length} ratings</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl border border-border p-5">
-              <h3 className={`font-semibold text-sm mb-3 flex items-center gap-2 ${T.accent}`}>
-                <MessageSquare size={14} /> Rate &amp; Review {profile.name.split(" ")[0]}
-              </h3>
-              {reviewSubmitted ? (
-                <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg px-4 py-3 text-sm">
-                  <CheckCircle2 size={15} /> Your review was submitted — thank you!
-                </div>
-              ) : (
-                <>
-                  <div className="flex items-center gap-1 mb-3">
-                    {[1,2,3,4,5].map((s) => (
-                      <button
-                        key={s}
-                        onMouseEnter={() => setHoverStar(s)}
-                        onMouseLeave={() => setHoverStar(0)}
-                        onClick={() => setPickedStar(s)}
-                        className="transition-transform hover:scale-125"
-                      >
-                        <Star size={30}
-                          className={s <= (hoverStar || pickedStar) ? "fill-amber-400 text-amber-400" : "text-stone-200"} />
-                      </button>
-                    ))}
-                  </div>
-                  <textarea
-                    rows={3}
-                    placeholder={`Share your experience as ${profile.name.split(" ")[0]}'s neighbor…`}
-                    value={reviewText}
-                    onChange={(e) => setReviewText(e.target.value)}
-                    className="w-full bg-muted rounded-lg px-3 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
-                  />
-                  <button
-                    onClick={submitReview}
-                    disabled={!pickedStar || !reviewText.trim()}
-                    className={`mt-2 ${T.btn} text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-40`}
-                  >
-                    Submit Review
-                  </button>
-                </>
-              )}
-            </div>
-
-            {reviews.map((r) => (
-              <div key={r.id} className="bg-white rounded-xl border border-border p-5">
-                <div className="flex items-start gap-3">
-                  <Avatar name={r.author} size="sm" />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-semibold">{r.author}</span>
-                      <span className="text-xs text-muted-foreground">{r.date}</span>
-                    </div>
-                    <p className="text-sm text-foreground/80 leading-relaxed mt-2">{r.body}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {cropSrc && (
-        <CropModal
-          src={cropSrc}
-          mode={cropMode}
-          onApply={(url) => {
-            if (cropMode === "avatar") applyAvatar(url);
-            else setCoverUrl(url);
-            setCropSrc(null);
-          }}
-          onClose={() => setCropSrc(null)}
-        />
-      )}
-
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-border flex items-stretch h-16">
-        {[
-          { label: "Home", icon: <Home size={20} />, action: onBack },
-          { label: "Search", icon: <Search size={20} />, action: () => {} },
-          { label: "Post", icon: <Plus size={20} />, action: () => {} },
-        ].map(({ label, icon, action }) => (
-          <button
-            key={label}
-            onClick={action}
-            className={`flex-1 flex flex-col items-center justify-center gap-1 text-xs font-medium transition-colors ${
-              label === "Post"
-                ? `${T.btn} text-white mx-4 my-2 rounded-xl`
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {icon}
-            {label}
-          </button>
-        ))}
+          ) : (
+            <p className="text-sm text-foreground/80 leading-relaxed">{profile.bio}</p>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
 // ─── Search View ─────────────────────────────────────────────────────────────
-
-function SearchView({
-  onBack,
-  onUserClick,
-  onBusinessClick,
-  groups,
-  activeLocation,
-}: {
+function SearchView({ onBack, onUserClick, onBusinessClick, groups, activeLocation }: {
   onBack: () => void;
   onUserClick: (name: string) => void;
   onBusinessClick: (id: number) => void;
-  groups: { id: number; name: string; description: string; members: number; joined: boolean; city: string }[];
+  groups: any[];
   activeLocation: LocationName;
 }) {
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<"all" | "people" | "businesses" | "groups">("all");
-
   const q = query.toLowerCase().trim();
-  const locFilter = (city: string) => activeLocation === "All Areas" || city === activeLocation;
 
-  const matchedPeople = Object.values(USER_PROFILES).filter(
-    (p) =>
-      locFilter(p.city) &&
-      (filter === "all" || filter === "people") &&
-      (q === "" || p.name.toLowerCase().includes(q) || p.neighborhood.toLowerCase().includes(q)),
-  );
-
-  const matchedBusinesses = BUSINESSES.filter(
-    (b) =>
-      locFilter(b.city) &&
-      (filter === "all" || filter === "businesses") &&
-      (q === "" || b.name.toLowerCase().includes(q) || b.category.toLowerCase().includes(q)),
-  );
-
-  const matchedGroups = groups.filter(
-    (g) =>
-      locFilter(g.city) &&
-      (filter === "all" || filter === "groups") &&
-      (q === "" || g.name.toLowerCase().includes(q) || g.description.toLowerCase().includes(q)),
-  );
-
-  const filters: { key: typeof filter; label: string }[] = [
-    { key: "all", label: "All" },
-    { key: "people", label: "People" },
-    { key: "businesses", label: "Businesses" },
-    { key: "groups", label: "Groups" },
-  ];
+  const matchedPeople = Object.values(USER_PROFILES).filter((p) => q === "" || p.name.toLowerCase().includes(q));
+  const matchedBusinesses = BUSINESSES.filter((b) => q === "" || b.name.toLowerCase().includes(q));
 
   return (
-    <div className="min-h-screen bg-purple-950 font-['DM_Sans',sans-serif] pb-20">
-      <div className="sticky top-0 z-40 bg-card border-b border-border shadow-sm px-4 py-3 flex items-center gap-3">
-        <button onClick={onBack} className="text-muted-foreground hover:text-foreground transition-colors p-1">
-          <ChevronLeft size={20} />
-        </button>
+    <div className="min-h-screen bg-purple-950 font-['DM_Sans',sans-serif] pb-20 text-white">
+      <div className="sticky top-0 z-40 bg-card text-foreground border-b border-border p-4 flex items-center gap-3">
+        <button onClick={onBack} className="text-muted-foreground hover:text-foreground"><ChevronLeft size={20} /></button>
         <div className="flex-1 flex items-center gap-2 bg-muted rounded-xl px-3 py-2">
-          <Search size={16} className="text-muted-foreground flex-shrink-0" />
-          <input
-            autoFocus
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search people, businesses, groups…"
-            className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
-          />
-          {query && (
-            <button onClick={() => setQuery("")} className="text-muted-foreground hover:text-foreground">
-              <X size={14} />
-            </button>
-          )}
+          <Search size={16} className="text-muted-foreground" />
+          <input autoFocus type="text" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search people, businesses..." className="flex-1 bg-transparent text-sm focus:outline-none" />
         </div>
       </div>
-
-      <div className="px-4 py-3 flex gap-2 overflow-x-auto">
-        {filters.map((f) => (
-          <button
-            key={f.key}
-            onClick={() => setFilter(f.key)}
-            className={`flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-              filter === f.key
-                ? "bg-primary text-primary-foreground"
-                : "bg-card text-muted-foreground hover:text-foreground border border-border"
-            }`}
-          >
-            {f.label}
+      <div className="p-4 max-w-2xl mx-auto flex flex-col gap-3">
+        {matchedPeople.map((p) => (
+          <button key={p.name} onClick={() => onUserClick(p.name)} className="bg-card text-foreground p-3 rounded-xl border border-border flex items-center gap-3 text-left">
+            <Avatar name={p.name} size="md" />
+            <div><p className="font-semibold text-sm">{p.name}</p><p className="text-xs text-muted-foreground">{p.neighborhood}</p></div>
           </button>
         ))}
-      </div>
-
-      <div className="px-4 flex flex-col gap-4 pb-6">
-        {/* People */}
-        {matchedPeople.length > 0 && (
-          <section>
-            {(filter === "all") && <h3 className="text-xs font-semibold uppercase tracking-wide text-purple-300 mb-2">People</h3>}
-            <div className="flex flex-col gap-2">
-              {matchedPeople.map((p) => (
-                <button
-                  key={p.name}
-                  onClick={() => onUserClick(p.name)}
-                  className="bg-card rounded-xl border border-border p-3 flex items-center gap-3 text-left hover:border-primary/30 transition-colors"
-                >
-                  <Avatar name={p.name} size="md" />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm text-foreground truncate">{p.name}</p>
-                    <p className="text-xs text-muted-foreground truncate">{p.neighborhood} · {p.posts} posts</p>
-                  </div>
-                  <ChevronRight size={16} className="text-muted-foreground flex-shrink-0" />
-                </button>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Businesses */}
-        {matchedBusinesses.length > 0 && (
-          <section>
-            {(filter === "all") && <h3 className="text-xs font-semibold uppercase tracking-wide text-purple-300 mb-2">Businesses</h3>}
-            <div className="flex flex-col gap-2">
-              {matchedBusinesses.map((b) => (
-                <button
-                  key={b.id}
-                  onClick={() => onBusinessClick(b.id)}
-                  className="bg-card rounded-xl border border-border p-3 flex items-center gap-3 text-left hover:border-primary/30 transition-colors"
-                >
-                  <div className="w-10 h-10 rounded-xl bg-secondary text-primary flex items-center justify-center flex-shrink-0 font-bold text-sm">
-                    {b.name.slice(0, 2).toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm text-foreground truncate">{b.name}</p>
-                    <p className="text-xs text-muted-foreground">{b.category} · ⭐ {b.rating} ({b.reviewCount})</p>
-                  </div>
-                  <ChevronRight size={16} className="text-muted-foreground flex-shrink-0" />
-                </button>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Groups */}
-        {matchedGroups.length > 0 && (
-          <section>
-            {(filter === "all") && <h3 className="text-xs font-semibold uppercase tracking-wide text-purple-300 mb-2">Groups</h3>}
-            <div className="flex flex-col gap-2">
-              {matchedGroups.map((g) => (
-                <div key={g.id} className="bg-card rounded-xl border border-border p-3 flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-secondary text-primary flex items-center justify-center flex-shrink-0">
-                    <Users size={18} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm text-foreground truncate">{g.name}</p>
-                    <p className="text-xs text-muted-foreground truncate">{g.description}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{g.members} members</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {q && matchedPeople.length === 0 && matchedBusinesses.length === 0 && matchedGroups.length === 0 && (
-          <div className="text-center py-12">
-            <Search size={32} className="text-purple-400 mx-auto mb-3" />
-            <p className="text-purple-200 font-medium">No results for "{query}"</p>
-            <p className="text-purple-400 text-sm mt-1">Try a different name or category</p>
-          </div>
-        )}
-
-        {!q && (
-          <div className="text-center py-12">
-            <Search size={32} className="text-purple-400 mx-auto mb-3" />
-            <p className="text-purple-200 font-medium">Search Neighborly</p>
-            <p className="text-purple-400 text-sm mt-1">Find neighbors, businesses, and community groups</p>
-          </div>
-        )}
+        {matchedBusinesses.map((b) => (
+          <button key={b.id} onClick={() => onBusinessClick(b.id)} className="bg-card text-foreground p-3 rounded-xl border border-border flex items-center gap-3 text-left">
+            <div className="w-10 h-10 rounded-xl bg-secondary text-primary flex items-center justify-center font-bold text-sm">{b.name.slice(0, 2)}</div>
+            <div><p className="font-semibold text-sm">{b.name}</p><p className="text-xs text-muted-foreground">{b.category} · ⭐ {b.rating}</p></div>
+          </button>
+        ))}
       </div>
     </div>
   );
 }
 
 // ─── Events View ──────────────────────────────────────────────────────────────
-
-function EventsView({ onBack, activeLocation }: { onBack: () => void; activeLocation: LocationName }) {
-  const allEvents = [
-    { id: 1, city: "Michigan City", title: "Community Cleanup", date: "Sat Aug 16", time: "9:00 AM", location: "Riverside Park", going: 34, icon: <Leaf size={16} />, color: "bg-emerald-50 text-emerald-700", desc: "Join neighbors for our monthly cleanup. Gloves and bags provided!" },
-    { id: 2, city: "La Porte", title: "Farmer's Market", date: "Sun Aug 17", time: "8:00 AM", location: "Main Street Plaza", going: 87, icon: <ShoppingBag size={16} />, color: "bg-amber-50 text-amber-700", desc: "Local vendors, fresh produce, and homemade goods every Sunday." },
-    { id: 3, city: "La Porte", title: "Block Party Planning", date: "Tue Aug 19", time: "7:00 PM", location: "Community Center", going: 22, icon: <Users size={16} />, color: "bg-blue-50 text-blue-700", desc: "Help plan the annual block party. All ideas welcome!" },
-    { id: 4, city: "New Buffalo", title: "Book Club Meetup", date: "Thu Aug 21", time: "6:30 PM", location: "Public Library", going: 15, icon: <Star size={16} />, color: "bg-purple-50 text-purple-700", desc: "This month: 'The Midnight Library'. Newcomers always welcome." },
-    { id: 5, city: "Long Beach", title: "Youth Soccer Practice", date: "Sat Aug 23", time: "10:00 AM", location: "Elm Street Field", going: 28, icon: <Zap size={16} />, color: "bg-rose-50 text-rose-700", desc: "Open practice for kids ages 6–12. Bring water and sunscreen." },
-  ];
-  const visibleEvents = activeLocation === "All Areas" ? allEvents : allEvents.filter((e) => e.city === activeLocation);
-
+function EventsView({ onBack }: { onBack: () => void }) {
   return (
-    <div className="min-h-screen bg-purple-950 font-['DM_Sans',sans-serif] pb-20">
-      <div className="sticky top-0 z-40 bg-card border-b border-border shadow-sm">
-        <div className="px-4 h-14 flex items-center gap-3">
-          <button onClick={onBack} className="text-muted-foreground hover:text-foreground transition-colors p-1">
-            <ChevronLeft size={20} />
-          </button>
-          <div className="flex items-center gap-2">
-            <CalendarDays size={18} className="text-primary" />
-            <h1 className="font-['Playfair_Display',serif] font-bold text-lg text-foreground">Upcoming Events</h1>
-          </div>
-        </div>
+    <div className="min-h-screen bg-purple-950 font-['DM_Sans',sans-serif] pb-20 text-white">
+      <div className="sticky top-0 z-40 bg-card text-foreground border-b border-border p-4 flex items-center gap-3">
+        <button onClick={onBack}><ChevronLeft size={20} /></button>
+        <h1 className="font-bold text-lg">Upcoming Events</h1>
       </div>
-
-      {activeLocation !== "All Areas" && (
-        <div className="px-4 pt-3 flex items-center gap-2">
-          <MapPin size={13} className="text-purple-300" />
-          <span className="text-xs font-semibold uppercase tracking-wide text-purple-300 font-['DM_Sans',sans-serif]">{activeLocation}</span>
-        </div>
-      )}
-      {visibleEvents.length === 0 && (
-        <div className="text-center py-14 px-4">
-          <CalendarDays size={32} className="text-purple-400 mx-auto mb-3" />
-          <p className="text-purple-100 font-semibold font-['DM_Sans',sans-serif]">No events in {activeLocation}</p>
-          <p className="text-purple-400 text-sm mt-1 font-['DM_Sans',sans-serif]">Check back soon or switch to All Areas</p>
-        </div>
-      )}
-      <div className="px-4 py-4 flex flex-col gap-3">
-        {visibleEvents.map((ev) => (
-          <div key={ev.id} className="bg-card rounded-xl border border-border overflow-hidden hover:border-primary/30 transition-colors">
-            <div className="p-4 flex gap-3">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${ev.color}`}>
-                {ev.icon}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-foreground">{ev.title}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{ev.date} · {ev.time} · {ev.location}</p>
-                <p className="text-sm text-foreground/80 mt-1.5">{ev.desc}</p>
-              </div>
-            </div>
-            <div className="px-4 pb-3 flex items-center justify-between border-t border-border pt-2">
-              <span className="text-xs text-muted-foreground">{ev.going} going</span>
-              <button className="px-4 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-medium hover:opacity-90 transition-opacity">
-                Join Event
-              </button>
-            </div>
+      <div className="p-4 max-w-2xl mx-auto flex flex-col gap-3">
+        {EVENTS.map((ev) => (
+          <div key={ev.id} className="bg-card text-foreground p-4 rounded-xl border border-border">
+            <p className="font-semibold">{ev.title}</p>
+            <p className="text-xs text-muted-foreground mt-1">{ev.date} · {ev.time} · {ev.going} going</p>
           </div>
         ))}
       </div>
@@ -2429,240 +601,210 @@ function EventsView({ onBack, activeLocation }: { onBack: () => void; activeLoca
 }
 
 // ─── Classifieds View ─────────────────────────────────────────────────────────
-
-function ClassifiedsView({
-  posts,
-  onBack,
-  onUserClick,
-  activeLocation,
-}: {
-  posts: Post[];
-  onBack: () => void;
-  onUserClick: (name: string) => void;
-  activeLocation: LocationName;
-}) {
-  const [search, setSearch] = useState("");
-  const locationPosts = activeLocation === "All Areas" ? posts : posts.filter((p) => p.city === activeLocation);
-  const filtered = locationPosts.filter(
-    (p) => search === "" || p.body.toLowerCase().includes(search.toLowerCase()) || (p.title ?? "").toLowerCase().includes(search.toLowerCase()),
-  );
-
+function ClassifiedsView({ posts, onBack }: { posts: Post[]; onBack: () => void }) {
   return (
-    <div className="min-h-screen bg-purple-950 font-['DM_Sans',sans-serif] pb-20">
-      <div className="sticky top-0 z-40 bg-card border-b border-border shadow-sm">
-        <div className="px-4 h-14 flex items-center gap-3">
-          <button onClick={onBack} className="text-muted-foreground hover:text-foreground transition-colors p-1">
-            <ChevronLeft size={20} />
-          </button>
-          <div className="flex items-center gap-2">
-            <ShoppingBag size={18} className="text-primary" />
-            <h1 className="font-['Playfair_Display',serif] font-bold text-lg text-foreground">Classifieds</h1>
-          </div>
-        </div>
-        <div className="px-4 pb-3">
-          <div className="flex items-center gap-2 bg-muted rounded-xl px-3 py-2">
-            <Search size={14} className="text-muted-foreground flex-shrink-0" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search listings…"
-              className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
-            />
-          </div>
-        </div>
+    <div className="min-h-screen bg-purple-950 font-['DM_Sans',sans-serif] pb-20 text-white">
+      <div className="sticky top-0 z-40 bg-card text-foreground border-b border-border p-4 flex items-center gap-3">
+        <button onClick={onBack}><ChevronLeft size={20} /></button>
+        <h1 className="font-bold text-lg">Classifieds</h1>
       </div>
-
-      <div className="px-4 py-4 flex flex-col gap-3">
-        {filtered.length === 0 ? (
-          <div className="text-center py-12">
-            <ShoppingBag size={32} className="text-purple-400 mx-auto mb-3" />
-            <p className="text-purple-200 font-medium">No listings yet</p>
-            <p className="text-purple-400 text-sm mt-1">Be the first to post something for sale</p>
+      <div className="p-4 max-w-2xl mx-auto flex flex-col gap-3">
+        {posts.map((p) => (
+          <div key={p.id} className="bg-card text-foreground p-4 rounded-xl border border-border">
+            <p className="font-semibold">{p.title}</p>
+            <p className="text-sm mt-1">{p.body}</p>
           </div>
-        ) : (
-          filtered.map((post) => (
-            <div key={post.id} className="bg-card rounded-xl border border-border overflow-hidden hover:border-primary/30 transition-colors">
-              {post.image && (
-                <img src={post.image} alt={post.title} className="w-full h-40 object-cover" />
-              )}
-              <div className="p-4">
-                <div className="flex items-start gap-3">
-                  <button onClick={() => onUserClick(post.author)}>
-                    <Avatar name={post.author} size="sm" />
-                  </button>
-                  <div className="flex-1 min-w-0">
-                    <button onClick={() => onUserClick(post.author)} className="font-semibold text-sm text-foreground hover:text-primary transition-colors">{post.author}</button>
-                    <p className="text-xs text-muted-foreground">{post.neighborhood} · {post.time}</p>
-                  </div>
-                </div>
-                {post.title && <p className="font-semibold text-foreground mt-2">{post.title}</p>}
-                <p className="text-sm text-foreground/80 mt-1">{post.body}</p>
-                <div className="flex gap-2 mt-3">
-                  <button className="flex-1 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
-                    Message Seller
-                  </button>
-                  <button className="px-3 py-2 border border-border rounded-lg text-muted-foreground hover:bg-muted transition-colors">
-                    <Bookmark size={16} />
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))
-        )}
+        ))}
       </div>
     </div>
   );
 }
 
-// ─── Advertise Modal ─────────────────────────────────────────────────────────
-function AdvertiseModal({ onClose }: { onClose: () => void }) {
-  const [submitted, setSubmitted] = useState(false);
-  const [pkg, setPkg] = useState("spotlight");
+// ─── Messages View ────────────────────────────────────────────────────────────
+function MessagesView({
+  currentUser,
+  onBack,
+}: {
+  currentUser: string;
+  onBack: () => void;
+}) {
+  const [activeContact, setActiveContact] = useState<string>("James Whitfield");
+  const [messages, setMessages] = useState<Message[]>([
+    { id: 1, sender: "James Whitfield", recipient: currentUser, text: "Hey! Are you still joining the community cleanup this weekend?", time: "10:30 AM" },
+    { id: 2, sender: currentUser, recipient: "James Whitfield", text: "Yes absolutely! Bringing supplies.", time: "10:32 AM" },
+  ]);
+  const [inputText, setInputText] = useState("");
+
+  const contacts = ["James Whitfield", "Nadia Petrov", "Grace Okonkwo", "Maria Santos", "Martinez Plumbing"];
+
+  const chatMessages = messages.filter(
+    (m) =>
+      (m.sender === currentUser && m.recipient === activeContact) ||
+      (m.sender === activeContact && m.recipient === currentUser)
+  );
+
+  function handleSend() {
+    if (!inputText.trim()) return;
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: Date.now(),
+        sender: currentUser,
+        recipient: activeContact,
+        text: inputText.trim(),
+        time: "Just now",
+      },
+    ]);
+    setInputText("");
+  }
 
   return (
-    <Dialog.Root open onOpenChange={(o) => { if (!o) onClose(); }}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/60 z-[60] backdrop-blur-sm animate-in fade-in-0" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[61] bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in-0 zoom-in-95" aria-describedby={undefined}>
-          
-          <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-            <Dialog.Title className="font-semibold text-lg flex items-center gap-2">
-              <Megaphone size={18} className="text-blue-600" /> Advertise With Us
-            </Dialog.Title>
-            <Dialog.Close onClick={onClose} className="text-muted-foreground hover:bg-muted p-1.5 rounded-lg transition-colors">
-              <X size={16} />
-            </Dialog.Close>
+    <div className="min-h-screen bg-purple-950 font-['DM_Sans',sans-serif] pb-20 text-white">
+      <div className="sticky top-0 z-40 bg-card text-foreground border-b border-border p-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <button onClick={onBack} className="text-muted-foreground hover:text-foreground">
+            <ChevronLeft size={20} />
+          </button>
+          <h1 className="font-bold text-lg">Messages</h1>
+        </div>
+      </div>
+
+      <div className="max-w-4xl mx-auto p-4 grid grid-cols-1 md:grid-cols-[260px_1fr] gap-4 h-[calc(100vh-120px)]">
+        {/* Contacts Sidebar */}
+        <div className="bg-card text-foreground rounded-2xl border border-border overflow-hidden flex flex-col">
+          <div className="p-3 border-b border-border font-semibold text-sm">Conversations</div>
+          <div className="overflow-y-auto flex-1">
+            {contacts.map((contact) => (
+              <button
+                key={contact}
+                onClick={() => setActiveContact(contact)}
+                className={`w-full flex items-center gap-3 p-3 text-left transition-colors border-b border-border/40 ${
+                  activeContact === contact ? "bg-secondary font-semibold" : "hover:bg-secondary/50"
+                }`}
+              >
+                <Avatar name={contact} size="sm" />
+                <span className="text-sm truncate">{contact}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Chat Window */}
+        <div className="bg-card text-foreground rounded-2xl border border-border flex flex-col overflow-hidden">
+          <div className="p-3 border-b border-border flex items-center gap-3 bg-secondary/30">
+            <Avatar name={activeContact} size="sm" />
+            <span className="font-semibold text-sm">{activeContact}</span>
           </div>
 
-          <div className="p-5">
-            {submitted ? (
-              <div className="text-center py-6">
-                <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <CheckCircle2 size={24} />
-                </div>
-                <h3 className="font-semibold text-lg mb-2">Request Received!</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Our team will review your ad request and reach out via email within 24 hours.
-                </p>
-                <button onClick={onClose} className="bg-blue-600 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">
-                  Done
-                </button>
-              </div>
+          <div className="flex-1 p-4 overflow-y-auto flex flex-col gap-3">
+            {chatMessages.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center my-auto">No messages yet. Say hello!</p>
             ) : (
-              <div className="flex flex-col gap-4">
-                <p className="text-sm text-muted-foreground">Reach neighbors directly by promoting your local business on the Neighborly feed.</p>
-                
-                <div>
-                  <label className="text-xs font-semibold uppercase text-muted-foreground mb-2 block">Select a Package</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button 
-                      onClick={() => setPkg("spotlight")}
-                      className={`p-3 text-left border rounded-xl transition-colors ${pkg === "spotlight" ? "border-blue-600 bg-blue-50 ring-1 ring-blue-600" : "border-border hover:border-blue-600/40"}`}
+              chatMessages.map((m) => {
+                const isMe = m.sender === currentUser;
+                return (
+                  <div key={m.id} className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}>
+                    <div
+                      className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm ${
+                        isMe ? "bg-blue-600 text-white rounded-br-none" : "bg-muted text-foreground rounded-bl-none"
+                      }`}
                     >
-                      <p className="font-semibold text-sm text-blue-700">Sidebar Spotlight</p>
-                      <p className="text-xs text-muted-foreground mt-1">$15 / week</p>
-                    </button>
-                    <button 
-                      onClick={() => setPkg("takeover")}
-                      className={`p-3 text-left border rounded-xl transition-colors ${pkg === "takeover" ? "border-amber-500 bg-amber-50 ring-1 ring-amber-500" : "border-border hover:border-amber-500/40"}`}
-                    >
-                      <p className="font-semibold text-sm text-amber-700">Feed Takeover</p>
-                      <p className="text-xs text-muted-foreground mt-1">$30 / week</p>
-                    </button>
+                      {m.text}
+                    </div>
+                    <span className="text-[10px] text-muted-foreground mt-1 px-1">{m.time}</span>
                   </div>
-                </div>
-
-                <div className="space-y-3 mt-2">
-                  <input type="text" placeholder="Business Name" className="w-full bg-muted rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600/30 border border-transparent" />
-                  <input type="text" placeholder="Headline (e.g., Grand Opening!)" className="w-full bg-muted rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600/30 border border-transparent" />
-                  <textarea rows={2} placeholder="Ad description..." className="w-full bg-muted rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600/30 border border-transparent resize-none" />
-                  <input type="url" placeholder="Website Link (Optional)" className="w-full bg-muted rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600/30 border border-transparent" />
-                </div>
-
-                <button 
-                  onClick={() => setSubmitted(true)}
-                  className="w-full mt-2 bg-blue-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-                >
-                  Submit Ad Request
-                </button>
-              </div>
+                );
+              })
             )}
           </div>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+
+          <div className="p-3 border-t border-border bg-secondary/30 flex gap-2">
+            <input
+              type="text"
+              placeholder={`Message ${activeContact}...`}
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSend()}
+              className="flex-1 bg-background border border-border rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600/30"
+            />
+            <button
+              onClick={handleSend}
+              className="bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors flex items-center justify-center"
+            >
+              <Send size={16} />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
 // ─── Main App ─────────────────────────────────────────────────────────────────
 
-type ActiveTab = "all" | PostCategory;
-
 export default function App() {
   const [posts, setPosts] = useState<Post[]>(INITIAL_POSTS);
-  const [activeTab, setActiveTab] = useState<ActiveTab>("all");
-  const [expandedPost, setExpandedPost] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<string>("all");
   const [composing, setComposing] = useState(false);
   const [newPostText, setNewPostText] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<PostCategory>("general");
-  const [classifiedPosts, setClassifiedPosts] = useState<Post[]>(
-    INITIAL_POSTS.filter((p) => p.category === "forsale"),
-  );
-  const [commentDraft, setCommentDraft] = useState<Record<number, string>>({});
+  const [classifiedPosts, setClassifiedPosts] = useState<Post[]>([]);
   const [notifOpen, setNotifOpen] = useState(false);
-  const [view, setView] = useState<ActiveView>({
-    page: "auth",
-    mode: "signin",
-  });
-  const [advertiseOpen, setAdvertiseOpen] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [view, setView] = useState<ActiveView>({ page: "auth", mode: "signin" });
   const [myAvatarUrl, setMyAvatarUrl] = useState<string | null>(null);
-  const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   const [activeLocation, setActiveLocation] = useState<LocationName>("All Areas");
   const [locationOpen, setLocationOpen] = useState(false);
+  const [currentUserName, setCurrentUserName] = useState<string>("Ashlie Wyse");
   const [groups, setGroups] = useState([
     { id: 1, name: "🪴 Plant & Garden Club", description: "Share tips, seeds, and local plant swaps", members: 142, joined: false, city: "Michigan City" },
     { id: 2, name: "🐾 Local Pet Owners", description: "Pet-friendly spots and vet recommendations", members: 98, joined: true, city: "Long Beach" },
-    { id: 3, name: "🛠️ DIY & Handyman", description: "Home improvement tips from neighbors", members: 215, joined: false, city: "New Buffalo" },
-    { id: 4, name: "📰 Local News Watch", description: "Breaking news and local updates for La Porte", members: 76, joined: false, city: "La Porte" },
   ]);
 
   function toggleJoinGroup(id: number) {
     setGroups((prev) => prev.map((g) => g.id === id ? { ...g, joined: !g.joined } : g));
   }
 
-  function goToBusiness(id: number) {
-    setView({ page: "business", id });
-    setNotifOpen(false);
-  }
-  function goToUser(name: string) {
-    if (USER_PROFILES[name]) setView({ page: "user", name });
-  }
-  function goToFeed() {
-    setView({ page: "feed" });
-  }
+  function goToFeed() { setView({ page: "feed" }); }
+  function goToUser(name: string) { if (USER_PROFILES[name]) setView({ page: "user", name }); }
+  function goToBusiness(id: number) { setView({ page: "business", id }); }
 
   if (view.page === "auth") {
     return (
       <AuthView
         mode={view.mode}
         onSwitchMode={(mode) => setView({ page: "auth", mode })}
-        onSuccess={() => setView({ page: "feed" })}
+        onSuccess={(loggedInName) => {
+          setCurrentUserName(loggedInName);
+          if (!USER_PROFILES[loggedInName]) {
+            USER_PROFILES[loggedInName] = {
+              name: loggedInName,
+              neighborhood: "Michigan City",
+              city: "Michigan City",
+              joinDate: "August 2026",
+              bio: "Active member of the neighborhood community.",
+              badges: ["newcomer"],
+              posts: 0,
+              neighbors: 1,
+              helpfulVotes: 0,
+              recsGiven: 0,
+              rating: 5.0,
+              ratingCount: 1,
+              neighborReviews: [],
+              galleryPhotos: [],
+              recentActivity: [{ type: "post", text: "Joined Neighborly", time: "Just now" }],
+            };
+          }
+          setView({ page: "feed" });
+        }}
       />
     );
   }
+
   if (view.page === "business") {
     const biz = BUSINESSES.find((b) => b.id === view.id);
-    if (biz)
-      return (
-        <BusinessProfileView
-          biz={biz}
-          onBack={goToFeed}
-          onUserClick={goToUser}
-        />
-      );
+    if (biz) return <BusinessProfileView biz={biz} onBack={goToFeed} />;
   }
+
   if (view.page === "user") {
     const profile = USER_PROFILES[view.name];
     if (profile)
@@ -2670,78 +812,50 @@ export default function App() {
         <UserProfileView
           profile={profile}
           onBack={goToFeed}
-          isOwnProfile={view.name === "Maria Santos"}
-          myAvatarUrl={view.name === "Maria Santos" ? myAvatarUrl : null}
-          onAvatarChange={view.name === "Maria Santos" ? setMyAvatarUrl : undefined}
+          isOwnProfile={view.name === currentUserName}
+          myAvatarUrl={view.name === currentUserName ? myAvatarUrl : null}
+          onAvatarChange={view.name === currentUserName ? setMyAvatarUrl : undefined}
+          onProfileUpdate={(updated) => {
+            USER_PROFILES[view.name] = { ...profile, ...updated };
+            if (updated.name && updated.name !== view.name) {
+              USER_PROFILES[updated.name] = USER_PROFILES[view.name];
+              delete USER_PROFILES[view.name];
+              setCurrentUserName(updated.name);
+              setView({ page: "user", name: updated.name });
+            } else {
+              setView({ ...view });
+            }
+          }}
         />
       );
   }
 
   if (view.page === "search") {
-    return (
-      <SearchView
-        onBack={goToFeed}
-        onUserClick={(name) => { if (USER_PROFILES[name]) setView({ page: "user", name }); }}
-        onBusinessClick={(id) => setView({ page: "business", id })}
-        groups={groups}
-        activeLocation={activeLocation}
-      />
-    );
+    return <SearchView onBack={goToFeed} onUserClick={goToUser} onBusinessClick={goToBusiness} groups={groups} activeLocation={activeLocation} />;
   }
 
   if (view.page === "events") {
-    return <EventsView onBack={goToFeed} activeLocation={activeLocation} />;
+    return <EventsView onBack={goToFeed} />;
   }
 
   if (view.page === "classifieds") {
-    return (
-      <ClassifiedsView
-        posts={classifiedPosts}
-        onBack={goToFeed}
-        onUserClick={(name) => { if (USER_PROFILES[name]) setView({ page: "user", name }); }}
-        activeLocation={activeLocation}
-      />
-    );
+    return <ClassifiedsView posts={classifiedPosts} onBack={goToFeed} />;
   }
 
-  const locationFilteredPosts =
-    activeLocation === "All Areas"
-      ? posts
-      : posts.filter((p) => p.city === activeLocation);
-
-  const filteredPosts =
-    activeTab === "all"
-      ? locationFilteredPosts
-      : locationFilteredPosts.filter((p) => p.category === activeTab);
-
-  function toggleLike(id: number) {
-    setPosts((prev) =>
-      prev.map((p) =>
-        p.id === id
-          ? {
-              ...p,
-              liked: !p.liked,
-              likes: p.liked ? p.likes - 1 : p.likes + 1,
-            }
-          : p,
-      ),
-    );
+  if (view.page === "messages") {
+    return <MessagesView currentUser={currentUserName} onBack={goToFeed} />;
   }
-  function toggleBookmark(id: number) {
-    setPosts((prev) =>
-      prev.map((p) =>
-        p.id === id ? { ...p, bookmarked: !p.bookmarked } : p,
-      ),
-    );
-  }
+
+  const locationFilteredPosts = activeLocation === "All Areas" ? posts : posts.filter((p) => p.city === activeLocation);
+  const filteredPosts = activeTab === "all" ? locationFilteredPosts : locationFilteredPosts.filter((p) => p.category === activeTab);
+
   function handleCreatePost() {
     const text = newPostText.trim();
     if (!text) return;
-
     const postCity = activeLocation === "All Areas" ? "Michigan City" : activeLocation;
     const newPost: Post = {
       id: Date.now(),
-      author: "Maria Santos",
+      author: currentUserName,
       authorBadges: ["champion"],
       neighborhood: postCity,
       city: postCity,
@@ -2753,788 +867,144 @@ export default function App() {
       bookmarked: false,
       liked: false,
     };
-
-    setPosts((prev) => [newPost, ...prev]);
-
-    if (selectedCategory === "forsale") {
-      setClassifiedPosts((prev) => [newPost, ...prev]);
-    }
-
+    setPosts([newPost, ...posts]);
+    if (selectedCategory === "forsale") setClassifiedPosts([newPost, ...classifiedPosts]);
     setNewPostText("");
-    setSelectedCategory("general");
     setComposing(false);
-  }
-  function submitComment(postId: number) {
-    const text = (commentDraft[postId] || "").trim();
-    if (!text) return;
-    setPosts((prev) =>
-      prev.map((p) =>
-        p.id === postId
-          ? {
-              ...p,
-              comments: [
-                ...p.comments,
-                {
-                  id: Date.now(),
-                  author: "You",
-                  authorBadges: [],
-                  body: text,
-                  time: "Just now",
-                  likes: 0,
-                },
-              ],
-            }
-          : p,
-      ),
-    );
-    setCommentDraft((prev) => ({ ...prev, [postId]: "" }));
   }
 
   return (
-    <div className="min-h-screen bg-purple-950 font-['DM_Sans',sans-serif] relative">
-      {/* Top Header */}
+    <div className="min-h-screen bg-purple-950 font-['DM_Sans',sans-serif] relative pb-20 lg:pb-0">
       <header className="sticky top-0 z-40 bg-white border-b border-border shadow-sm">
         <div className="max-w-screen-2xl mx-auto px-6 h-16 flex items-center gap-4">
+          <span className="font-['Playfair_Display',serif] font-bold text-2xl bg-gradient-to-r from-purple-700 to-blue-500 bg-clip-text text-transparent tracking-tight">Neighborly</span>
 
-          {/* Neighborly wordmark */}
-          <div className="flex-shrink-0 flex items-center gap-2">
-            <span className="font-['Playfair_Display',serif] font-bold text-2xl bg-gradient-to-r from-purple-700 to-blue-500 bg-clip-text text-transparent tracking-tight leading-none">Neighborly</span>
-          </div>
-
-          {/* Location switcher */}
-          <div className="relative flex-shrink-0">
-            <button
-              onClick={() => setLocationOpen((o) => !o)}
-              className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors font-['DM_Sans',sans-serif]"
-            >
+          <div className="relative">
+            <button onClick={() => setLocationOpen((o) => !o)} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
               <MapPin size={14} className="text-primary" />
               <span className="font-medium">{activeLocation}</span>
-              <ChevronDown size={13} className={`transition-transform ${locationOpen ? "rotate-180" : ""}`} />
+              <ChevronDown size={13} />
             </button>
             {locationOpen && (
               <div className="absolute top-full left-0 mt-2 w-52 bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden">
-                <p className="px-3 pt-2.5 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground font-['DM_Sans',sans-serif]">Choose Area</p>
                 {LOCATIONS.map((loc) => (
-                  <button
-                    key={loc}
-                    onClick={() => { setActiveLocation(loc); setLocationOpen(false); }}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors font-['DM_Sans',sans-serif] ${
-                      activeLocation === loc
-                        ? "bg-primary/10 text-primary font-semibold"
-                        : "text-foreground hover:bg-secondary"
-                    }`}
-                  >
-                    <MapPin size={13} className={activeLocation === loc ? "text-primary" : "text-muted-foreground"} />
+                  <button key={loc} onClick={() => { setActiveLocation(loc); setLocationOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-secondary">
                     {loc}
-                    {activeLocation === loc && <CheckCircle2 size={13} className="ml-auto text-primary" />}
                   </button>
                 ))}
               </div>
             )}
-            {locationOpen && (
-              <div className="fixed inset-0 z-40" onClick={() => setLocationOpen(false)} />
-            )}
           </div>
 
-          {/* Desktop nav — center */}
           <nav className="hidden lg:flex items-center gap-1 mx-auto">
-            {[
-              { icon: <Home size={16} />, label: "Home", page: "feed" as const },
-              { icon: <CalendarDays size={16} />, label: "Events", page: "events" as const },
-              { icon: <Briefcase size={16} />, label: "Businesses", page: "feed" as const },
-              { icon: <ShoppingBag size={16} />, label: "Classifieds", page: "classifieds" as const },
-            ].map((item) => (
-              <button
-                key={item.label}
-                onClick={() => setView({ page: item.page })}
-                className={`flex flex-col items-center gap-0.5 px-4 py-2 rounded-lg transition-colors text-xs font-medium ${
-                  view.page === item.page && item.page !== "feed"
-                    ? "text-primary bg-secondary"
-                    : "text-muted-foreground hover:bg-secondary hover:text-primary"
-                }`}
-              >
-                {item.icon}
-                {item.label}
-              </button>
-            ))}
+            <button onClick={goToFeed} className="px-4 py-2 text-xs font-medium text-muted-foreground hover:text-primary">Home</button>
+            <button onClick={() => setView({ page: "events" })} className="px-4 py-2 text-xs font-medium text-muted-foreground hover:text-primary">Events</button>
+            <button onClick={() => setView({ page: "classifieds" })} className="px-4 py-2 text-xs font-medium text-muted-foreground hover:text-primary">Classifieds</button>
+            <button onClick={() => setView({ page: "messages" })} className="px-4 py-2 text-xs font-medium text-muted-foreground hover:text-primary">Messages</button>
+            <button onClick={() => setView({ page: "search" })} className="px-4 py-2 text-xs font-medium text-muted-foreground hover:text-primary">Search</button>
           </nav>
 
-          {/* Right side — bell + avatar */}
-          <div className="flex items-center gap-2 ml-auto flex-shrink-0">
-            <button
-              onClick={() => setNotifOpen(!notifOpen)}
-              className="relative p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <Bell size={18} />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-600 rounded-full border-2 border-white" />
-            </button>
-            <button onClick={() => goToUser("Maria Santos")}>
-              <Avatar name="Maria Santos" size="sm" src={myAvatarUrl} />
-            </button>
+          <div className="flex items-center gap-2 ml-auto">
+            <button onClick={() => setView({ page: "messages" })} className="relative p-2 rounded-lg hover:bg-secondary text-muted-foreground" title="Messages"><MessageSquare size={18} /></button>
+            <button onClick={() => setNotifOpen(!notifOpen)} className="relative p-2 rounded-lg hover:bg-secondary text-muted-foreground"><Bell size={18} /></button>
+            <button onClick={() => goToUser(currentUserName)}><Avatar name={currentUserName} size="sm" src={myAvatarUrl} /></button>
           </div>
         </div>
       </header>
 
-      {/* Floating Edge Toggle Button - Attached to Left Edge of Sidebar */}
-      <button
-        onClick={() => setSidebarOpen(!sidebarOpen)}
-        className={`fixed top-1/2 -translate-y-1/2 z-50 lg:hidden bg-purple-900 text-white p-2.5 rounded-l-xl shadow-lg hover:bg-purple-800 transition-all duration-300 ease-in-out flex items-center justify-center border-l border-t border-b border-purple-700 ${
-          sidebarOpen ? "right-72" : "right-0 rounded-l-xl rounded-r-none"
-        }`}
-        aria-label="Toggle Sidebar"
-      >
-        {sidebarOpen ? (
-          <ChevronRight size={20} className="text-white" />
-        ) : (
-          <ChevronLeft size={20} className="text-white animate-pulse" />
-        )}
-      </button>
-
-      {notifOpen && (
-        <div
-          className="fixed inset-0 z-50"
-          onClick={() => setNotifOpen(false)}
-        >
-          <div
-            className="absolute top-14 right-4 w-80 bg-white rounded-xl shadow-2xl border border-border overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-              <h3 className="font-semibold text-sm">Notifications</h3>
-              <button
-                onClick={() => setNotifOpen(false)}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <X size={15} />
-              </button>
-            </div>
-            {[
-              {
-                msg: "James liked your comment on the cleanup post",
-                time: "5m ago",
-                unread: true,
-              },
-              {
-                msg: "Priya commented on a Safety post you follow",
-                time: "1h ago",
-                unread: true,
-              },
-            ].map((n, i) => (
-              <div
-                key={i}
-                className={`px-4 py-3 flex gap-3 items-start hover:bg-secondary/50 cursor-pointer transition-colors ${n.unread ? "bg-blue-50/60" : ""}`}
-              >
-                {n.unread && (
-                  <span className="w-2 h-2 rounded-full bg-blue-600 mt-1.5 flex-shrink-0" />
-                )}
-                <div>
-                  <p className="text-sm">{n.msg}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{n.time}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       <main className="max-w-screen-2xl mx-auto px-6 py-6 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
-        
-        {/* Feed */}
         <section className="flex flex-col gap-4 min-w-0">
           {!composing ? (
-            <div
-              className="bg-card rounded-xl border border-border p-4 flex items-center gap-3 cursor-pointer hover:border-primary/30 transition-colors"
-              onClick={() => setComposing(true)}
-            >
-              <Avatar name="Maria Santos" size="md" src={myAvatarUrl} />
-              <div className="flex-1 bg-muted rounded-lg px-4 py-2.5 text-sm text-muted-foreground font-['DM_Sans',sans-serif]">
-                What's happening in Maplewood Heights?
-              </div>
-              <button className="flex items-center gap-1.5 bg-primary text-primary-foreground px-3 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
-                <Plus size={14} /> Post
-              </button>
+            <div className="bg-card rounded-xl border border-border p-4 flex items-center gap-3 cursor-pointer" onClick={() => setComposing(true)}>
+              <Avatar name={currentUserName} size="md" src={myAvatarUrl} />
+              <div className="flex-1 bg-muted rounded-lg px-4 py-2.5 text-sm text-muted-foreground">What's happening in your neighborhood?</div>
+              <button className="bg-primary text-primary-foreground px-3 py-2 rounded-lg text-sm font-medium"><Plus size={14} /> Post</button>
             </div>
           ) : (
             <div className="bg-card rounded-xl border border-primary/30 p-4 shadow-sm">
-              <div className="flex items-start gap-3">
-                <Avatar name="Maria Santos" size="md" src={myAvatarUrl} />
-                <div className="flex-1">
-                  <textarea
-                    autoFocus
-                    placeholder="Share something with your neighbors..."
-                    value={newPostText}
-                    onChange={(e) => setNewPostText(e.target.value)}
-                    className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none resize-none min-h-[80px] font-['DM_Sans',sans-serif]"
-                  />
-                  <div className="mt-3 pt-3 border-t border-border">
-                    <p className="text-xs font-medium text-muted-foreground mb-2 font-['DM_Sans',sans-serif]">Category</p>
-                    <div className="flex gap-1.5 flex-wrap mb-3">
-                      {(Object.keys(CATEGORY_META) as PostCategory[]).map((cat) => {
-                        const active = selectedCategory === cat;
-                        return (
-                          <button
-                            key={cat}
-                            onClick={() => setSelectedCategory(cat)}
-                            className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border font-medium transition-all font-['DM_Sans',sans-serif] ${CATEGORY_META[cat].color} ${
-                              active
-                                ? "ring-2 ring-offset-1 ring-current scale-105 shadow-sm"
-                                : "opacity-50 hover:opacity-80"
-                            }`}
-                          >
-                            {CATEGORY_META[cat].icon}
-                            {CATEGORY_META[cat].label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    {selectedCategory === "forsale" && (
-                      <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1.5 rounded-lg mb-2 flex items-center gap-1.5 font-['DM_Sans',sans-serif]">
-                        <ShoppingBag size={11} /> This post will also appear in Classifieds
-                      </p>
-                    )}
-                    <div className="flex justify-end gap-2">
-                      <button
-                        onClick={() => {
-                          setComposing(false);
-                          setNewPostText("");
-                          setSelectedCategory("general");
-                        }}
-                        className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors font-['DM_Sans',sans-serif]"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleCreatePost}
-                        disabled={!newPostText.trim()}
-                        className="px-4 py-1.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-40 font-['DM_Sans',sans-serif]"
-                      >
-                        Post
-                      </button>
-                    </div>
-                  </div>
-                </div>
+              <textarea autoFocus placeholder="Share something..." value={newPostText} onChange={(e) => setNewPostText(e.target.value)} className="w-full bg-transparent text-sm focus:outline-none resize-none min-h-[80px]" />
+              <div className="flex justify-end gap-2 mt-2">
+                <button onClick={() => setComposing(false)} className="px-3 py-1.5 text-sm">Cancel</button>
+                <button onClick={handleCreatePost} className="px-4 py-1.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium">Post</button>
               </div>
             </div>
           )}
 
-          {/* Location empty state */}
-          {filteredPosts.length === 0 && (
-            <div className="text-center py-14">
-              <MapPin size={32} className="text-purple-400 mx-auto mb-3" />
-              <p className="text-purple-100 font-semibold font-['DM_Sans',sans-serif]">No posts in {activeLocation}</p>
-              <p className="text-purple-400 text-sm mt-1 font-['DM_Sans',sans-serif]">Be the first to post something here</p>
-            </div>
-          )}
-
-          {filteredPosts.map((post, idx) => {
-            const showCityHeader =
-              activeLocation === "All Areas" &&
-              (idx === 0 || filteredPosts[idx - 1].city !== post.city);
-            const isLastInCity =
-              activeLocation === "All Areas" &&
-              (idx === filteredPosts.length - 1 || filteredPosts[idx + 1].city !== post.city);
-            const meta = CATEGORY_META[post.category];
-            const expanded = expandedPost === post.id;
-            return (
-              <React.Fragment key={post.id}>
-                {showCityHeader && (
-                  <div className={`flex items-center gap-2 px-1 ${idx > 0 ? "mt-2" : ""}`}>
-                    <MapPin size={13} className="text-purple-300 flex-shrink-0" />
-                    <span className="text-xs font-semibold uppercase tracking-wide text-purple-300 font-['DM_Sans',sans-serif]">
-                      {post.city}
-                    </span>
-                    <div className="flex-1 h-px bg-purple-800/40" />
-                  </div>
-                )}
-              <article
-                className="bg-card rounded-xl border border-border hover:border-primary/20 transition-colors overflow-hidden"
-              >
-                <div className="p-4 pb-0">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-start gap-3">
-                      <button
-                        onClick={() => goToUser(post.author)}
-                      >
-                        <Avatar name={post.author} size="md" />
-                      </button>
-                      <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <button
-                            onClick={() =>
-                              goToUser(post.author)
-                            }
-                            className="font-semibold text-sm hover:text-blue-600 transition-colors"
-                          >
-                            {post.author}
-                          </button>
-                          {post.authorBadges
-                            .slice(0, 2)
-                            .map((b) => (
-                              <UserBadgePill
-                                key={b}
-                                type={b}
-                                compact
-                              />
-                            ))}
-                          <span
-                            className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border font-medium ${meta.color}`}
-                          >
-                            {meta.icon} {meta.label}
-                          </span>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {post.neighborhood} · {post.time}
-                        </p>
-                      </div>
-                    </div>
-                    <button className="text-muted-foreground hover:text-foreground p-1 rounded">
-                      <MoreHorizontal size={16} />
-                    </button>
-                  </div>
-                  <div className="mt-3 mb-3">
-                    {post.title && (
-                      <h2 className="font-['Playfair_Display',serif] font-semibold text-base mb-1.5 leading-snug">
-                        {post.title}
-                      </h2>
-                    )}
-                    <p className="text-sm text-foreground/85 leading-relaxed">
-                      {post.body}
-                    </p>
-                  </div>
+          {filteredPosts.map((post) => (
+            <article key={post.id} className="bg-card rounded-xl border border-border p-4">
+              <div className="flex items-center gap-3">
+                <button onClick={() => goToUser(post.author)}><Avatar name={post.author} size="md" /></button>
+                <div>
+                  <button onClick={() => goToUser(post.author)} className="font-semibold text-sm">{post.author}</button>
+                  <p className="text-xs text-muted-foreground">{post.neighborhood} · {post.time}</p>
                 </div>
-                {post.image && (
-                  <div className="bg-muted">
-                    <img
-                      src={post.image}
-                      alt={post.title || "Post image"}
-                      className="w-full object-cover max-h-64"
-                    />
-                  </div>
-                )}
-
-                <div className="px-4 py-2.5 flex items-center justify-between border-t border-border">
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-4 h-4 rounded-full bg-blue-600 flex items-center justify-center">
-                      <ThumbsUp
-                        size={8}
-                        className="text-white"
-                      />
-                    </div>
-                    <span className="text-xs text-muted-foreground">
-                      {post.likes} neighbors
-                    </span>
-                  </div>
-                  <button
-                    onClick={() =>
-                      setExpandedPost(expanded ? null : post.id)
-                    }
-                    className="text-xs text-muted-foreground hover:text-blue-600 transition-colors"
-                  >
-                    {post.comments.length} comments
-                  </button>
-                </div>
-
-                <div className="px-4 pb-3 flex items-center gap-1 border-t border-border pt-2">
-                  <button
-                    onClick={() => toggleLike(post.id)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex-1 justify-center ${post.liked ? "bg-blue-600/10 text-blue-600" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}
-                  >
-                    <Heart
-                      size={14}
-                      className={
-                        post.liked
-                          ? "fill-blue-600 text-blue-600"
-                          : ""
-                      }
-                    />
-                    {post.liked ? "Liked" : "Like"}
-                  </button>
-                  <button
-                    onClick={() =>
-                      setExpandedPost(expanded ? null : post.id)
-                    }
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors flex-1 justify-center"
-                  >
-                    <MessageCircle size={14} />
-                    Comment
-                  </button>
-                  <button
-                    onClick={() => toggleBookmark(post.id)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex-1 justify-center ${post.bookmarked ? "bg-amber-50 text-amber-700" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}
-                  >
-                    <Bookmark
-                      size={14}
-                      className={
-                        post.bookmarked
-                          ? "fill-amber-600 text-amber-600"
-                          : ""
-                      }
-                    />
-                    Save
-                  </button>
-                  <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors flex-1 justify-center">
-                    <Share2 size={14} />
-                    Share
-                  </button>
-                </div>
-
-                {expanded && (
-                  <div className="border-t border-border bg-muted/40 px-4 py-3">
-                    <div className="flex flex-col gap-3 mb-3">
-                      {post.comments.map((c) => (
-                        <div
-                          key={c.id}
-                          className="flex gap-2.5"
-                        >
-                          <button
-                            onClick={() => goToUser(c.author)}
-                          >
-                            <Avatar name={c.author} size="sm" />
-                          </button>
-                          <div className="flex-1 bg-card rounded-lg px-3 py-2 border border-border">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <button
-                                onClick={() =>
-                                  goToUser(c.author)
-                                }
-                                className="text-sm font-semibold hover:text-blue-600 transition-colors"
-                              >
-                                {c.author}
-                              </button>
-                              {c.authorBadges
-                                .slice(0, 1)
-                                .map((b) => (
-                                  <UserBadgePill
-                                    key={b}
-                                    type={b}
-                                    compact
-                                  />
-                                ))}
-                              <span className="text-xs text-muted-foreground">
-                                {c.time}
-                              </span>
-                            </div>
-                            <p className="text-sm text-foreground/85 mt-0.5">
-                              {c.body}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="flex gap-2.5 items-center">
-                      <Avatar name="Maria Santos" size="sm" src={myAvatarUrl} />
-                      <div className="flex-1 flex items-center gap-2 bg-card rounded-lg border border-border px-3 py-2 focus-within:border-blue-600/40 transition-colors">
-                        <input
-                          type="text"
-                          placeholder="Write a comment..."
-                          value={commentDraft[post.id] || ""}
-                          onChange={(e) =>
-                            setCommentDraft((prev) => ({
-                              ...prev,
-                              [post.id]: e.target.value,
-                            }))
-                          }
-                          onKeyDown={(e) =>
-                            e.key === "Enter" &&
-                            submitComment(post.id)
-                          }
-                          className="flex-1 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none"
-                        />
-                        <button
-                          onClick={() => submitComment(post.id)}
-                          className="text-blue-600 hover:text-blue-600/70 transition-colors"
-                        >
-                          <Send size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </article>
-              </React.Fragment>
-            );
-          })}
+              </div>
+              <p className="text-sm text-foreground/85 mt-3">{post.body}</p>
+            </article>
+          ))}
         </section>
 
-        {/* Desktop sidebar — always visible on lg+ */}
         <aside className="hidden lg:flex flex-col gap-4 self-start sticky top-14 max-h-[calc(100vh-3.5rem)] overflow-y-auto pb-6">
-
-            {/* Logo card */}
-            <div className="bg-card rounded-xl border border-border p-4 shadow-sm flex items-center justify-center">
-              <img src={neighborlyAppLogo} alt="Neighborly App" className="w-full h-auto object-contain" />
-            </div>
-
-            <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-semibold text-sm">Local Weather</h3>
-                <span className="text-xs font-medium text-muted-foreground bg-secondary px-2 py-0.5 rounded">Maplewood Hts</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-2xl font-bold">74°F</p>
-                  <p className="text-xs text-muted-foreground">Partly Cloudy</p>
-                </div>
-                <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center">🌤️</div>
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl p-4 text-white shadow-sm">
-              <div className="flex items-center gap-2 mb-2">
-                <Megaphone size={16} className="text-blue-200" />
-                <h3 className="font-semibold text-sm">Grow Your Business</h3>
-              </div>
-              <p className="text-xs text-blue-100 mb-3 leading-relaxed">
-                Reach thousands of neighbors in the feed. Packages start at $15/week.
-              </p>
-              <button onClick={() => setAdvertiseOpen(true)} className="w-full bg-white text-blue-700 font-semibold text-xs py-2 rounded-lg hover:bg-blue-50 transition-colors">
-                Advertise With Us
-              </button>
-            </div>
-
-            <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold text-sm">Community Groups</h3>
-                <button
-                  onClick={() => setIsCreateGroupOpen(true)}
-                  className="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 font-semibold px-2.5 py-1 rounded-lg transition-colors"
-                >
-                  + Create
-                </button>
-              </div>
-              <div className="flex flex-col gap-2">
-                {(activeLocation === "All Areas" ? groups : groups.filter(g => g.city === activeLocation)).map((group) => (
-                  <div key={group.id} className="p-2.5 rounded-lg border border-border/60 hover:bg-secondary/30 transition-colors">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-semibold truncate flex-1 mr-2">{group.name}</span>
-                      <button
-                        onClick={() => toggleJoinGroup(group.id)}
-                        className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors flex-shrink-0 ${group.joined ? "bg-secondary text-muted-foreground hover:bg-secondary/80" : "bg-primary text-primary-foreground hover:bg-primary/90"}`}
-                      >
-                        {group.joined ? "Joined" : "Join"}
-                      </button>
-                    </div>
-                    <p className="text-xs text-muted-foreground line-clamp-1">{group.description}</p>
-                    <span className="text-[10px] text-muted-foreground">{group.members} members</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="bg-card rounded-xl border border-border p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold text-sm">Upcoming Events</h3>
-                <button className="text-xs text-blue-600 font-medium hover:underline">See all</button>
-              </div>
-              <div className="flex flex-col gap-3">
-                {EVENTS.map((ev) => (
-                  <div key={ev.id} className="flex gap-3 items-start">
-                    <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center text-blue-600 flex-shrink-0">{ev.icon}</div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium leading-tight truncate">{ev.title}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">{ev.date} · {ev.time}</p>
-                      <p className="text-xs text-muted-foreground">{ev.going} going</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="bg-card rounded-xl border border-border p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold text-sm">Local Businesses</h3>
-                <button className="text-xs text-blue-600 font-medium hover:underline">Browse</button>
-              </div>
-              <div className="flex flex-col gap-3">
-                {BUSINESSES.map((biz) => (
-                  <button key={biz.id} onClick={() => goToBusiness(biz.id)} className="flex items-start gap-2.5 w-full text-left group">
-                    <div className="w-8 h-8 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center flex-shrink-0">
-                      <Briefcase size={13} className="text-amber-700" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium leading-tight group-hover:text-blue-600 transition-colors">{biz.name}</p>
-                      <p className="text-xs text-muted-foreground">{biz.category}</p>
-                      <div className="flex items-center gap-1 mt-0.5">
-                        <Star size={10} className="fill-amber-400 text-amber-400" />
-                        <span className="text-xs font-medium">{biz.rating}</span>
-                        <span className="text-xs text-muted-foreground">({biz.reviewCount})</span>
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="bg-card rounded-xl border border-border p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold text-sm">Active Neighbors</h3>
-                <button className="text-xs text-blue-600 font-medium hover:underline">View all</button>
-              </div>
-              <div className="flex flex-col gap-2.5">
-                {(["Nadia Petrov", "James Whitfield", "Grace Okonkwo"] as const).map((name) => {
-                  return (
-                    <div key={name} className="flex items-center gap-2.5">
-                      <button onClick={() => goToUser(name)}><Avatar name={name} size="sm" /></button>
-                      <div className="flex-1 min-w-0">
-                        <button onClick={() => goToUser(name)} className="text-sm font-medium leading-tight hover:text-blue-600 transition-colors block">{name}</button>
-                      </div>
-                      <button className="text-xs text-blue-600 border border-blue-600/30 rounded-full px-2 py-0.5 hover:bg-secondary transition-colors flex-shrink-0">Follow</button>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <p className="text-xs text-muted-foreground text-center px-2">© 2026 Neighborly · Privacy · Terms · Help</p>
-        </aside>
-      </main>
-      
-      {/* Mobile sliding drawer — backdrop */}
-      {sidebarOpen && (
-        <div className="fixed inset-0 z-40 lg:hidden bg-black/50" onClick={() => setSidebarOpen(false)} />
-      )}
-
-      {/* Mobile sliding drawer — panel */}
-      <aside className={`fixed top-0 right-0 bottom-0 z-50 w-72 lg:hidden bg-purple-950 overflow-y-auto flex flex-col gap-4 p-4 shadow-2xl transition-transform duration-300 ease-in-out ${sidebarOpen ? "translate-x-0" : "translate-x-full"}`}>
-          {/* Logo card */}
           <div className="bg-card rounded-xl border border-border p-4 shadow-sm flex items-center justify-center">
             <img src={neighborlyAppLogo} alt="Neighborly App" className="w-full h-auto object-contain" />
           </div>
 
-          {/* Weather */}
           <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
             <div className="flex items-center justify-between mb-2">
               <h3 className="font-semibold text-sm">Local Weather</h3>
               <span className="text-xs font-medium text-muted-foreground bg-secondary px-2 py-0.5 rounded">Maplewood Hts</span>
             </div>
             <div className="flex items-center justify-between">
-              <div><p className="text-2xl font-bold">74°F</p><p className="text-xs text-muted-foreground">Partly Cloudy</p></div>
+              <div>
+                <p className="text-2xl font-bold">74°F</p>
+                <p className="text-xs text-muted-foreground">Partly Cloudy</p>
+              </div>
               <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center">🌤️</div>
             </div>
           </div>
 
-          {/* Grow Your Business */}
-          <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl p-4 text-white shadow-sm">
-            <div className="flex items-center gap-2 mb-2">
-              <Megaphone size={16} className="text-blue-200" />
-              <h3 className="font-semibold text-sm">Grow Your Business</h3>
-            </div>
-            <p className="text-xs text-blue-100 mb-3 leading-relaxed">
-              Reach thousands of neighbors directly in the feed. Packages start at just $15/week.
-            </p>
-            <button onClick={() => setAdvertiseOpen(true)} className="w-full bg-white text-blue-700 font-semibold text-sm py-2 rounded-lg hover:bg-blue-50 transition-colors shadow-sm">
-              Advertise With Us
-            </button>
-          </div>  
-
-          {/* Community Groups */}
           <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold text-sm">Community Groups</h3>
-              <button onClick={() => setIsCreateGroupOpen(true)} className="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 font-semibold px-2.5 py-1 rounded-lg transition-colors">+ Create</button>
             </div>
             <div className="flex flex-col gap-2">
-              {(activeLocation === "All Areas" ? groups : groups.filter(g => g.city === activeLocation)).map((group) => (
-                <div key={group.id} className="p-2.5 rounded-lg border border-border/60 hover:bg-secondary/30 transition-colors">
+              {groups.map((group) => (
+                <div key={group.id} className="p-2.5 rounded-lg border border-border/60">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-semibold truncate flex-1 mr-2">{group.name}</span>
-                    <button onClick={() => toggleJoinGroup(group.id)} className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors flex-shrink-0 ${group.joined ? "bg-secondary text-muted-foreground" : "bg-primary text-primary-foreground hover:bg-primary/90"}`}>{group.joined ? "Joined" : "Join"}</button>
+                    <span className="text-xs font-semibold">{group.name}</span>
+                    <button onClick={() => toggleJoinGroup(group.id)} className={`text-xs px-2 py-0.5 rounded-full font-medium ${group.joined ? "bg-secondary text-muted-foreground" : "bg-primary text-primary-foreground"}`}>
+                      {group.joined ? "Joined" : "Join"}
+                    </button>
                   </div>
-                  <p className="text-xs text-muted-foreground line-clamp-1">{group.description}</p>
-                  <span className="text-[10px] text-muted-foreground">{group.members} members</span>
+                  <p className="text-xs text-muted-foreground">{group.description}</p>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Upcoming Events */}
           <div className="bg-card rounded-xl border border-border p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-sm">Upcoming Events</h3>
-              <button className="text-xs text-blue-600 font-medium hover:underline">See all</button>
-            </div>
+            <h3 className="font-semibold text-sm mb-3">Upcoming Events</h3>
             <div className="flex flex-col gap-3">
               {EVENTS.map((ev) => (
                 <div key={ev.id} className="flex gap-3 items-start">
                   <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center text-blue-600 flex-shrink-0">{ev.icon}</div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium leading-tight truncate">{ev.title}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{ev.date} · {ev.time}</p>
-                    <p className="text-xs text-muted-foreground">{ev.going} going</p>
+                  <div>
+                    <p className="text-sm font-medium">{ev.title}</p>
+                    <p className="text-xs text-muted-foreground">{ev.date} · {ev.going} going</p>
                   </div>
                 </div>
               ))}
             </div>
           </div>
+        </aside>
+      </main>
 
-          {/* Local Businesses */}
-          <div className="bg-card rounded-xl border border-border p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-sm">Local Businesses</h3>
-              <button className="text-xs text-blue-600 font-medium hover:underline">Browse</button>
-            </div>
-            <div className="flex flex-col gap-3">
-              {BUSINESSES.map((biz) => (
-                <button key={biz.id} onClick={() => { goToBusiness(biz.id); setSidebarOpen(false); }} className="flex items-start gap-2.5 w-full text-left group">
-                  <div className="w-8 h-8 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center flex-shrink-0"><Briefcase size={13} className="text-amber-700" /></div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium leading-tight group-hover:text-blue-600 transition-colors">{biz.name}</p>
-                    <p className="text-xs text-muted-foreground">{biz.category}</p>
-                  </div>
-                  <ChevronRight size={14} className="text-muted-foreground mt-1 flex-shrink-0" />
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Active Neighbors */}
-          <div className="bg-card rounded-xl border border-border p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-sm">Active Neighbors</h3>
-            </div>
-            <div className="flex flex-col gap-2.5">
-              {(["Nadia Petrov", "James Whitfield", "Grace Okonkwo"] as const).map((name) => {
-                return (
-                  <div key={name} className="flex items-center gap-2.5">
-                    <button onClick={() => { goToUser(name); setSidebarOpen(false); }}><Avatar name={name} size="sm" /></button>
-                    <div className="flex-1 min-w-0">
-                      <button onClick={() => { goToUser(name); setSidebarOpen(false); }} className="text-sm font-medium leading-tight hover:text-blue-600 transition-colors block">{name}</button>
-                    </div>
-                    <button className="text-xs text-blue-600 border border-blue-600/30 rounded-full px-2 py-0.5 hover:bg-secondary transition-colors flex-shrink-0">Follow</button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <p className="text-xs text-muted-foreground text-center px-2 pb-2">© 2026 Neighborly · Privacy · Terms · Help</p>
-      </aside>
-
-      {advertiseOpen && <AdvertiseModal onClose={() => setAdvertiseOpen(false)} />}
-
-      {/* Fixed bottom nav — mobile */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 lg:hidden bg-purple-800 border-t border-purple-700 flex items-stretch h-16">
-        {[
-          { label: "Home", icon: <Home size={20} />, action: goToFeed, page: "feed" },
-          { label: "Search", icon: <Search size={20} />, action: () => setView({ page: "search" }), page: "search" },
-          { label: "Post", icon: <Plus size={20} />, action: () => { goToFeed(); setComposing(true); }, page: null },
-          { label: "Events", icon: <CalendarDays size={20} />, action: () => setView({ page: "events" }), page: "events" },
-          { label: "Sell", icon: <ShoppingBag size={20} />, action: () => setView({ page: "classifieds" }), page: "classifieds" },
-        ].map(({ label, icon, action, page }) => (
-          <button
-            key={label}
-            onClick={action}
-            className={`flex-1 flex flex-col items-center justify-center gap-1 text-xs font-medium transition-colors ${
-              label === "Post"
-                ? "bg-primary text-primary-foreground mx-3 my-2 rounded-xl"
-                : view.page === page
-                ? "text-white"
-                : "text-purple-200 hover:text-white"
-            }`}
-          >
-            {icon}
-            {label !== "Post" && label}
-          </button>
-        ))}
+      <div className="fixed bottom-0 left-0 right-0 z-50 lg:hidden bg-purple-900 border-t border-purple-800 flex items-stretch h-16 text-white">
+        <button onClick={goToFeed} className="flex-1 flex flex-col items-center justify-center text-xs gap-1"><Home size={18} /> Home</button>
+        <button onClick={() => setView({ page: "search" })} className="flex-1 flex flex-col items-center justify-center text-xs gap-1"><Search size={18} /> Search</button>
+        <button onClick={() => { goToFeed(); setComposing(true); }} className="flex-1 flex flex-col items-center justify-center text-xs gap-1 bg-primary text-primary-foreground m-2 rounded-xl"><Plus size={18} /></button>
+        <button onClick={() => setView({ page: "messages" })} className="flex-1 flex flex-col items-center justify-center text-xs gap-1"><MessageSquare size={18} /> Chat</button>
+        <button onClick={() => setView({ page: "events" })} className="flex-1 flex flex-col items-center justify-center text-xs gap-1"><CalendarDays size={18} /> Events</button>
       </div>
     </div>
   );
