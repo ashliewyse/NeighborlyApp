@@ -16,20 +16,20 @@ replaceOnce(
 
 replaceOnce(
   '  | { page: "user"; name: string }\n  | { page: "auth"; mode: "signin" | "signup" }',
-  '  | { page: "user"; name: string }\n  | { page: "me" }\n  | { page: "settings" }\n  | { page: "auth"; mode: "signin" | "signup" }',
-  'me/settings view type',
+  '  | { page: "user"; name: string }\n  | { page: "me" }\n  | { page: "my-business" }\n  | { page: "settings" }\n  | { page: "auth"; mode: "signin" | "signup" }',
+  'me/business/settings view type',
 );
 
 replaceOnce(
   '  const [myAvatarUrl, setMyAvatarUrl] = useState<string | null>(null);\n',
-  '  const [myAvatarUrl, setMyAvatarUrl] = useState<string | null>(null);\n  const [currentProfile, setCurrentProfile] = useState<UserProfile | null>(null);\n  const [authReady, setAuthReady] = useState(false);\n',
-  'current profile state',
+  '  const [myAvatarUrl, setMyAvatarUrl] = useState<string | null>(null);\n  const [currentProfile, setCurrentProfile] = useState<UserProfile | null>(null);\n  const [currentBusiness, setCurrentBusiness] = useState<Business | null>(null);\n  const [currentAccountType, setCurrentAccountType] = useState<"personal" | "business">("personal");\n  const [authReady, setAuthReady] = useState(false);\n',
+  'current account state',
 );
 
 replaceOnce(
   '  function toggleJoinGroup(id: number) {\n',
-  `  async function loadCurrentProfile(goToProfile = false) {\n    const { data: { user } } = await supabase.auth.getUser();\n    if (!user) {\n      setCurrentProfile(null);\n      setAuthReady(true);\n      return;\n    }\n\n    const { data: row } = await supabase\n      .from("profiles")\n      .select("*")\n      .eq("id", user.id)\n      .maybeSingle();\n\n    const m = user.user_metadata || {};\n    const created = row?.created_at ? new Date(row.created_at) : new Date(user.created_at);\n    const profile: UserProfile = {\n      name: row?.full_name || m.full_name || user.email?.split("@")[0] || "Neighbor",\n      neighborhood: row?.neighborhood || m.neighborhood || row?.city || m.city || "Your neighborhood",\n      city: row?.city || m.city || "Michigan City",\n      joinDate: created.toLocaleDateString(undefined, { month: "long", year: "numeric" }),\n      bio: row?.bio || m.bio || "",\n      badges: ["newcomer"],\n      posts: 0,\n      neighbors: 0,\n      helpfulVotes: 0,\n      recsGiven: 0,\n      rating: 0,\n      ratingCount: 0,\n      neighborReviews: [],\n      galleryPhotos: [],\n      recentActivity: [],\n    };\n\n    setCurrentProfile(profile);\n    setMyAvatarUrl(row?.avatar_url || null);\n    if (row?.city && LOCATIONS.includes(row.city as LocationName)) {\n      setActiveLocation(row.city as LocationName);\n    }\n    setAuthReady(true);\n    if (goToProfile) setView({ page: "me" });\n    else setView({ page: "feed" });\n  }\n\n  useEffect(() => {\n    let active = true;\n    supabase.auth.getSession().then(async ({ data }) => {\n      if (!active) return;\n      if (data.session?.user) await loadCurrentProfile(false);\n      else setAuthReady(true);\n    });\n    const { data: authListener } = supabase.auth.onAuthStateChange((event) => {\n      if (!active) return;\n      if (event === "SIGNED_OUT") {\n        setCurrentProfile(null);\n        setView({ page: "auth", mode: "signin" });\n      }\n    });\n    return () => {\n      active = false;\n      authListener.subscription.unsubscribe();\n    };\n  }, []);\n\n  function toggleJoinGroup(id: number) {\n`,
-  'profile loader',
+  `  async function loadCurrentProfile(goToProfile = false) {\n    const { data: { user } } = await supabase.auth.getUser();\n    if (!user) {\n      setCurrentProfile(null);\n      setCurrentBusiness(null);\n      setCurrentAccountType("personal");\n      setAuthReady(true);\n      return;\n    }\n\n    const { data: row } = await supabase\n      .from("profiles")\n      .select("*")\n      .eq("id", user.id)\n      .maybeSingle();\n\n    const m = user.user_metadata || {};\n    const accountType = (row?.account_type || m.account_type) === "business" ? "business" : "personal";\n    setCurrentAccountType(accountType);\n\n    const created = row?.created_at ? new Date(row.created_at) : new Date(user.created_at);\n    const profile: UserProfile = {\n      name: row?.full_name || m.full_name || user.email?.split("@")[0] || "Neighbor",\n      neighborhood: row?.neighborhood || m.neighborhood || row?.city || m.city || "Your neighborhood",\n      city: row?.city || m.city || "Michigan City",\n      joinDate: created.toLocaleDateString(undefined, { month: "long", year: "numeric" }),\n      bio: row?.bio || m.bio || "",\n      badges: ["newcomer"],\n      posts: 0,\n      neighbors: 0,\n      helpfulVotes: 0,\n      recsGiven: 0,\n      rating: 0,\n      ratingCount: 0,\n      neighborReviews: [],\n      galleryPhotos: [],\n      recentActivity: [],\n    };\n\n    setCurrentProfile(profile);\n    setMyAvatarUrl(row?.avatar_url || null);\n\n    if (accountType === "business") {\n      const { data: businessRow } = await supabase\n        .from("business_profiles")\n        .select("*")\n        .eq("id", user.id)\n        .maybeSingle();\n\n      if (businessRow) {\n        const services = Array.isArray(businessRow.services)\n          ? businessRow.services\n          : typeof businessRow.services === "string" && businessRow.services.trim()\n            ? businessRow.services.split(",").map((v: string) => v.trim()).filter(Boolean)\n            : [];\n        setCurrentBusiness({\n          id: -1,\n          name: businessRow.business_name || m.business_name || profile.name,\n          category: businessRow.category || m.business_category || "Local Business",\n          city: businessRow.city || row?.city || m.city || "Michigan City",\n          rating: 0,\n          reviewCount: 0,\n          badges: [],\n          description: businessRow.description || m.business_description || "",\n          services,\n          photos: [],\n          phone: businessRow.phone || m.business_phone || "",\n          email: user.email || "",\n          website: businessRow.website || m.business_website || "",\n          address: [businessRow.neighborhood, businessRow.city, businessRow.zip_code].filter(Boolean).join(", "),\n          hours: [],\n          founded: String(created.getFullYear()),\n          owner: businessRow.owner_name || profile.name,\n          reviews: [],\n        });\n      } else {\n        setCurrentBusiness({\n          id: -1,\n          name: m.business_name || profile.name,\n          category: m.business_category || "Local Business",\n          city: row?.city || m.city || "Michigan City",\n          rating: 0,\n          reviewCount: 0,\n          badges: [],\n          description: m.business_description || "",\n          services: [],\n          photos: [],\n          phone: m.business_phone || "",\n          email: user.email || "",\n          website: m.business_website || "",\n          address: [row?.neighborhood || m.neighborhood, row?.city || m.city, row?.zip_code || m.zip_code].filter(Boolean).join(", "),\n          hours: [],\n          founded: String(created.getFullYear()),\n          owner: profile.name,\n          reviews: [],\n        });\n      }\n    } else {\n      setCurrentBusiness(null);\n    }\n\n    if (row?.city && LOCATIONS.includes(row.city as LocationName)) {\n      setActiveLocation(row.city as LocationName);\n    }\n    setAuthReady(true);\n    if (goToProfile) setView({ page: accountType === "business" ? "my-business" : "me" });\n    else setView({ page: "feed" });\n  }\n\n  useEffect(() => {\n    let active = true;\n    supabase.auth.getSession().then(async ({ data }) => {\n      if (!active) return;\n      if (data.session?.user) await loadCurrentProfile(false);\n      else setAuthReady(true);\n    });\n    const { data: authListener } = supabase.auth.onAuthStateChange((event) => {\n      if (!active) return;\n      if (event === "SIGNED_OUT") {\n        setCurrentProfile(null);\n        setCurrentBusiness(null);\n        setCurrentAccountType("personal");\n        setView({ page: "auth", mode: "signin" });\n      }\n    });\n    return () => {\n      active = false;\n      authListener.subscription.unsubscribe();\n    };\n  }, []);\n\n  function toggleJoinGroup(id: number) {\n`,
+  'account-aware profile loader',
 );
 
 replaceOnce(
@@ -46,14 +46,14 @@ replaceOnce(
 
 replaceOnce(
   '  if (view.page === "business") {\n',
-  `  if (view.page === "settings") {\n    return <SettingsView onBack={() => setView({ page: "feed" })} />;\n  }\n  if (view.page === "me" && currentProfile) {\n    return (\n      <UserProfileView\n        profile={currentProfile}\n        onBack={goToFeed}\n        isOwnProfile\n        myAvatarUrl={myAvatarUrl}\n        onAvatarChange={setMyAvatarUrl}\n      />\n    );\n  }\n  if (view.page === "business") {\n`,
-  'settings + own profile rendering',
+  `  if (view.page === "settings") {\n    return <SettingsView onBack={() => setView({ page: "feed" })} />;\n  }\n  if (view.page === "me" && currentProfile) {\n    return (\n      <UserProfileView\n        profile={currentProfile}\n        onBack={goToFeed}\n        isOwnProfile\n        myAvatarUrl={myAvatarUrl}\n        onAvatarChange={setMyAvatarUrl}\n      />\n    );\n  }\n  if (view.page === "my-business" && currentBusiness) {\n    return (\n      <BusinessProfileView\n        biz={currentBusiness}\n        onBack={goToFeed}\n        onUserClick={goToUser}\n      />\n    );\n  }\n  if (view.page === "business") {\n`,
+  'settings + own personal/business rendering',
 );
 
 replaceOnce(
   '<button onClick={() => goToUser("Maria Santos")}>\n              <Avatar name="Maria Santos" size="sm" src={myAvatarUrl} />\n            </button>',
-  '<button onClick={() => setView({ page: "settings" })} className="hidden sm:inline-flex px-2.5 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary">Settings</button>\n            <button onClick={() => setView({ page: "me" })}>\n              <Avatar name={currentProfile?.name || "Neighbor"} size="sm" src={myAvatarUrl} />\n            </button>',
-  'header settings + profile button',
+  '<button onClick={() => setView({ page: "settings" })} className="hidden sm:inline-flex px-2.5 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary">Settings</button>\n            <button onClick={() => setView({ page: currentAccountType === "business" ? "my-business" : "me" })}>\n              <Avatar name={currentAccountType === "business" ? (currentBusiness?.name || currentProfile?.name || "Business") : (currentProfile?.name || "Neighbor")} size="sm" src={myAvatarUrl} />\n            </button>',
+  'header settings + account-aware profile button',
 );
 
 s = s.replaceAll(
@@ -63,9 +63,9 @@ s = s.replaceAll(
 
 replaceOnce(
   '      author: "Maria Santos",\n      authorBadges: ["champion"],',
-  '      author: currentProfile?.name || "You",\n      authorBadges: ["newcomer"],',
+  '      author: currentAccountType === "business" ? (currentBusiness?.name || currentProfile?.name || "Business") : (currentProfile?.name || "You"),\n      authorBadges: ["newcomer"],',
   'new post author',
 );
 
 fs.writeFileSync(file, s);
-console.log('Patched App.tsx with authenticated profile and settings.');
+console.log('Patched App.tsx with account-aware personal/business profiles and settings.');
