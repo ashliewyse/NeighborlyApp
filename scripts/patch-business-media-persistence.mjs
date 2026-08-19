@@ -161,6 +161,11 @@ replaceOnce(
 'business gallery upload');
 
 s = s.replaceAll('biz.photos.length', 'businessPhotos.length');
+replaceOnce(
+  '<BusinessProfileView biz={currentBusiness} onBack={goToFeed} onUserClick={goToUser} />',
+  '<BusinessProfileView biz={currentBusiness} onBack={goToFeed} onUserClick={goToUser} isOwnProfile />',
+  'mark current business as owner',
+);
 
 fs.writeFileSync(file, s);
 console.log('Patched persistent business cover, logo, and gallery media.');
