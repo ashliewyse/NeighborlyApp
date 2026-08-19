@@ -4,7 +4,7 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "build": "node scripts/patch-current-user-profile.mjs && vite build",
+    "build": "node scripts/patch-current-user-profile.mjs && node scripts/patch-account-types.mjs && vite build",
     "dev": "vite"
   },
   "dependencies": {
