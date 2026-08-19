@@ -4,7 +4,7 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "build": "node scripts/patch-current-user-profile.mjs && node scripts/patch-account-types.mjs && node scripts/patch-mobile-profile-nav.mjs && node scripts/patch-business-media-persistence.mjs && node scripts/patch-feed-avatar.mjs && vite build",
+    "build": "node scripts/patch-current-user-profile.mjs && node scripts/patch-account-types.mjs && node scripts/patch-mobile-profile-nav.mjs && node scripts/patch-business-media-persistence.mjs && node scripts/patch-feed-avatar.mjs && node scripts/patch-post-persistence.mjs && vite build",
     "dev": "vite"
   },
   "dependencies": {
