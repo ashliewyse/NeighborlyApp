@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { Analytics } from "@vercel/analytics/react";
 import { AuthView as SupabaseAuthView } from "@/app/components/AuthView";
 import { ImageWithFallback } from "@/app/components/figma/ImageWithFallback";
 import neighborlyLogo from "@/imports/Copilot_20260807_041314.png";
@@ -3597,6 +3598,7 @@ export default function App() {
     
 
       </div>
+      <Analytics />
     </div>
   );
 }
