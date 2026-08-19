@@ -9,15 +9,16 @@ function patchComponent(name,nextName,isBusiness){
  if(end<0) end=s.length;
  let b=s.slice(start,end);
  if(isBusiness){
-   b=b.replace(/useState<"about" \| "services" \| "photos" \| "contact" \| "reviews">\("about"\)/,'useState<"about" | "posts" | "services" | "photos" | "contact" | "reviews">("about")');
-   b=b.replace(/\["about",\s*"services",\s*"photos",\s*"contact",\s*"reviews"\]/,'["about", "posts", "services", "photos", "contact", "reviews"]');
+   // Handle the multiline formatting used by the original business profile.
+   b=b.replace(/"about"\s*\|\s*"services"\s*\|\s*"photos"\s*\|\s*"contact"\s*\|\s*"reviews"/,'"about" | "posts" | "services" | "photos" | "contact" | "reviews"');
+   b=b.replace(/\[\s*"about",\s*"services",\s*"photos",\s*"contact",\s*"reviews",?\s*\]/,'["about", "posts", "services", "photos", "contact", "reviews"]');
    if(!b.includes('{tab === "posts" &&')){
      const m='{tab === "services" && ('; const p=b.indexOf(m);
      if(p>=0) b=b.slice(0,p)+'{tab === "posts" && <div className="bg-white rounded-xl border border-border p-6"><h3 className="font-semibold text-lg mb-2">Posts</h3><p className="text-sm text-muted-foreground">Posts by this business and posts neighbors share to this profile will appear here.</p></div>}\n\n        '+b.slice(p);
    }
  } else {
-   b=b.replace(/useState<"about" \| "photos" \| "reviews">\("about"\)/,'useState<"about" | "posts" | "photos" | "reviews">("about")');
-   b=b.replace(/\(\["about",\s*"photos",\s*"reviews"\] as const\)/,'(["about", "posts", "photos", "reviews"] as const)');
+   b=b.replace(/"about"\s*\|\s*"photos"\s*\|\s*"reviews"/,'"about" | "posts" | "photos" | "reviews"');
+   b=b.replace(/\(\[\s*"about",\s*"photos",\s*"reviews",?\s*\] as const\)/,'(["about", "posts", "photos", "reviews"] as const)');
    if(!b.includes('{tab === "posts" &&')){
      const m='{tab === "about" && ('; const p=b.indexOf(m);
      if(p>=0) b=b.slice(0,p)+'{tab === "posts" && <div className="bg-white rounded-xl border border-border p-6"><h3 className="font-semibold text-lg mb-2">Posts</h3><p className="text-sm text-muted-foreground">Posts by this neighbor and posts shared to this profile will appear here.</p></div>}\n\n        '+b.slice(p);
