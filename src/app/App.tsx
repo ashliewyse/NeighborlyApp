@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { AuthView as SupabaseAuthView } from "@/app/AuthView";
+import { AuthView as SupabaseAuthView } from "@/app/components/AuthView";
 import { ImageWithFallback } from "@/app/components/figma/ImageWithFallback";
 import neighborlyLogo from "@/imports/Copilot_20260807_041314.png";
 import neighborlyAppLogo from "@/imports/watermarked_img_9245041771390677153.jpg";
