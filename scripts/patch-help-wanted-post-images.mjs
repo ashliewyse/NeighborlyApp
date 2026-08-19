@@ -5,7 +5,7 @@ let s=fs.readFileSync(file,'utf8');
 function once(from,to,label){ if(!s.includes(from)) throw new Error('Patch failed: '+label); s=s.replace(from,to); }
 
 // New Help Wanted category.
-once('  | "recommendation";\ntype ActiveView =','  | "recommendation"\n  | "helpwanted";\ntype ActiveView =','PostCategory helpwanted');
+once('  | "general";\ntype ActiveView =','  | "general"\n  | "helpwanted";\ntype ActiveView =','PostCategory helpwanted');
 once('  general: {\n    label: "General",\n    color: "text-stone-600 bg-stone-50 border-stone-200",\n    icon: <Leaf size={11} />,\n  },\n};','  general: {\n    label: "General",\n    color: "text-stone-600 bg-stone-50 border-stone-200",\n    icon: <Leaf size={11} />,\n  },\n  helpwanted: {\n    label: "Help Wanted",\n    color: "text-blue-700 bg-blue-50 border-blue-200",\n    icon: <Briefcase size={11} />,\n  },\n};','category meta');
 
 // Composer image state/ref.
