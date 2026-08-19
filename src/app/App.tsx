@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { AuthView as SupabaseAuthView } from "@/app/AuthView";
 import { ImageWithFallback } from "@/app/components/figma/ImageWithFallback";
 import neighborlyLogo from "@/imports/Copilot_20260807_041314.png";
 import neighborlyAppLogo from "@/imports/watermarked_img_9245041771390677153.jpg";
@@ -2646,7 +2647,7 @@ export default function App() {
 
   if (view.page === "auth") {
     return (
-      <AuthView
+      <SupabaseAuthView
         mode={view.mode}
         onSwitchMode={(mode) => setView({ page: "auth", mode })}
         onSuccess={() => setView({ page: "feed" })}
