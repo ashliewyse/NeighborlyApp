@@ -4,7 +4,7 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "build": "node scripts/patch-current-user-profile.mjs && node scripts/patch-account-types.mjs && node scripts/patch-mobile-profile-nav.mjs && node scripts/patch-profile-media-persistence.mjs && node scripts/patch-profile-media-rpc.mjs && node scripts/patch-business-media-persistence.mjs && node scripts/patch-feed-avatar.mjs && node scripts/patch-post-persistence.mjs && node scripts/patch-posts-tabs-only.mjs && node scripts/patch-profile-posts-feed.mjs && node scripts/patch-help-wanted-post-images.mjs && node scripts/patch-final-posts-profile-links.mjs && vite build",
+    "build": "node scripts/patch-current-user-profile.mjs && node scripts/patch-account-types.mjs && node scripts/patch-mobile-profile-nav.mjs && node scripts/patch-profile-media-persistence.mjs && node scripts/patch-profile-media-rpc.mjs && node scripts/patch-business-media-persistence.mjs && node scripts/patch-feed-avatar.mjs && node scripts/patch-post-persistence.mjs && node scripts/patch-posts-tabs-only.mjs && node scripts/patch-profile-posts-feed.mjs && node scripts/patch-help-wanted-post-images.mjs && node scripts/patch-final-posts-profile-links.mjs && node scripts/patch-personal-profile-security-reviews.mjs && vite build",
     "dev": "vite"
   },
   "dependencies": {
