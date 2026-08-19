@@ -23,21 +23,33 @@ replaceOnce(
 `  if (view.page === "me" && currentProfile) return <UserProfileView profile={currentProfile} onBack={goToFeed} isOwnProfile myAvatarUrl={myAvatarUrl} onAvatarChange={setMyAvatarUrl} />;
   if (view.page === "my-business" && currentBusiness) return <BusinessProfileView biz={currentBusiness} onBack={goToFeed} onUserClick={goToUser} />;`,
 `  if (view.page === "me" && currentProfile) return (
-    <div className="relative min-h-screen">
+    <div className="min-h-screen bg-background">
+      <div className="bg-white border-b border-border">
+        <div className="max-w-5xl mx-auto px-4 py-2.5 flex justify-end">
+          <button onClick={() => setView({ page: "settings" })} className="inline-flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-medium text-foreground hover:bg-muted">
+            ⚙️ Settings
+          </button>
+        </div>
+      </div>
       <UserProfileView profile={currentProfile} onBack={goToFeed} isOwnProfile myAvatarUrl={myAvatarUrl} onAvatarChange={setMyAvatarUrl} />
-      <button onClick={() => setView({ page: "settings" })} className="fixed right-4 bottom-24 z-50 rounded-full bg-white border border-border shadow-lg px-4 py-2 text-sm font-medium">⚙️ Settings</button>
     </div>
   );
   if (view.page === "my-business" && currentBusiness) return (
-    <div className="relative min-h-screen">
+    <div className="min-h-screen bg-background">
+      <div className="bg-white border-b border-border">
+        <div className="max-w-5xl mx-auto px-4 py-2.5 flex justify-end">
+          <button onClick={() => setView({ page: "settings" })} className="inline-flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-medium text-foreground hover:bg-muted">
+            ⚙️ Settings
+          </button>
+        </div>
+      </div>
       <BusinessProfileView biz={currentBusiness} onBack={goToFeed} onUserClick={goToUser} />
-      <button onClick={() => setView({ page: "settings" })} className="fixed right-4 bottom-24 z-50 rounded-full bg-white border border-border shadow-lg px-4 py-2 text-sm font-medium">⚙️ Settings</button>
     </div>
   );`,
-'move settings into profile pages'
+'move settings into aligned profile action bar'
 );
 
 s = s.replace('.from("business_profiles")\n        .select("*")\n        .eq("id", user.id)', '.from("business_profiles")\n        .select("*")\n        .eq("user_id", user.id)');
 
 fs.writeFileSync(file, s);
-console.log('Restored profile navigation on mobile and moved Settings into profile pages.');
+console.log('Restored profile nav and moved Settings to an aligned profile action bar.');
