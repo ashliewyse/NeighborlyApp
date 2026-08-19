@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
+import { Analytics } from "@vercel/analytics/react";
 import { AuthView as SupabaseAuthView } from "@/app/components/AuthView";
+import { supabase } from "@/lib/supabase";
 import { ImageWithFallback } from "@/app/components/figma/ImageWithFallback";
 import neighborlyLogo from "@/imports/Copilot_20260807_041314.png";
 import neighborlyAppLogo from "@/imports/watermarked_img_9245041771390677153.jpg";
@@ -140,6 +142,7 @@ type ActiveView =
   | { page: "feed" }
   | { page: "business"; id: number }
   | { page: "user"; name: string }
+  | { page: "me" }
   | { page: "auth"; mode: "signin" | "signup" }
   | { page: "search" }
   | { page: "events" }
@@ -2620,6 +2623,8 @@ export default function App() {
   const [advertiseOpen, setAdvertiseOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [myAvatarUrl, setMyAvatarUrl] = useState<string | null>(null);
+  const [currentProfile, setCurrentProfile] = useState<UserProfile | null>(null);
+  const [authReady, setAuthReady] = useState(false);
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   const [activeLocation, setActiveLocation] = useState<LocationName>("All Areas");
   const [locationOpen, setLocationOpen] = useState(false);
@@ -2629,6 +2634,70 @@ export default function App() {
     { id: 3, name: "🛠️ DIY & Handyman", description: "Home improvement tips from neighbors", members: 215, joined: false, city: "New Buffalo" },
     { id: 4, name: "📰 Local News Watch", description: "Breaking news and local updates for La Porte", members: 76, joined: false, city: "La Porte" },
   ]);
+
+  async function loadCurrentProfile(goToProfile = false) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setCurrentProfile(null);
+      setAuthReady(true);
+      return;
+    }
+
+    const { data: row } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    const m = user.user_metadata || {};
+    const created = row?.created_at ? new Date(row.created_at) : new Date(user.created_at);
+    const profile: UserProfile = {
+      name: row?.full_name || m.full_name || user.email?.split("@")[0] || "Neighbor",
+      neighborhood: row?.neighborhood || m.neighborhood || row?.city || m.city || "Your neighborhood",
+      city: row?.city || m.city || "Michigan City",
+      joinDate: created.toLocaleDateString(undefined, { month: "long", year: "numeric" }),
+      bio: row?.bio || m.bio || "",
+      badges: ["newcomer"],
+      posts: 0,
+      neighbors: 0,
+      helpfulVotes: 0,
+      recsGiven: 0,
+      rating: 0,
+      ratingCount: 0,
+      neighborReviews: [],
+      galleryPhotos: [],
+      recentActivity: [],
+    };
+
+    setCurrentProfile(profile);
+    setMyAvatarUrl(row?.avatar_url || null);
+    if (row?.city && LOCATIONS.includes(row.city as LocationName)) {
+      setActiveLocation(row.city as LocationName);
+    }
+    setAuthReady(true);
+    if (goToProfile) setView({ page: "me" });
+    else setView({ page: "feed" });
+  }
+
+  useEffect(() => {
+    let active = true;
+    supabase.auth.getSession().then(async ({ data }) => {
+      if (!active) return;
+      if (data.session?.user) await loadCurrentProfile(false);
+      else setAuthReady(true);
+    });
+    const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
+      if (!active) return;
+      if (event === "SIGNED_OUT") {
+        setCurrentProfile(null);
+        setView({ page: "auth", mode: "signin" });
+      }
+    });
+    return () => {
+      active = false;
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
 
   function toggleJoinGroup(id: number) {
     setGroups((prev) => prev.map((g) => g.id === id ? { ...g, joined: !g.joined } : g));
@@ -2645,12 +2714,31 @@ export default function App() {
     setView({ page: "feed" });
   }
 
+  if (!authReady) {
+    return (
+      <div className="min-h-screen bg-purple-950 flex items-center justify-center text-white font-['DM_Sans',sans-serif]">
+        Loading your Neighborly profile…
+      </div>
+    );
+  }
+
   if (view.page === "auth") {
     return (
       <SupabaseAuthView
         mode={view.mode}
         onSwitchMode={(mode) => setView({ page: "auth", mode })}
-        onSuccess={() => setView({ page: "feed" })}
+        onSuccess={() => { void loadCurrentProfile(false); }}
+      />
+    );
+  }
+  if (view.page === "me" && currentProfile) {
+    return (
+      <UserProfileView
+        profile={currentProfile}
+        onBack={goToFeed}
+        isOwnProfile
+        myAvatarUrl={myAvatarUrl}
+        onAvatarChange={setMyAvatarUrl}
       />
     );
   }
@@ -2743,8 +2831,8 @@ export default function App() {
     const postCity = activeLocation === "All Areas" ? "Michigan City" : activeLocation;
     const newPost: Post = {
       id: Date.now(),
-      author: "Maria Santos",
-      authorBadges: ["champion"],
+      author: currentProfile?.name || "You",
+      authorBadges: ["newcomer"],
       neighborhood: postCity,
       city: postCity,
       time: "Just now",
@@ -2879,8 +2967,8 @@ export default function App() {
               <Bell size={18} />
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-600 rounded-full border-2 border-white" />
             </button>
-            <button onClick={() => goToUser("Maria Santos")}>
-              <Avatar name="Maria Santos" size="sm" src={myAvatarUrl} />
+            <button onClick={() => setView({ page: "me" })}>
+              <Avatar name={currentProfile?.name || "Neighbor"} size="sm" src={myAvatarUrl} />
             </button>
           </div>
         </div>
@@ -3005,7 +3093,7 @@ export default function App() {
               className="bg-card rounded-xl border border-border p-4 flex items-center gap-3 cursor-pointer hover:border-primary/30 transition-colors"
               onClick={() => setComposing(true)}
             >
-              <Avatar name="Maria Santos" size="md" src={myAvatarUrl} />
+              <Avatar name={currentProfile?.name || "Neighbor"} size="md" src={myAvatarUrl} />
               <div className="flex-1 bg-muted rounded-lg px-4 py-2.5 text-sm text-muted-foreground font-['DM_Sans',sans-serif]">
                 What's happening in Maplewood Heights?
               </div>
@@ -3016,7 +3104,7 @@ export default function App() {
           ) : (
             <div className="bg-card rounded-xl border border-primary/30 p-4 shadow-sm">
               <div className="flex items-start gap-3">
-                <Avatar name="Maria Santos" size="md" src={myAvatarUrl} />
+                <Avatar name={currentProfile?.name || "Neighbor"} size="md" src={myAvatarUrl} />
                 <div className="flex-1">
                   <textarea
                     autoFocus
@@ -3597,6 +3685,7 @@ export default function App() {
     
 
       </div>
+      <Analytics />
     </div>
   );
 }
