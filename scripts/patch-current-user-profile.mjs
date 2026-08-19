@@ -10,14 +10,14 @@ function replaceOnce(from, to, label) {
 
 replaceOnce(
   'import { AuthView as SupabaseAuthView } from "@/app/components/AuthView";\n',
-  'import { AuthView as SupabaseAuthView } from "@/app/components/AuthView";\nimport { supabase } from "@/lib/supabase";\n',
-  'supabase import',
+  'import { AuthView as SupabaseAuthView } from "@/app/components/AuthView";\nimport { SettingsView } from "@/app/components/SettingsView";\nimport { supabase } from "@/lib/supabase";\n',
+  'settings + supabase import',
 );
 
 replaceOnce(
   '  | { page: "user"; name: string }\n  | { page: "auth"; mode: "signin" | "signup" }',
-  '  | { page: "user"; name: string }\n  | { page: "me" }\n  | { page: "auth"; mode: "signin" | "signup" }',
-  'me view type',
+  '  | { page: "user"; name: string }\n  | { page: "me" }\n  | { page: "settings" }\n  | { page: "auth"; mode: "signin" | "signup" }',
+  'me/settings view type',
 );
 
 replaceOnce(
@@ -46,14 +46,14 @@ replaceOnce(
 
 replaceOnce(
   '  if (view.page === "business") {\n',
-  `  if (view.page === "me" && currentProfile) {\n    return (\n      <UserProfileView\n        profile={currentProfile}\n        onBack={goToFeed}\n        isOwnProfile\n        myAvatarUrl={myAvatarUrl}\n        onAvatarChange={setMyAvatarUrl}\n      />\n    );\n  }\n  if (view.page === "business") {\n`,
-  'own profile rendering',
+  `  if (view.page === "settings") {\n    return <SettingsView onBack={() => setView({ page: "feed" })} />;\n  }\n  if (view.page === "me" && currentProfile) {\n    return (\n      <UserProfileView\n        profile={currentProfile}\n        onBack={goToFeed}\n        isOwnProfile\n        myAvatarUrl={myAvatarUrl}\n        onAvatarChange={setMyAvatarUrl}\n      />\n    );\n  }\n  if (view.page === "business") {\n`,
+  'settings + own profile rendering',
 );
 
 replaceOnce(
   '<button onClick={() => goToUser("Maria Santos")}>\n              <Avatar name="Maria Santos" size="sm" src={myAvatarUrl} />\n            </button>',
-  '<button onClick={() => setView({ page: "me" })}>\n              <Avatar name={currentProfile?.name || "Neighbor"} size="sm" src={myAvatarUrl} />\n            </button>',
-  'header profile button',
+  '<button onClick={() => setView({ page: "settings" })} className="hidden sm:inline-flex px-2.5 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary">Settings</button>\n            <button onClick={() => setView({ page: "me" })}>\n              <Avatar name={currentProfile?.name || "Neighbor"} size="sm" src={myAvatarUrl} />\n            </button>',
+  'header settings + profile button',
 );
 
 s = s.replaceAll(
@@ -68,4 +68,4 @@ replaceOnce(
 );
 
 fs.writeFileSync(file, s);
-console.log('Patched App.tsx to use the authenticated Supabase profile.');
+console.log('Patched App.tsx with authenticated profile and settings.');
