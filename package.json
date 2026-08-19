@@ -4,7 +4,7 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "build": "node scripts/patch-current-user-profile.mjs && vite build",
+    "build": "node scripts/patch-current-user-profile.mjs && node scripts/patch-account-types.mjs && node scripts/patch-mobile-profile-nav.mjs && vite build",
     "dev": "vite"
   },
   "dependencies": {
@@ -77,16 +77,10 @@
     "react-dom": "18.3.1"
   },
   "peerDependenciesMeta": {
-    "react": {
-      "optional": true
-    },
-    "react-dom": {
-      "optional": true
-    }
+    "react": { "optional": true },
+    "react-dom": { "optional": true }
   },
   "pnpm": {
-    "overrides": {
-      "vite": "6.3.5"
-    }
+    "overrides": { "vite": "6.3.5" }
   }
 }
