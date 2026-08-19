@@ -16,7 +16,6 @@ const component=`function ProfilePostsFeed({ profileName, profileType }: { profi
       if (profileType === "business") {
         const { data: businessRow } = await supabase.from("business_profiles").select("user_id").eq("business_name", profileName).maybeSingle();
         ownerId = businessRow?.user_id || null;
-        // Own business fallback: the displayed business can be assembled in memory, but posts are always saved with auth user.id.
         if (!ownerId) {
           const { data: { user } } = await supabase.auth.getUser();
           if (user) {
@@ -25,7 +24,7 @@ const component=`function ProfilePostsFeed({ profileName, profileType }: { profi
           }
         }
       } else {
-        const { data: profileRow } = await supabase.from("profiles").select("id").eq("full_name", profileName).maybeSingle();
+        const { data: profileRow } = await supabase.from("profiles").select("id").eq("full_name", profileName).eq("account_type", "personal").maybeSingle();
         ownerId = profileRow?.id || null;
       }
       if (!ownerId) { if (active) { setItems([]); setLoading(false); } return; }
@@ -57,4 +56,4 @@ function patchBlock(name,nextName,nameExpressions,profileType){
 patchBlock('BusinessProfileView','UserProfileView',['biz.name','biz.businessName'],'business');
 patchBlock('UserProfileView','SearchPage',['profile.name'],'personal');
 fs.writeFileSync(file,s);
-console.log('Profile Posts now resolve the real Supabase user UUID before filtering posts.');
+console.log('Profile Posts resolve the correct business or personal Supabase account UUID.');
