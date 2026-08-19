@@ -23,11 +23,13 @@ replaceOnce(
   onBack,
   onUserClick,
   isOwnProfile = false,
+  onLogoChange,
 }: {
   biz: Business;
   onBack: () => void;
   onUserClick: (name: string) => void;
   isOwnProfile?: boolean;
+  onLogoChange?: (url: string) => void;
 }) {`,
 'business ownership prop');
 
@@ -60,7 +62,9 @@ replaceOnce(
         supabase.from("profiles").select("avatar_url").eq("id", user.id).maybeSingle(),
       ]);
       if (!active) return;
-      setLogoUrl(businessRow?.logo_url || profileRow?.avatar_url || null);
+      const persistedLogo = businessRow?.logo_url || profileRow?.avatar_url || null;
+      setLogoUrl(persistedLogo);
+      if (persistedLogo) onLogoChange?.(persistedLogo);
       setCoverUrl(businessRow?.cover_url || null);
       if (photos) setBusinessPhotos(photos.map((p: any) => ({ url: p.image_url, alt: p.caption || "Business photo" })));
     })();
@@ -92,7 +96,9 @@ replaceOnce(
       if (error) throw error;
       if (kind === "logo") {
         setLogoUrl(publicUrl);
-        await supabase.from("profiles").update({ avatar_url: publicUrl, updated_at: new Date().toISOString() }).eq("id", user.id);
+        onLogoChange?.(publicUrl);
+        const { error: profileError } = await supabase.from("profiles").update({ avatar_url: publicUrl, updated_at: new Date().toISOString() }).eq("id", user.id);
+        if (profileError) throw profileError;
       } else setCoverUrl(publicUrl);
     } catch (e: any) { setMediaError(e?.message || "Could not save business photo."); }
     finally { setMediaBusy(false); }
@@ -163,9 +169,9 @@ replaceOnce(
 s = s.replaceAll('biz.photos.length', 'businessPhotos.length');
 replaceOnce(
   '<BusinessProfileView biz={currentBusiness} onBack={goToFeed} onUserClick={goToUser} />',
-  '<BusinessProfileView biz={currentBusiness} onBack={goToFeed} onUserClick={goToUser} isOwnProfile />',
-  'mark current business as owner',
+  '<BusinessProfileView biz={currentBusiness} onBack={goToFeed} onUserClick={goToUser} isOwnProfile onLogoChange={setMyAvatarUrl} />',
+  'mark current business as owner and sync feed avatar',
 );
 
 fs.writeFileSync(file, s);
-console.log('Patched persistent business cover, logo, and gallery media.');
+console.log('Patched persistent business media and feed avatar sync.');
