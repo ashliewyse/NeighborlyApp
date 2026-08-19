@@ -39,8 +39,8 @@ replaceOnce(
 );
 
 replaceOnce(
-  '      {/* Cover */}',
-  '      {mediaError && isOwnProfile && <div className="mx-auto max-w-5xl px-4 pt-3"><div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{mediaError}</div></div>}\n      {mediaBusy && isOwnProfile && <div className="mx-auto max-w-5xl px-4 pt-3 text-xs text-muted-foreground">Saving photo…</div>}\n      {/* Cover */}',
+  '    <div className="min-h-screen bg-background">\n      <div className="relative h-44 md:h-56 overflow-hidden">',
+  '    <div className="min-h-screen bg-background">\n      {mediaError && isOwnProfile && <div className="mx-auto max-w-5xl px-4 pt-3"><div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{mediaError}</div></div>}\n      {mediaBusy && isOwnProfile && <div className="mx-auto max-w-5xl px-4 pt-3 text-xs text-muted-foreground">Saving photo…</div>}\n      <div className="relative h-44 md:h-56 overflow-hidden">',
   'media status',
 );
 
