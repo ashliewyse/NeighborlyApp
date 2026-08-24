@@ -206,6 +206,7 @@ interface Comment {
 interface Post {
   id: number;
   author: string;
+  authorId?: string;
   authorBadges: UserBadgeType[];
   neighborhood: string;
   city: string;
@@ -302,7 +303,113 @@ const LOCATIONS = [
   "New Buffalo",
   "Long Beach",
 ] as const;
-type LocationName = (typeof LOCATIONS)[number];
+type LocationName = string;
+
+interface WeatherSnapshot {
+  status: "loading" | "ready" | "error";
+  temperature: number | null;
+  description: string;
+  icon: string;
+}
+
+const INITIAL_WEATHER: WeatherSnapshot = {
+  status: "loading",
+  temperature: null,
+  description: "Loading conditions…",
+  icon: "🌤️",
+};
+
+const LOCATION_COORDINATES: Record<string, { latitude: number; longitude: number }> = {
+  "michigan city": { latitude: 41.7075, longitude: -86.895 },
+  "la porte": { latitude: 41.6111, longitude: -86.7225 },
+  "new buffalo": { latitude: 41.7939, longitude: -86.7439 },
+  "long beach": { latitude: 41.7389, longitude: -86.8567 },
+};
+
+function locationKey(value?: string | null) {
+  return (value || "").trim().toLocaleLowerCase();
+}
+
+function canonicalLocation(value?: string | null) {
+  const trimmed = (value || "").trim();
+  if (!trimmed) return "Michigan City";
+  return LOCATIONS.find((locationName) => locationKey(locationName) === locationKey(trimmed)) || trimmed;
+}
+
+function sameLocation(left?: string | null, right?: string | null) {
+  return locationKey(left) === locationKey(right);
+}
+
+function weatherCondition(code: number, isDay: boolean) {
+  if (code === 0) return { description: "Clear", icon: isDay ? "☀️" : "🌙" };
+  if (code === 1) return { description: "Mostly Clear", icon: isDay ? "🌤️" : "🌙" };
+  if (code === 2) return { description: "Partly Cloudy", icon: "⛅" };
+  if (code === 3) return { description: "Cloudy", icon: "☁️" };
+  if (code === 45 || code === 48) return { description: "Foggy", icon: "🌫️" };
+  if (code >= 51 && code <= 57) return { description: "Drizzle", icon: "🌦️" };
+  if ((code >= 61 && code <= 67) || (code >= 80 && code <= 82)) return { description: "Rain", icon: "🌧️" };
+  if ((code >= 71 && code <= 77) || (code >= 85 && code <= 86)) return { description: "Snow", icon: "❄️" };
+  if (code >= 95) return { description: "Thunderstorms", icon: "⛈️" };
+  return { description: "Current Conditions", icon: "🌤️" };
+}
+
+async function fetchWeatherSnapshot(locationName: string, signal: AbortSignal): Promise<WeatherSnapshot> {
+  let coordinates = LOCATION_COORDINATES[locationKey(locationName)];
+
+  if (!coordinates) {
+    const searchResponse = await fetch(
+      `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(locationName)}&count=5&language=en&format=json&countryCode=US`,
+      { signal },
+    );
+    if (!searchResponse.ok) throw new Error("Could not find this location");
+    const searchData = await searchResponse.json();
+    const match = searchData.results?.find((result: any) => result.country_code === "US") || searchData.results?.[0];
+    if (!match) throw new Error("Could not find this location");
+    coordinates = { latitude: match.latitude, longitude: match.longitude };
+  }
+
+  const weatherResponse = await fetch(
+    `https://api.open-meteo.com/v1/forecast?latitude=${coordinates.latitude}&longitude=${coordinates.longitude}&current=temperature_2m,weather_code,is_day&temperature_unit=fahrenheit&timezone=auto`,
+    { signal },
+  );
+  if (!weatherResponse.ok) throw new Error("Could not load weather");
+  const weatherData = await weatherResponse.json();
+  const temperature = Number(weatherData.current?.temperature_2m);
+  const code = Number(weatherData.current?.weather_code);
+  if (!Number.isFinite(temperature) || !Number.isFinite(code)) throw new Error("Weather data was incomplete");
+  const condition = weatherCondition(code, weatherData.current?.is_day !== 0);
+  return {
+    status: "ready",
+    temperature: Math.round(temperature),
+    description: condition.description,
+    icon: condition.icon,
+  };
+}
+
+function WeatherCard({ locationName, weather }: { locationName: string; weather: WeatherSnapshot }) {
+  return (
+    <div className="bg-card rounded-xl border border-border p-4 shadow-sm" aria-live="polite">
+      <div className="flex items-center justify-between gap-3 mb-2">
+        <h3 className="font-semibold text-sm">Local Weather</h3>
+        <span
+          className="max-w-36 truncate text-xs font-medium text-muted-foreground bg-secondary px-2 py-0.5 rounded"
+          title={locationName}
+        >
+          {locationName}
+        </span>
+      </div>
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-2xl font-bold">{weather.temperature === null ? "--°" : `${weather.temperature}°F`}</p>
+          <p className="text-xs text-muted-foreground">{weather.description}</p>
+        </div>
+        <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center" aria-hidden="true">
+          {weather.icon}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const BUSINESSES: Business[] = [
   {
@@ -2680,7 +2787,7 @@ function SearchView({
   const [filter, setFilter] = useState<"all" | "people" | "businesses" | "groups">("all");
 
   const q = query.toLowerCase().trim();
-  const locFilter = (city: string) => activeLocation === "All Areas" || city === activeLocation;
+  const locFilter = (city: string) => activeLocation === "All Areas" || sameLocation(city, activeLocation);
 
   const matchedPeople = Object.values(USER_PROFILES).filter(
     (p) =>
@@ -2850,7 +2957,7 @@ function EventsView({ onBack, activeLocation }: { onBack: () => void; activeLoca
     { id: 4, city: "New Buffalo", title: "Book Club Meetup", date: "Thu Aug 21", time: "6:30 PM", location: "Public Library", going: 15, icon: <Star size={16} />, color: "bg-purple-50 text-purple-700", desc: "This month: 'The Midnight Library'. Newcomers always welcome." },
     { id: 5, city: "Long Beach", title: "Youth Soccer Practice", date: "Sat Aug 23", time: "10:00 AM", location: "Elm Street Field", going: 28, icon: <Zap size={16} />, color: "bg-rose-50 text-rose-700", desc: "Open practice for kids ages 6–12. Bring water and sunscreen." },
   ];
-  const visibleEvents = activeLocation === "All Areas" ? allEvents : allEvents.filter((e) => e.city === activeLocation);
+  const visibleEvents = activeLocation === "All Areas" ? allEvents : allEvents.filter((e) => sameLocation(e.city, activeLocation));
 
   return (
     <div className="min-h-screen bg-purple-950 font-['DM_Sans',sans-serif] pb-20">
@@ -2923,7 +3030,7 @@ function ClassifiedsView({
   activeLocation: LocationName;
 }) {
   const [search, setSearch] = useState("");
-  const locationPosts = activeLocation === "All Areas" ? posts : posts.filter((p) => p.city === activeLocation);
+  const locationPosts = activeLocation === "All Areas" ? posts : posts.filter((p) => sameLocation(p.city, activeLocation));
   const filtered = locationPosts.filter(
     (p) => search === "" || p.body.toLowerCase().includes(search.toLowerCase()) || (p.title ?? "").toLowerCase().includes(search.toLowerCase()),
   );
@@ -3444,12 +3551,41 @@ export default function App() {
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   const [activeLocation, setActiveLocation] = useState<LocationName>("All Areas");
   const [locationOpen, setLocationOpen] = useState(false);
+  const [weather, setWeather] = useState<WeatherSnapshot>(INITIAL_WEATHER);
   const [groups, setGroups] = useState([
     { id: 1, name: "🪴 Plant & Garden Club", description: "Share tips, seeds, and local plant swaps", members: 142, joined: false, city: "Michigan City" },
     { id: 2, name: "🐾 Local Pet Owners", description: "Pet-friendly spots and vet recommendations", members: 98, joined: true, city: "Long Beach" },
     { id: 3, name: "🛠️ DIY & Handyman", description: "Home improvement tips from neighbors", members: 215, joined: false, city: "New Buffalo" },
     { id: 4, name: "📰 Local News Watch", description: "Breaking news and local updates for La Porte", members: 76, joined: false, city: "La Porte" },
   ]);
+
+  const homeLocation = canonicalLocation(currentBusiness?.city || currentProfile?.city);
+  const browsingLocation = activeLocation === "All Areas" ? homeLocation : canonicalLocation(activeLocation);
+  const availableLocations = Array.from(new Set<string>([...LOCATIONS, homeLocation]));
+
+  useEffect(() => {
+    if (!authReady) return;
+    const controller = new AbortController();
+
+    const refreshWeather = async () => {
+      setWeather(INITIAL_WEATHER);
+      try {
+        const snapshot = await fetchWeatherSnapshot(browsingLocation, controller.signal);
+        setWeather(snapshot);
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        console.error("Could not load local weather", error);
+        setWeather({ status: "error", temperature: null, description: "Weather unavailable", icon: "🌤️" });
+      }
+    };
+
+    void refreshWeather();
+    const timer = window.setInterval(() => { void refreshWeather(); }, 10 * 60 * 1000);
+    return () => {
+      controller.abort();
+      window.clearInterval(timer);
+    };
+  }, [authReady, browsingLocation]);
 
   async function loadCurrentProfile(goToProfile = false) {
     const { data: { user } } = await supabase.auth.getUser();
@@ -3475,7 +3611,7 @@ export default function App() {
       id: user.id,
       name: row?.full_name || m.full_name || user.email?.split("@")[0] || "Neighbor",
       neighborhood: row?.neighborhood || m.neighborhood || row?.city || m.city || "Your neighborhood",
-      city: row?.city || m.city || "Michigan City",
+      city: canonicalLocation(row?.city || m.city),
       joinDate: created.toLocaleDateString(undefined, { month: "long", year: "numeric" }),
       bio: row?.bio || m.bio || "",
       badges: ["newcomer"],
@@ -3488,6 +3624,7 @@ export default function App() {
 
     setCurrentProfile(profile);
     setMyAvatarUrl(row?.avatar_url || null);
+    let defaultLocation = profile.city;
 
     if (accountType === "business") {
       const { data: businessRow } = await supabase
@@ -3501,7 +3638,7 @@ export default function App() {
         ownerId: user.id,
         name: businessRow?.business_name || m.business_name || profile.name,
         category: businessRow?.category || m.business_category || "Local Business",
-        city: businessRow?.city || row?.city || m.city || "Michigan City",
+        city: canonicalLocation(businessRow?.city || row?.city || m.city),
         rating: 0, reviewCount: 0, badges: [],
         description: businessRow?.description || m.business_description || "",
         services, photos: [], phone: businessRow?.phone || m.business_phone || "", email: user.email || "",
@@ -3509,9 +3646,10 @@ export default function App() {
         address: [businessRow?.neighborhood || row?.neighborhood || m.neighborhood, businessRow?.city || row?.city || m.city, businessRow?.zip_code || row?.zip_code || m.zip_code].filter(Boolean).join(", "),
         hours: [], founded: String(created.getFullYear()), owner: businessRow?.owner_name || profile.name, reviews: [],
       });
+      defaultLocation = canonicalLocation(businessRow?.city || row?.city || m.city);
     } else setCurrentBusiness(null);
 
-    if (row?.city && LOCATIONS.includes(row.city as LocationName)) setActiveLocation(row.city as LocationName);
+    setActiveLocation(defaultLocation);
     setAuthReady(true);
     if (goToProfile || location.pathname === "/profile") {
       setView({ page: accountType === "business" ? "my-business" : "me" });
@@ -3640,7 +3778,7 @@ export default function App() {
     (async () => {
       const { data: rows, error } = await supabase
         .from("posts")
-        .select("id, author_id, category, content, image_url, created_at")
+        .select("id, author_id, category, content, image_url, city, neighborhood, created_at")
         .order("created_at", { ascending: false })
         .limit(100);
       if (error || !rows?.length) return;
@@ -3664,8 +3802,8 @@ export default function App() {
           authorId: r.author_id,
           authorAvatar: isBiz ? (b?.logo_url || p?.avatar_url || null) : (p?.avatar_url || null),
           authorBadges: [],
-          neighborhood: b?.neighborhood || p?.neighborhood || b?.city || p?.city || "Local Area",
-          city: b?.city || p?.city || "Michigan City",
+          neighborhood: r.neighborhood || b?.neighborhood || p?.neighborhood || r.city || b?.city || p?.city || "Local Area",
+          city: canonicalLocation(r.city || b?.city || p?.city),
           time: created.toLocaleDateString() === new Date().toLocaleDateString() ? "Today" : created.toLocaleDateString(),
           category: (r.category || "general") as PostCategory,
           body: r.content,
@@ -3921,7 +4059,7 @@ export default function App() {
   const locationFilteredPosts =
     activeLocation === "All Areas"
       ? posts
-      : posts.filter((p) => p.city === activeLocation);
+      : posts.filter((p) => sameLocation(p.city, activeLocation));
 
   const filteredPosts =
     activeTab === "all"
@@ -3964,13 +4102,16 @@ export default function App() {
       imageUrl=publicData.publicUrl;
     }
 
-    const postCity = activeLocation === "All Areas" ? (currentBusiness?.city || currentProfile?.city || "Michigan City") : activeLocation;
+    const postCity = browsingLocation;
+    const postNeighborhood = activeLocation === "All Areas"
+      ? (currentBusiness?.address.split(",")[0] || currentProfile?.neighborhood || postCity)
+      : postCity;
     const postType = selectedCategory === "safety" ? "alert" : selectedCategory === "recommendation" ? "recommendation" : selectedCategory === "helpwanted" ? "help_wanted" : "discussion";
-    const { data: saved, error } = await supabase.from("posts").insert({ author_id:user.id, post_type:postType, category:selectedCategory, content:text, image_url:imageUrl }).select("id, created_at").single();
+    const { data: saved, error } = await supabase.from("posts").insert({ author_id:user.id, post_type:postType, category:selectedCategory, content:text, image_url:imageUrl, city:postCity, neighborhood:postNeighborhood }).select("id, created_at").single();
     if (error) { console.error("Could not save post",error); return; }
 
     const authorName=currentAccountType === "business" ? (currentBusiness?.name || "Business") : (currentProfile?.name || "You");
-    const newPost: Post={ id:new Date(saved.created_at).getTime(), author:authorName, authorId:user.id, authorAvatar:myAvatarUrl, authorBadges:[], neighborhood:postCity, city:postCity, time:"Just now", category:selectedCategory, body:text, image:imageUrl || undefined, likes:0, comments:[], bookmarked:false, liked:false };
+    const newPost: Post={ id:new Date(saved.created_at).getTime(), author:authorName, authorId:user.id, authorAvatar:myAvatarUrl, authorBadges:[], neighborhood:postNeighborhood, city:postCity, time:"Just now", category:selectedCategory, body:text, image:imageUrl || undefined, likes:0, comments:[], bookmarked:false, liked:false };
     setPosts(prev=>[newPost,...prev]);
     if(selectedCategory === "forsale") setClassifiedPosts(prev=>[newPost,...prev]);
     setNewPostText(""); setSelectedCategory("general"); setComposing(false);
@@ -4027,7 +4168,7 @@ export default function App() {
             {locationOpen && (
               <div className="absolute top-full left-0 mt-2 w-52 bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden">
                 <p className="px-3 pt-2.5 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground font-['DM_Sans',sans-serif]">Choose Area</p>
-                {LOCATIONS.map((loc) => (
+                {availableLocations.map((loc) => (
                   <button
                     key={loc}
                     onClick={() => { setActiveLocation(loc); setLocationOpen(false); }}
@@ -4195,7 +4336,7 @@ export default function App() {
             >
               <Avatar name={currentAccountType === "business" ? (currentBusiness?.name || "Business") : (currentProfile?.name || "Neighbor")} size="md" src={myAvatarUrl} />
               <div className="flex-1 bg-muted rounded-lg px-4 py-2.5 text-sm text-muted-foreground font-['DM_Sans',sans-serif]">
-                What's happening in Maplewood Heights?
+                What's happening in {browsingLocation}?
               </div>
               <button className="flex items-center gap-1.5 bg-primary text-primary-foreground px-3 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
                 <Plus size={14} /> Post
@@ -4522,19 +4663,7 @@ export default function App() {
               <img src={neighborlyAppLogo} alt="Neighborly App" className="w-full h-auto object-contain" />
             </div>
 
-            <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-semibold text-sm">Local Weather</h3>
-                <span className="text-xs font-medium text-muted-foreground bg-secondary px-2 py-0.5 rounded">Maplewood Hts</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-2xl font-bold">74°F</p>
-                  <p className="text-xs text-muted-foreground">Partly Cloudy</p>
-                </div>
-                <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center">🌤️</div>
-              </div>
-            </div>
+            <WeatherCard locationName={browsingLocation} weather={weather} />
 
             <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl p-4 text-white shadow-sm">
               <div className="flex items-center gap-2 mb-2">
@@ -4560,7 +4689,7 @@ export default function App() {
                 </button>
               </div>
               <div className="flex flex-col gap-2">
-                {(activeLocation === "All Areas" ? groups : groups.filter(g => g.city === activeLocation)).map((group) => (
+                {(activeLocation === "All Areas" ? groups : groups.filter(g => sameLocation(g.city, activeLocation))).map((group) => (
                   <div key={group.id} className="p-2.5 rounded-lg border border-border/60 hover:bg-secondary/30 transition-colors">
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-xs font-semibold truncate flex-1 mr-2">{group.name}</span>
@@ -4659,16 +4788,7 @@ export default function App() {
           </div>
 
           {/* Weather */}
-          <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-semibold text-sm">Local Weather</h3>
-              <span className="text-xs font-medium text-muted-foreground bg-secondary px-2 py-0.5 rounded">Maplewood Hts</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <div><p className="text-2xl font-bold">74°F</p><p className="text-xs text-muted-foreground">Partly Cloudy</p></div>
-              <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center">🌤️</div>
-            </div>
-          </div>
+          <WeatherCard locationName={browsingLocation} weather={weather} />
 
           {/* Grow Your Business */}
           <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl p-4 text-white shadow-sm">
@@ -4691,7 +4811,7 @@ export default function App() {
               <button onClick={() => setIsCreateGroupOpen(true)} className="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 font-semibold px-2.5 py-1 rounded-lg transition-colors">+ Create</button>
             </div>
             <div className="flex flex-col gap-2">
-              {(activeLocation === "All Areas" ? groups : groups.filter(g => g.city === activeLocation)).map((group) => (
+              {(activeLocation === "All Areas" ? groups : groups.filter(g => sameLocation(g.city, activeLocation))).map((group) => (
                 <div key={group.id} className="p-2.5 rounded-lg border border-border/60 hover:bg-secondary/30 transition-colors">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-semibold truncate flex-1 mr-2">{group.name}</span>
