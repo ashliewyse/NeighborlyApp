@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Analytics } from "@vercel/analytics/react";
-import { AuthView as SupabaseAuthView } from "@/app/components/AuthView";
+import { useLocation, useNavigate } from "react-router";
+import { SettingsView } from "@/app/components/SettingsView";
+import { supabase } from "@/lib/supabase";
 import { ImageWithFallback } from "@/app/components/figma/ImageWithFallback";
 import neighborlyLogo from "@/imports/Copilot_20260807_041314.png";
 import neighborlyAppLogo from "@/imports/watermarked_img_9245041771390677153.jpg";
@@ -74,6 +76,7 @@ interface UserBadge {
 interface BusinessReview {
   id: number;
   author: string;
+  authorId?: string;
   authorBadges: UserBadgeType[];
   rating: number;
   date: string;
@@ -136,12 +139,15 @@ type PostCategory =
   | "event"
   | "forsale"
   | "recommendation"
-  | "general";
+  | "general"
+  | "helpwanted";
 type ActiveView =
   | { page: "feed" }
   | { page: "business"; id: number }
   | { page: "user"; name: string }
-  | { page: "auth"; mode: "signin" | "signup" }
+  | { page: "me" }
+  | { page: "my-business" }
+  | { page: "settings" }
   | { page: "search" }
   | { page: "events" }
   | { page: "classifieds" };
@@ -165,6 +171,7 @@ interface Post {
   title?: string;
   body: string;
   image?: string;
+  authorAvatar?: string | null;
   likes: number;
   comments: Comment[];
   bookmarked: boolean;
@@ -564,6 +571,11 @@ const CATEGORY_META: Record<
     color: "text-stone-600 bg-stone-50 border-stone-200",
     icon: <Leaf size={11} />,
   },
+  helpwanted: {
+    label: "Help Wanted",
+    color: "text-blue-700 bg-blue-50 border-blue-200",
+    icon: <Briefcase size={11} />,
+  },
 };
 
 const INITIAL_POSTS: Post[] = [
@@ -936,26 +948,138 @@ function AuthView({
 
 // ─── Business Profile ─────────────────────────────────────────────────────────
 
+function ProfilePostsFeed({ profileName, profileType }: { profileName: string; profileType: "business" | "personal" }) {
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      let ownerId: string | null = null;
+      if (profileType === "business") {
+        const { data: businessRow } = await supabase.from("business_profiles").select("user_id").eq("business_name", profileName).maybeSingle();
+        ownerId = businessRow?.user_id || null;
+        // Own business fallback: the displayed business can be assembled in memory, but posts are always saved with auth user.id.
+        if (!ownerId) {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const { data: ownBusiness } = await supabase.from("business_profiles").select("business_name").eq("user_id", user.id).maybeSingle();
+            if (ownBusiness?.business_name === profileName) ownerId = user.id;
+          }
+        }
+      } else {
+        const { data: profileRow } = await supabase.from("profiles").select("id").eq("full_name", profileName).maybeSingle();
+        ownerId = profileRow?.id || null;
+      }
+      if (!ownerId) { if (active) { setItems([]); setLoading(false); } return; }
+      const { data, error } = await supabase.from("posts").select("id, author_id, category, content, image_url, created_at").eq("author_id", ownerId).order("created_at", { ascending: false }).limit(50);
+      if (!active) return;
+      setItems(error ? [] : (data || [])); setLoading(false);
+    })();
+    return () => { active = false; };
+  }, [profileName, profileType]);
+  if (loading) return <div className="bg-white rounded-xl border border-border p-6 text-sm text-muted-foreground">Loading posts…</div>;
+  if (!items.length) return <div className="bg-white rounded-xl border border-border p-6"><h3 className="font-semibold text-lg mb-2">Posts</h3><p className="text-sm text-muted-foreground">No posts from {profileName} yet.</p></div>;
+  return <div className="space-y-4">{items.map((post:any) => <div key={post.id} className="bg-white rounded-xl border border-border p-4 sm:p-5"><div className="font-semibold mb-1">{profileName}</div><div className="text-xs text-muted-foreground mb-3">{new Date(post.created_at).toLocaleDateString()}</div><p className="text-sm sm:text-base whitespace-pre-wrap">{post.content}</p>{post.image_url && <img src={post.image_url} alt="Post" className="mt-3 w-full max-h-[480px] object-cover rounded-lg" />}</div>)}</div>;
+}
+
 function BusinessProfileView({
   biz,
   onBack,
   onUserClick,
+  isOwnProfile = false,
+  onLogoChange,
 }: {
   biz: Business;
   onBack: () => void;
-  onUserClick: (name: string) => void;
+  onUserClick: (name: string, authorId?: string) => void;
+  isOwnProfile?: boolean;
+  onLogoChange?: (url: string) => void;
 }) {
   const [tab, setTab] = useState<
-    "about" | "services" | "photos" | "contact" | "reviews"
+    "about" | "posts" | "services" | "photos" | "contact" | "reviews"
   >("about");
   const [photosExpanded, setPhotosExpanded] = useState(false);
-  const [reviewHelpful, setReviewHelpful] = useState<
-    Record<number, boolean>
-  >({});
+  const [reviewHelpful, setReviewHelpful] = useState<Record<number, boolean>>({});
+  const [businessPhotos, setBusinessPhotos] = useState(biz.photos);
+  const [coverUrl, setCoverUrl] = useState<string | null>(null);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [mediaBusy, setMediaBusy] = useState(false);
+  const [mediaError, setMediaError] = useState<string | null>(null);
 
-  const visiblePhotos = photosExpanded
-    ? biz.photos
-    : biz.photos.slice(0, 4);
+  useEffect(() => {
+    if (!isOwnProfile) return;
+    let active = true;
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !active) return;
+      const [{ data: businessRow }, { data: photos }, { data: profileRow }] = await Promise.all([
+        supabase.from("business_profiles").select("logo_url, cover_url").eq("user_id", user.id).maybeSingle(),
+        supabase.from("profile_photos").select("image_url, caption").eq("user_id", user.id).order("created_at", { ascending: true }),
+        supabase.from("profiles").select("avatar_url").eq("id", user.id).maybeSingle(),
+      ]);
+      if (!active) return;
+      const persistedLogo = businessRow?.logo_url || profileRow?.avatar_url || null;
+      setLogoUrl(persistedLogo);
+      if (persistedLogo) onLogoChange?.(persistedLogo);
+      setCoverUrl(businessRow?.cover_url || null);
+      if (photos) setBusinessPhotos(photos.map((p: any) => ({ url: p.image_url, alt: p.caption || "Business photo" })));
+    })();
+    return () => { active = false; };
+  }, [isOwnProfile]);
+
+  async function uploadBusinessFile(file: File, kind: "logo" | "cover" | "gallery") {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("You must be signed in to upload photos.");
+    const ext = (file.name.split(".").pop() || "jpg").replace(/[^a-z0-9]/gi, "").toLowerCase() || "jpg";
+    const path = user.id + "/business-" + kind + "/" + Date.now() + "-" + Math.random().toString(36).slice(2) + "." + ext;
+    const { error } = await supabase.storage.from("neighborly-media").upload(path, file, { contentType: file.type || "image/jpeg", cacheControl: "3600", upsert: false });
+    if (error) throw error;
+    return supabase.storage.from("neighborly-media").getPublicUrl(path).data.publicUrl;
+  }
+
+  async function saveBusinessImage(e: React.ChangeEvent<HTMLInputElement>, kind: "logo" | "cover") {
+    if (!isOwnProfile) return;
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setMediaBusy(true); setMediaError(null);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("You must be signed in.");
+      const publicUrl = await uploadBusinessFile(file, kind);
+      const update = kind === "logo" ? { logo_url: publicUrl } : { cover_url: publicUrl };
+      const { error } = await supabase.from("business_profiles").update({ ...update, updated_at: new Date().toISOString() }).eq("user_id", user.id);
+      if (error) throw error;
+      if (kind === "logo") {
+        setLogoUrl(publicUrl);
+        onLogoChange?.(publicUrl);
+        const { error: profileError } = await supabase.from("profiles").update({ avatar_url: publicUrl, updated_at: new Date().toISOString() }).eq("id", user.id);
+        if (profileError) throw profileError;
+      } else setCoverUrl(publicUrl);
+    } catch (e: any) { setMediaError(e?.message || "Could not save business photo."); }
+    finally { setMediaBusy(false); }
+  }
+
+  async function saveBusinessGallery(e: React.ChangeEvent<HTMLInputElement>) {
+    if (!isOwnProfile) return;
+    const files = Array.from(e.target.files || []);
+    e.target.value = "";
+    if (!files.length) return;
+    setMediaBusy(true); setMediaError(null);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("You must be signed in.");
+      for (const photo of files) {
+        const publicUrl = await uploadBusinessFile(photo, "gallery");
+        const { error } = await supabase.from("profile_photos").insert({ user_id: user.id, image_url: publicUrl, caption: photo.name });
+        if (error) throw error;
+        setBusinessPhotos((prev) => [...prev, { url: publicUrl, alt: photo.name }]);
+      }
+    } catch (e: any) { setMediaError(e?.message || "Could not save business photos."); }
+    finally { setMediaBusy(false); }
+  }
+
+  const visiblePhotos = photosExpanded ? businessPhotos : businessPhotos.slice(0, 4);
 
   return (
     <div className="min-h-screen bg-purple-950">
@@ -971,9 +1095,16 @@ function BusinessProfileView({
 
           {/* Hero area */}
           <div className="pb-0">
-            <div className="flex items-end gap-4 pb-4">
-              <div className="w-20 h-20 rounded-2xl bg-card border-4 border-card shadow-md flex items-center justify-center text-primary flex-shrink-0">
-                <Briefcase size={28} />
+            <div className="relative mb-4 h-36 sm:h-52 overflow-hidden rounded-xl bg-gradient-to-r from-blue-700 to-cyan-500">
+              {coverUrl && <img src={coverUrl} alt={biz.name + " cover"} className="h-full w-full object-cover" />}
+              {isOwnProfile && <label className="absolute right-3 bottom-3 cursor-pointer rounded-lg bg-white/95 px-3 py-2 text-xs font-semibold shadow"><Camera size={13} className="inline mr-1" />Change Cover<input type="file" accept="image/*" className="hidden" onChange={(e) => void saveBusinessImage(e, "cover")} /></label>}
+            </div>
+            {mediaError && isOwnProfile && <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{mediaError}</div>}
+            {mediaBusy && isOwnProfile && <div className="mb-3 text-xs text-muted-foreground">Saving photo…</div>}
+            <div className="flex flex-col sm:flex-row sm:items-end gap-4 pb-4">
+              <div className="relative w-20 h-20 rounded-2xl bg-card border-4 border-card shadow-md flex items-center justify-center text-primary flex-shrink-0 overflow-hidden">
+                {logoUrl ? <img src={logoUrl} alt={biz.name} className="w-full h-full object-cover" /> : <Briefcase size={28} />}
+                {isOwnProfile && <label className="absolute inset-x-0 bottom-0 cursor-pointer bg-black/55 py-1 text-center text-[10px] text-white">Edit<input type="file" accept="image/*" className="hidden" onChange={(e) => void saveBusinessImage(e, "logo")} /></label>}
               </div>
               <div className="flex-1 pb-1">
                 <div className="flex flex-wrap items-center gap-2 mb-1">
@@ -998,14 +1129,14 @@ function BusinessProfileView({
                   </span>
                 </div>
               </div>
-              <div className="flex gap-2 pb-1 flex-shrink-0">
+              <div className="flex w-full sm:w-auto gap-2 pb-1 flex-shrink-0">
                 <a
                   href={`tel:${biz.phone}`}
-                  className="flex items-center gap-1.5 bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity font-['DM_Sans',sans-serif]"
+                  className="flex flex-1 sm:flex-none justify-center items-center gap-1.5 bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity font-['DM_Sans',sans-serif]"
                 >
                   <Phone size={13} /> Call
                 </a>
-                <button className="flex items-center gap-1.5 border border-border bg-card px-4 py-2 rounded-lg text-sm font-medium hover:bg-secondary transition-colors font-['DM_Sans',sans-serif]">
+                <button className="flex flex-1 sm:flex-none justify-center items-center gap-1.5 border border-border bg-card px-4 py-2 rounded-lg text-sm font-medium hover:bg-secondary transition-colors font-['DM_Sans',sans-serif]">
                   <MessageSquare size={13} /> Message
                 </button>
               </div>
@@ -1013,15 +1144,9 @@ function BusinessProfileView({
           </div>
 
           {/* Tabs */}
-          <div className="flex border-t border-border">
+          <div className="flex overflow-x-auto border-t border-border">
             {(
-              [
-                "about",
-                "services",
-                "photos",
-                "contact",
-                "reviews",
-              ] as const
+              ["about", "posts", "services", "photos", "contact", "reviews"] as const
             ).map((t) => (
               <button
                 key={t}
@@ -1035,7 +1160,7 @@ function BusinessProfileView({
                 {t === "reviews"
                   ? `Reviews (${biz.reviews.length})`
                   : t === "photos"
-                    ? `Photos (${biz.photos.length})`
+                    ? `Photos (${businessPhotos.length})`
                     : t.charAt(0).toUpperCase() + t.slice(1)}
               </button>
             ))}
@@ -1166,6 +1291,8 @@ function BusinessProfileView({
           </div>
         )}
 
+        {tab === "posts" && <ProfilePostsFeed profileName={biz.name} profileType="business" />}
+
         {tab === "services" && (
           <div className="bg-white rounded-xl border border-border p-6">
             <div className="flex items-center justify-between mb-5">
@@ -1218,9 +1345,10 @@ function BusinessProfileView({
           <div className="bg-white rounded-xl border border-border p-6">
             <div className="flex items-center justify-between mb-5">
               <h2 className="font-semibold">Photo Gallery</h2>
-              <span className="text-xs text-muted-foreground bg-secondary px-2 py-1 rounded-full flex items-center gap-1.5">
-                <Camera size={11} /> {biz.photos.length} photos
-              </span>
+              <div className="flex items-center gap-2">
+                {isOwnProfile && <label className="cursor-pointer rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground">Upload Photos<input type="file" accept="image/*" multiple className="hidden" onChange={(e) => void saveBusinessGallery(e)} /></label>}
+                <span className="text-xs text-muted-foreground bg-secondary px-2 py-1 rounded-full flex items-center gap-1.5"><Camera size={11} /> {businessPhotos.length} photos</span>
+              </div>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {visiblePhotos.map((photo, i) => (
@@ -1242,7 +1370,7 @@ function BusinessProfileView({
                 </div>
               ))}
             </div>
-            {biz.photos.length > 4 && (
+            {businessPhotos.length > 4 && (
               <button
                 onClick={() =>
                   setPhotosExpanded(!photosExpanded)
@@ -1260,7 +1388,7 @@ function BusinessProfileView({
                 ) : (
                   <>
                     <Camera size={14} /> View{" "}
-                    {biz.photos.length - 4} more photos
+                    {businessPhotos.length - 4} more photos
                   </>
                 )}
               </button>
@@ -1781,7 +1909,7 @@ function UserProfileView({
   myAvatarUrl?: string | null;
   onAvatarChange?: (url: string) => void;
 }) {
-  const [tab, setTab] = useState<"about" | "photos" | "reviews">("about");
+  const [tab, setTab] = useState<"about" | "posts" | "photos" | "reviews">("about");
   const [theme, setTheme] = useState<ThemeName>("Classic Blue");
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(myAvatarUrl);
@@ -1795,8 +1923,29 @@ function UserProfileView({
   const [themeOpen, setThemeOpen] = useState(false);
   const [cropSrc, setCropSrc] = useState<string | null>(null);
   const [cropMode, setCropMode] = useState<"avatar" | "cover">("avatar");
+  const [mediaBusy, setMediaBusy] = useState(false);
+  const [mediaError, setMediaError] = useState<string | null>(null);
 
   const T = PROFILE_THEMES[theme];
+
+  useEffect(() => {
+    if (!isOwnProfile) return;
+    let active = true;
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !active) return;
+      const [{ data: row }, { data: photos }] = await Promise.all([
+        supabase.from("profiles").select("avatar_url, cover_url, theme").eq("id", user.id).maybeSingle(),
+        supabase.from("profile_photos").select("image_url, caption").eq("user_id", user.id).order("created_at", { ascending: true }),
+      ]);
+      if (!active) return;
+      if (row?.avatar_url) { setAvatarUrl(row.avatar_url); onAvatarChange?.(row.avatar_url); }
+      if (row?.cover_url) setCoverUrl(row.cover_url);
+      if (row?.theme && Object.prototype.hasOwnProperty.call(PROFILE_THEMES, row.theme)) setTheme(row.theme as ThemeName);
+      if (photos) setGallery(photos.map((p: any) => ({ url: p.image_url, alt: p.caption || "Profile photo" })));
+    })();
+    return () => { active = false; };
+  }, [isOwnProfile]);
 
   useEffect(() => {
     document.documentElement.style.setProperty("--scrollbar-thumb", T.scrollbarColor);
@@ -1822,17 +1971,72 @@ function UserProfileView({
     const f = e.target.files?.[0];
     if (f) { openCrop(f, "avatar"); e.target.value = ""; }
   }
-  function applyAvatar(url: string) {
-    setAvatarUrl(url);
-    onAvatarChange?.(url);
+  async function uploadMedia(blob: Blob, kind: "avatar" | "cover" | "gallery", originalName = "image.jpg") {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("You must be signed in to upload photos.");
+    const ext = (originalName.split(".").pop() || "jpg").replace(/[^a-z0-9]/gi, "").toLowerCase() || "jpg";
+    const path = user.id + "/" + kind + "/" + Date.now() + "-" + Math.random().toString(36).slice(2) + "." + ext;
+    const { error } = await supabase.storage.from("neighborly-media").upload(path, blob, { contentType: blob.type || "image/jpeg", cacheControl: "3600", upsert: false });
+    if (error) throw error;
+    return supabase.storage.from("neighborly-media").getPublicUrl(path).data.publicUrl;
   }
-  function handleGalleryUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    Array.from(e.target.files || []).forEach((f) => {
-      setGallery((prev) => [
-        ...prev,
-        { url: URL.createObjectURL(f), alt: f.name },
-      ]);
-    });
+
+  async function applyAvatar(url: string) {
+    if (!isOwnProfile) return;
+    setMediaBusy(true); setMediaError(null);
+    try {
+      const blob = await fetch(url).then((r) => r.blob());
+      const publicUrl = await uploadMedia(blob, "avatar", "avatar.jpg");
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not signed in");
+      const { error } = await supabase.rpc("set_my_profile_media", { p_avatar_url: publicUrl, p_cover_url: null, p_theme: null });
+      if (error) throw error;
+      setAvatarUrl(publicUrl); onAvatarChange?.(publicUrl);
+    } catch (e: any) { setMediaError(e?.message || "Could not save profile photo."); }
+    finally { setMediaBusy(false); }
+  }
+
+  async function applyCover(url: string) {
+    if (!isOwnProfile) return;
+    setMediaBusy(true); setMediaError(null);
+    try {
+      const blob = await fetch(url).then((r) => r.blob());
+      const publicUrl = await uploadMedia(blob, "cover", "cover.jpg");
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not signed in");
+      const { error } = await supabase.rpc("set_my_profile_media", { p_avatar_url: null, p_cover_url: publicUrl, p_theme: null });
+      if (error) throw error;
+      setCoverUrl(publicUrl);
+    } catch (e: any) { setMediaError(e?.message || "Could not save cover photo."); }
+    finally { setMediaBusy(false); }
+  }
+
+  async function saveTheme(t: ThemeName) {
+    if (!isOwnProfile) return;
+    setTheme(t); setThemeOpen(false); setMediaError(null);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { error } = await supabase.rpc("set_my_profile_media", { p_avatar_url: null, p_cover_url: null, p_theme: t });
+    if (error) setMediaError(error.message);
+  }
+
+  async function handleGalleryUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    if (!isOwnProfile) return;
+    const files = Array.from(e.target.files || []);
+    e.target.value = "";
+    if (!files.length) return;
+    setMediaBusy(true); setMediaError(null);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("You must be signed in to upload photos.");
+      for (const f of files) {
+        const publicUrl = await uploadMedia(f, "gallery", f.name);
+        const { error } = await supabase.from("profile_photos").insert({ user_id: user.id, image_url: publicUrl, caption: f.name });
+        if (error) throw error;
+        setGallery((prev) => [...prev, { url: publicUrl, alt: f.name }]);
+      }
+    } catch (e: any) { setMediaError(e?.message || "Could not save profile photos."); }
+    finally { setMediaBusy(false); }
   }
   function submitReview() {
     if (!pickedStar || !reviewText.trim()) return;
@@ -1847,6 +2051,8 @@ function UserProfileView({
 
   return (
     <div className="min-h-screen bg-background">
+      {mediaError && isOwnProfile && <div className="mx-auto max-w-5xl px-4 pt-3"><div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{mediaError}</div></div>}
+      {mediaBusy && isOwnProfile && <div className="mx-auto max-w-5xl px-4 pt-3 text-xs text-muted-foreground">Saving photo…</div>}
       <div className="relative h-44 md:h-56 overflow-hidden">
         {coverUrl
           ? <img src={coverUrl} alt="Cover" className="w-full h-full object-cover" />
@@ -1894,7 +2100,7 @@ function UserProfileView({
                       {(Object.keys(PROFILE_THEMES) as ThemeName[]).map((t) => (
                         <button
                           key={t}
-                          onClick={() => { setTheme(t); setThemeOpen(false); }}
+                          onClick={() => { void saveTheme(t); }}
                           className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-muted transition-colors ${t === theme ? "font-semibold" : ""}`}
                         >
                           <span className={`w-4 h-4 rounded-full bg-gradient-to-br ${PROFILE_THEMES[t].cover} flex-shrink-0`} />
@@ -1939,7 +2145,7 @@ function UserProfileView({
           )}
 
           <div className="flex border-t border-border">
-            {(["about", "photos", "reviews"] as const).map((t) => (
+            {(["about", "posts", "photos", "reviews"] as const).map((t) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
@@ -1957,6 +2163,8 @@ function UserProfileView({
       </div>
 
       <div className="max-w-3xl mx-auto px-4 py-6 pb-24">
+        {tab === "posts" && <ProfilePostsFeed profileName={profile.name} profileType="personal" />}
+
         {tab === "about" && (
           <div className="grid grid-cols-1 md:grid-cols-[1fr_200px] gap-5">
             <div className="flex flex-col gap-4">
@@ -2154,8 +2362,8 @@ function UserProfileView({
           src={cropSrc}
           mode={cropMode}
           onApply={(url) => {
-            if (cropMode === "avatar") applyAvatar(url);
-            else setCoverUrl(url);
+            if (cropMode === "avatar") void applyAvatar(url);
+            else void applyCover(url);
             setCropSrc(null);
           }}
           onClose={() => setCropSrc(null)}
@@ -2196,7 +2404,7 @@ function SearchView({
   activeLocation,
 }: {
   onBack: () => void;
-  onUserClick: (name: string) => void;
+  onUserClick: (name: string, authorId?: string) => void;
   onBusinessClick: (id: number) => void;
   groups: { id: number; name: string; description: string; members: number; joined: boolean; city: string }[];
   activeLocation: LocationName;
@@ -2440,7 +2648,7 @@ function ClassifiedsView({
 }: {
   posts: Post[];
   onBack: () => void;
-  onUserClick: (name: string) => void;
+  onUserClick: (name: string, authorId?: string) => void;
   activeLocation: LocationName;
 }) {
   const [search, setSearch] = useState("");
@@ -2490,11 +2698,11 @@ function ClassifiedsView({
               )}
               <div className="p-4">
                 <div className="flex items-start gap-3">
-                  <button onClick={() => onUserClick(post.author)}>
-                    <Avatar name={post.author} size="sm" />
+                  <button onClick={() => onUserClick(post.author, post.authorId)}>
+                    <Avatar name={post.author} size="sm" src={post.authorAvatar || null} />
                   </button>
                   <div className="flex-1 min-w-0">
-                    <button onClick={() => onUserClick(post.author)} className="font-semibold text-sm text-foreground hover:text-primary transition-colors">{post.author}</button>
+                    <button onClick={() => onUserClick(post.author, post.authorId)} className="font-semibold text-sm text-foreground hover:text-primary transition-colors">{post.author}</button>
                     <p className="text-xs text-muted-foreground">{post.neighborhood} · {post.time}</p>
                   </div>
                 </div>
@@ -2602,11 +2810,16 @@ function AdvertiseModal({ onClose }: { onClose: () => void }) {
 type ActiveTab = "all" | PostCategory;
 
 export default function App() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [posts, setPosts] = useState<Post[]>(INITIAL_POSTS);
   const [activeTab, setActiveTab] = useState<ActiveTab>("all");
   const [expandedPost, setExpandedPost] = useState<number | null>(null);
   const [composing, setComposing] = useState(false);
   const [newPostText, setNewPostText] = useState("");
+  const [newPostImage, setNewPostImage] = useState<File | null>(null);
+  const [newPostImagePreview, setNewPostImagePreview] = useState<string | null>(null);
+  const postImageInputRef = useRef<HTMLInputElement | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<PostCategory>("general");
   const [classifiedPosts, setClassifiedPosts] = useState<Post[]>(
     INITIAL_POSTS.filter((p) => p.category === "forsale"),
@@ -2614,13 +2827,15 @@ export default function App() {
   const [commentDraft, setCommentDraft] = useState<Record<number, string>>({});
   const [notifOpen, setNotifOpen] = useState(false);
   const [messagesOpen, setMessagesOpen] = useState(false);
-  const [view, setView] = useState<ActiveView>({
-    page: "auth",
-    mode: "signin",
-  });
+  const [view, setView] = useState<ActiveView>({ page: "feed" });
   const [advertiseOpen, setAdvertiseOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [myAvatarUrl, setMyAvatarUrl] = useState<string | null>(null);
+  const postsLoadedRef = useRef(false);
+  const [currentProfile, setCurrentProfile] = useState<UserProfile | null>(null);
+  const [currentBusiness, setCurrentBusiness] = useState<Business | null>(null);
+  const [currentAccountType, setCurrentAccountType] = useState<"personal" | "business">("personal");
+  const [authReady, setAuthReady] = useState(false);
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   const [activeLocation, setActiveLocation] = useState<LocationName>("All Areas");
   const [locationOpen, setLocationOpen] = useState(false);
@@ -2631,6 +2846,142 @@ export default function App() {
     { id: 4, name: "📰 Local News Watch", description: "Breaking news and local updates for La Porte", members: 76, joined: false, city: "La Porte" },
   ]);
 
+  async function loadCurrentProfile(goToProfile = false) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setCurrentProfile(null);
+      setCurrentBusiness(null);
+      setCurrentAccountType("personal");
+      setAuthReady(true);
+      return;
+    }
+
+    const { data: row } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    const m = user.user_metadata || {};
+    const accountType = (row?.account_type || m.account_type) === "business" ? "business" : "personal";
+    setCurrentAccountType(accountType);
+
+    const created = row?.created_at ? new Date(row.created_at) : new Date(user.created_at);
+    const profile: UserProfile = {
+      name: row?.full_name || m.full_name || user.email?.split("@")[0] || "Neighbor",
+      neighborhood: row?.neighborhood || m.neighborhood || row?.city || m.city || "Your neighborhood",
+      city: row?.city || m.city || "Michigan City",
+      joinDate: created.toLocaleDateString(undefined, { month: "long", year: "numeric" }),
+      bio: row?.bio || m.bio || "",
+      badges: ["newcomer"],
+      posts: 0, neighbors: 0, helpfulVotes: 0, recsGiven: 0, rating: 0, ratingCount: 0,
+      neighborReviews: [], galleryPhotos: [], recentActivity: [],
+    };
+
+    setCurrentProfile(profile);
+    setMyAvatarUrl(row?.avatar_url || null);
+
+    if (accountType === "business") {
+      const { data: businessRow } = await supabase
+        .from("business_profiles")
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      const services = Array.isArray(businessRow?.services) ? businessRow.services : typeof businessRow?.services === "string" && businessRow.services.trim() ? businessRow.services.split(",").map((v: string) => v.trim()).filter(Boolean) : [];
+      setCurrentBusiness({
+        id: -1,
+        name: businessRow?.business_name || m.business_name || profile.name,
+        category: businessRow?.category || m.business_category || "Local Business",
+        city: businessRow?.city || row?.city || m.city || "Michigan City",
+        rating: 0, reviewCount: 0, badges: [],
+        description: businessRow?.description || m.business_description || "",
+        services, photos: [], phone: businessRow?.phone || m.business_phone || "", email: user.email || "",
+        website: businessRow?.website || m.business_website || "",
+        address: [businessRow?.neighborhood || row?.neighborhood || m.neighborhood, businessRow?.city || row?.city || m.city, businessRow?.zip_code || row?.zip_code || m.zip_code].filter(Boolean).join(", "),
+        hours: [], founded: String(created.getFullYear()), owner: businessRow?.owner_name || profile.name, reviews: [],
+      });
+    } else setCurrentBusiness(null);
+
+    if (row?.city && LOCATIONS.includes(row.city as LocationName)) setActiveLocation(row.city as LocationName);
+    setAuthReady(true);
+    if (goToProfile || location.pathname === "/profile") {
+      setView({ page: accountType === "business" ? "my-business" : "me" });
+    } else if (location.pathname === "/settings") {
+      setView({ page: "settings" });
+    } else {
+      setView({ page: "feed" });
+    }
+  }
+
+  useEffect(() => {
+    let active = true;
+    supabase.auth.getSession().then(async ({ data }) => { if (!active) return; if (data.session?.user) await loadCurrentProfile(false); else setAuthReady(true); });
+    const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
+      if (!active) return;
+      if (event === "SIGNED_OUT") {
+        setCurrentProfile(null);
+        setCurrentBusiness(null);
+        setCurrentAccountType("personal");
+        navigate("/sign-in", { replace: true });
+      }
+    });
+    return () => { active = false; authListener.subscription.unsubscribe(); };
+  }, []);
+
+  useEffect(() => {
+    if (!authReady) return;
+    if (location.pathname === "/settings") {
+      setView({ page: "settings" });
+    } else if (location.pathname === "/profile") {
+      setView({ page: currentAccountType === "business" ? "my-business" : "me" });
+    } else if (location.pathname === "/" && ["settings", "me", "my-business"].includes(view.page)) {
+      setView({ page: "feed" });
+    }
+  }, [authReady, currentAccountType, location.pathname]);
+
+  useEffect(() => {
+    if (!authReady || postsLoadedRef.current) return;
+    postsLoadedRef.current = true;
+    (async () => {
+      const { data: rows, error } = await supabase
+        .from("posts")
+        .select("id, author_id, category, content, image_url, created_at")
+        .order("created_at", { ascending: false })
+        .limit(100);
+      if (error || !rows?.length) return;
+
+      const ids = [...new Set(rows.map((r: any) => r.author_id).filter(Boolean))];
+      const [{ data: profileRows }, { data: businessRows }] = await Promise.all([
+        supabase.from("profiles").select("id, full_name, city, neighborhood, avatar_url, account_type").in("id", ids),
+        supabase.from("business_profiles").select("user_id, business_name, city, neighborhood, logo_url").in("user_id", ids),
+      ]);
+      const profiles = new Map((profileRows || []).map((p: any) => [p.id, p]));
+      const businesses = new Map((businessRows || []).map((b: any) => [b.user_id, b]));
+
+      const loaded: Post[] = rows.map((r: any, index: number) => {
+        const p: any = profiles.get(r.author_id);
+        const b: any = businesses.get(r.author_id);
+        const isBiz = p?.account_type === "business" || !!b;
+        const created = new Date(r.created_at);
+        return {
+          id: created.getTime() + index,
+          author: isBiz ? (b?.business_name || p?.full_name || "Local Business") : (p?.full_name || "Neighbor"),
+          authorId: r.author_id,
+          authorAvatar: isBiz ? (b?.logo_url || p?.avatar_url || null) : (p?.avatar_url || null),
+          authorBadges: [],
+          neighborhood: b?.neighborhood || p?.neighborhood || b?.city || p?.city || "Local Area",
+          city: b?.city || p?.city || "Michigan City",
+          time: created.toLocaleDateString() === new Date().toLocaleDateString() ? "Today" : created.toLocaleDateString(),
+          category: (r.category || "general") as PostCategory,
+          body: r.content,
+          image: r.image_url || undefined,
+          likes: 0, comments: [], bookmarked: false, liked: false,
+        };
+      });
+      setPosts((prev) => [...loaded, ...prev.filter((p) => !loaded.some((d) => d.body === p.body && d.author === p.author))]);
+    })();
+  }, [authReady]);
+
   function toggleJoinGroup(id: number) {
     setGroups((prev) => prev.map((g) => g.id === id ? { ...g, joined: !g.joined } : g));
   }
@@ -2639,22 +2990,98 @@ export default function App() {
     setView({ page: "business", id });
     setNotifOpen(false);
   }
-  function goToUser(name: string) {
-    if (USER_PROFILES[name]) setView({ page: "user", name });
+  async function goToUser(name: string, authorId?: string) {
+    // If this author owns a saved business profile and the displayed post name matches
+    // that business, route to the business view before attempting a personal profile.
+    if (authorId) {
+      const { data: businessRow } = await supabase
+        .from("business_profiles")
+        .select("*")
+        .eq("user_id", authorId)
+        .maybeSingle();
+
+      if (businessRow?.business_name && businessRow.business_name.trim().toLowerCase() === name.trim().toLowerCase()) {
+        const businessId = BUSINESSES.find((b) => b.name.trim().toLowerCase() === name.trim().toLowerCase())?.id;
+        if (businessId) {
+          setView({ page: "business", id: businessId });
+          return;
+        }
+
+        // For the signed-in owner, use the app's established my-business route.
+        // That route renders currentBusiness, which is already hydrated from business_profiles.
+        const { data: { user: signedInUser } } = await supabase.auth.getUser();
+        if (signedInUser?.id === authorId) {
+          setView({ page: "my-business" });
+          return;
+        }
+      }
+    }
+    if (USER_PROFILES[name]) {
+      setView({ page: "user", name });
+      return;
+    }
+
+    let row: any = null;
+    if (authorId) {
+      const { data } = await supabase.from("profiles").select("*").eq("id", authorId).maybeSingle();
+      row = data;
+    }
+    if (!row) {
+      const { data } = await supabase.from("profiles").select("*").ilike("full_name", name).limit(1).maybeSingle();
+      row = data;
+    }
+    if (!row) return;
+
+    const resolvedName = row.full_name || name;
+    USER_PROFILES[resolvedName] = {
+      name: resolvedName,
+      neighborhood: row.neighborhood || row.city || "",
+      city: row.city || "Michigan City",
+      joinDate: row.created_at
+        ? new Date(row.created_at).toLocaleDateString(undefined, { month: "long", year: "numeric" })
+        : "",
+      bio: row.bio || "",
+      badges: [],
+      posts: 0,
+      neighbors: 0,
+      helpfulVotes: 0,
+      recsGiven: 0,
+      rating: 0,
+      ratingCount: 0,
+      neighborReviews: [],
+      galleryPhotos: [],
+      recentActivity: [],
+    };
+    setView({ page: "user", name: resolvedName });
   }
   function goToFeed() {
     setView({ page: "feed" });
+    navigate("/");
+  }
+  function goToOwnProfile() {
+    setView({ page: currentAccountType === "business" ? "my-business" : "me" });
+    navigate("/profile");
+  }
+  function goToSettings() {
+    setView({ page: "settings" });
+    navigate("/settings");
   }
 
-  if (view.page === "auth") {
-    return (
-      <SupabaseAuthView
-        mode={view.mode}
-        onSwitchMode={(mode) => setView({ page: "auth", mode })}
-        onSuccess={() => setView({ page: "feed" })}
-      />
-    );
-  }
+  if (!authReady) return <div className="min-h-screen bg-purple-950 flex items-center justify-center text-white">Loading your Neighborly profile…</div>;
+
+  if (view.page === "settings") return <SettingsView onBack={goToFeed} />;
+  if (view.page === "me" && currentProfile) return (
+    <div className="min-h-screen bg-background">
+      <div className="bg-white border-b border-border"><div className="max-w-5xl mx-auto px-4 py-2.5 flex justify-end"><button onClick={goToSettings} className="inline-flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-medium text-foreground hover:bg-muted">⚙️ Settings</button></div></div>
+      <UserProfileView profile={currentProfile} onBack={goToFeed} isOwnProfile myAvatarUrl={myAvatarUrl} onAvatarChange={setMyAvatarUrl} />
+    </div>
+  );
+  if (view.page === "my-business" && currentBusiness) return (
+    <div className="min-h-screen bg-background">
+      <div className="bg-white border-b border-border"><div className="max-w-5xl mx-auto px-4 py-2.5 flex justify-end"><button onClick={goToSettings} className="inline-flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-medium text-foreground hover:bg-muted">⚙️ Settings</button></div></div>
+      <BusinessProfileView biz={currentBusiness} onBack={goToFeed} onUserClick={goToUser} isOwnProfile onLogoChange={setMyAvatarUrl} />
+    </div>
+  );
   if (view.page === "business") {
     const biz = BUSINESSES.find((b) => b.id === view.id);
     if (biz)
@@ -2737,35 +3164,34 @@ export default function App() {
       ),
     );
   }
-  function handleCreatePost() {
+  async function handleCreatePost() {
     const text = newPostText.trim();
-    if (!text) return;
+    if (!text && !newPostImage) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
 
-    const postCity = activeLocation === "All Areas" ? "Michigan City" : activeLocation;
-    const newPost: Post = {
-      id: Date.now(),
-      author: "Maria Santos",
-      authorBadges: ["champion"],
-      neighborhood: postCity,
-      city: postCity,
-      time: "Just now",
-      category: selectedCategory,
-      body: text,
-      likes: 0,
-      comments: [],
-      bookmarked: false,
-      liked: false,
-    };
-
-    setPosts((prev) => [newPost, ...prev]);
-
-    if (selectedCategory === "forsale") {
-      setClassifiedPosts((prev) => [newPost, ...prev]);
+    let imageUrl: string | null = null;
+    if (newPostImage) {
+      const ext=(newPostImage.name.split(".").pop() || "jpg").toLowerCase();
+      const path=user.id+"/posts/"+Date.now()+"-"+Math.random().toString(36).slice(2)+"."+ext;
+      const { error: uploadError } = await supabase.storage.from("neighborly-media").upload(path,newPostImage,{ upsert:false, contentType:newPostImage.type || undefined });
+      if (uploadError) { console.error("Could not upload post photo",uploadError); return; }
+      const { data: publicData } = supabase.storage.from("neighborly-media").getPublicUrl(path);
+      imageUrl=publicData.publicUrl;
     }
 
-    setNewPostText("");
-    setSelectedCategory("general");
-    setComposing(false);
+    const postCity = activeLocation === "All Areas" ? (currentBusiness?.city || currentProfile?.city || "Michigan City") : activeLocation;
+    const postType = selectedCategory === "safety" ? "alert" : selectedCategory === "recommendation" ? "recommendation" : selectedCategory === "helpwanted" ? "help_wanted" : "discussion";
+    const { data: saved, error } = await supabase.from("posts").insert({ author_id:user.id, post_type:postType, category:selectedCategory, content:text, image_url:imageUrl }).select("id, created_at").single();
+    if (error) { console.error("Could not save post",error); return; }
+
+    const authorName=currentAccountType === "business" ? (currentBusiness?.name || "Business") : (currentProfile?.name || "You");
+    const newPost: Post={ id:new Date(saved.created_at).getTime(), author:authorName, authorAvatar:myAvatarUrl, authorBadges:[], neighborhood:postCity, city:postCity, time:"Just now", category:selectedCategory, body:text, image:imageUrl || undefined, likes:0, comments:[], bookmarked:false, liked:false };
+    setPosts(prev=>[newPost,...prev]);
+    if(selectedCategory === "forsale") setClassifiedPosts(prev=>[newPost,...prev]);
+    setNewPostText(""); setSelectedCategory("general"); setComposing(false);
+    if(newPostImagePreview) URL.revokeObjectURL(newPostImagePreview);
+    setNewPostImage(null); setNewPostImagePreview(null); if(postImageInputRef.current) postImageInputRef.current.value="";
   }
   function submitComment(postId: number) {
     const text = (commentDraft[postId] || "").trim();
@@ -2880,8 +3306,8 @@ export default function App() {
               <Bell size={18} />
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-600 rounded-full border-2 border-white" />
             </button>
-            <button onClick={() => goToUser("Maria Santos")}>
-              <Avatar name="Maria Santos" size="sm" src={myAvatarUrl} />
+            <button onClick={goToOwnProfile} aria-label="View profile">
+              <Avatar name={currentAccountType === "business" ? (currentBusiness?.name || "Business") : (currentProfile?.name || "Neighbor")} size="sm" src={myAvatarUrl} />
             </button>
           </div>
         </div>
@@ -3006,7 +3432,7 @@ export default function App() {
               className="bg-card rounded-xl border border-border p-4 flex items-center gap-3 cursor-pointer hover:border-primary/30 transition-colors"
               onClick={() => setComposing(true)}
             >
-              <Avatar name="Maria Santos" size="md" src={myAvatarUrl} />
+              <Avatar name={currentAccountType === "business" ? (currentBusiness?.name || "Business") : (currentProfile?.name || "Neighbor")} size="md" src={myAvatarUrl} />
               <div className="flex-1 bg-muted rounded-lg px-4 py-2.5 text-sm text-muted-foreground font-['DM_Sans',sans-serif]">
                 What's happening in Maplewood Heights?
               </div>
@@ -3017,7 +3443,7 @@ export default function App() {
           ) : (
             <div className="bg-card rounded-xl border border-primary/30 p-4 shadow-sm">
               <div className="flex items-start gap-3">
-                <Avatar name="Maria Santos" size="md" src={myAvatarUrl} />
+                <Avatar name={currentAccountType === "business" ? (currentBusiness?.name || "Business") : (currentProfile?.name || "Neighbor")} size="md" src={myAvatarUrl} />
                 <div className="flex-1">
                   <textarea
                     autoFocus
@@ -3047,6 +3473,13 @@ export default function App() {
                         );
                       })}
                     </div>
+                    <div className="mb-3">
+                      <input ref={postImageInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f=e.target.files?.[0] || null; setNewPostImage(f); if(newPostImagePreview) URL.revokeObjectURL(newPostImagePreview); setNewPostImagePreview(f ? URL.createObjectURL(f) : null); }} />
+                      <button type="button" onClick={() => postImageInputRef.current?.click()} className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg border border-border hover:bg-secondary transition-colors font-medium">
+                        <Camera size={14} /> Add Photo
+                      </button>
+                      {newPostImagePreview && <div className="relative mt-2 w-fit"><img src={newPostImagePreview} alt="Post preview" className="max-h-48 max-w-full rounded-lg object-cover border border-border" /><button type="button" aria-label="Remove photo" onClick={() => { if(newPostImagePreview) URL.revokeObjectURL(newPostImagePreview); setNewPostImage(null); setNewPostImagePreview(null); if(postImageInputRef.current) postImageInputRef.current.value=""; }} className="absolute top-1 right-1 bg-black/70 text-white rounded-full p-1"><X size={13}/></button></div>}
+                    </div>
                     {selectedCategory === "forsale" && (
                       <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1.5 rounded-lg mb-2 flex items-center gap-1.5 font-['DM_Sans',sans-serif]">
                         <ShoppingBag size={11} /> This post will also appear in Classifieds
@@ -3058,6 +3491,10 @@ export default function App() {
                           setComposing(false);
                           setNewPostText("");
                           setSelectedCategory("general");
+                          if (newPostImagePreview) URL.revokeObjectURL(newPostImagePreview);
+                          setNewPostImage(null);
+                          setNewPostImagePreview(null);
+                          if (postImageInputRef.current) postImageInputRef.current.value = "";
                         }}
                         className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors font-['DM_Sans',sans-serif]"
                       >
@@ -3065,7 +3502,7 @@ export default function App() {
                       </button>
                       <button
                         onClick={handleCreatePost}
-                        disabled={!newPostText.trim()}
+                        disabled={!newPostText.trim() && !newPostImage}
                         className="px-4 py-1.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-40 font-['DM_Sans',sans-serif]"
                       >
                         Post
@@ -3113,15 +3550,15 @@ export default function App() {
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-start gap-3">
                       <button
-                        onClick={() => goToUser(post.author)}
+                        onClick={() => goToUser(post.author, post.authorId)}
                       >
-                        <Avatar name={post.author} size="md" />
+                        <Avatar name={post.author} size="md" src={post.authorAvatar || (post.author === (currentAccountType === "business" ? currentBusiness?.name : currentProfile?.name) ? myAvatarUrl : null)} />
                       </button>
                       <div>
                         <div className="flex items-center gap-2 flex-wrap">
                           <button
                             onClick={() =>
-                              goToUser(post.author)
+                              goToUser(post.author, post.authorId)
                             }
                             className="font-semibold text-sm hover:text-blue-600 transition-colors"
                           >
