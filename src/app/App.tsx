@@ -140,6 +140,22 @@ interface UserProfile {
   theme?: string | null;
 }
 
+interface MessageContact {
+  id: string;
+  name: string;
+  avatarUrl?: string | null;
+  accountType?: "personal" | "business";
+}
+
+interface DirectMessage {
+  id: string;
+  sender_id: string;
+  recipient_id: string;
+  body: string;
+  read_at: string | null;
+  created_at: string;
+}
+
 type PostCategory =
   | "news"
   | "safety"
@@ -994,6 +1010,7 @@ function BusinessProfileView({
   biz,
   onBack,
   onUserClick,
+  onMessage,
   isOwnProfile = false,
   onLogoChange,
   onSettings,
@@ -1001,6 +1018,7 @@ function BusinessProfileView({
   biz: Business;
   onBack: () => void;
   onUserClick: (name: string, authorId?: string) => void;
+  onMessage?: (contact: MessageContact) => void;
   isOwnProfile?: boolean;
   onLogoChange?: (url: string) => void;
   onSettings?: () => void;
@@ -1160,9 +1178,14 @@ function BusinessProfileView({
                 >
                   <Phone size={13} /> Call
                 </a>
-                <button className="flex flex-1 sm:flex-none justify-center items-center gap-1.5 border border-border bg-card px-4 py-2 rounded-lg text-sm font-medium hover:bg-secondary transition-colors font-['DM_Sans',sans-serif]">
-                  <MessageSquare size={13} /> Message
-                </button>
+                {!isOwnProfile && biz.ownerId && (
+                  <button
+                    onClick={() => onMessage?.({ id: biz.ownerId!, name: biz.name, avatarUrl: logoUrl, accountType: "business" })}
+                    className="flex flex-1 sm:flex-none justify-center items-center gap-1.5 border border-border bg-card px-4 py-2 rounded-lg text-sm font-medium hover:bg-secondary transition-colors font-['DM_Sans',sans-serif]"
+                  >
+                    <MessageSquare size={13} /> Message
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -1941,6 +1964,7 @@ function resolveProfileTheme(value?: string | null): ThemeName {
 function UserProfileView({
   profile,
   onBack,
+  onMessage,
   isOwnProfile = false,
   myAvatarUrl = null,
   onAvatarChange,
@@ -1948,6 +1972,7 @@ function UserProfileView({
 }: {
   profile: UserProfile;
   onBack: () => void;
+  onMessage?: (contact: MessageContact) => void;
   isOwnProfile?: boolean;
   myAvatarUrl?: string | null;
   onAvatarChange?: (url: string) => void;
@@ -2171,9 +2196,19 @@ function UserProfileView({
                 </div>
               )}
               {!isOwnProfile && (
-                <button className={`flex items-center gap-1.5 ${T.btn} text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors`}>
-                  <Users size={13} /> Follow
-                </button>
+                <>
+                  {profile.id && (
+                    <button
+                      onClick={() => onMessage?.({ id: profile.id!, name: profile.name, avatarUrl, accountType: "personal" })}
+                      className="flex items-center gap-1.5 border border-border bg-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-muted transition-colors"
+                    >
+                      <MessageSquare size={13} /> Message
+                    </button>
+                  )}
+                  <button className={`flex items-center gap-1.5 ${T.btn} text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors`}>
+                    <Users size={13} /> Follow
+                  </button>
+                </>
               )}
             </div>
           </div>
@@ -2682,11 +2717,15 @@ function ClassifiedsView({
   posts,
   onBack,
   onUserClick,
+  onMessage,
+  currentUserId,
   activeLocation,
 }: {
   posts: Post[];
   onBack: () => void;
   onUserClick: (name: string, authorId?: string) => void;
+  onMessage: (contact: MessageContact) => void;
+  currentUserId?: string;
   activeLocation: LocationName;
 }) {
   const [search, setSearch] = useState("");
@@ -2747,7 +2786,11 @@ function ClassifiedsView({
                 {post.title && <p className="font-semibold text-foreground mt-2">{post.title}</p>}
                 <p className="text-sm text-foreground/80 mt-1">{post.body}</p>
                 <div className="flex gap-2 mt-3">
-                  <button className="flex-1 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
+                  <button
+                    onClick={() => post.authorId && onMessage({ id: post.authorId, name: post.author, avatarUrl: post.authorAvatar || null })}
+                    disabled={!post.authorId || post.authorId === currentUserId}
+                    className="flex-1 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+                  >
                     Message Seller
                   </button>
                   <button className="px-3 py-2 border border-border rounded-lg text-muted-foreground hover:bg-muted transition-colors">
@@ -2843,6 +2886,331 @@ function AdvertiseModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+function formatMessageTime(value: string) {
+  const date = new Date(value);
+  const now = new Date();
+  if (date.toDateString() === now.toDateString()) {
+    return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  }
+  return date.toLocaleDateString([], { month: "short", day: "numeric" });
+}
+
+function MessagingModal({
+  open,
+  onClose,
+  currentUserId,
+  initialContact,
+  onUnreadChange,
+}: {
+  open: boolean;
+  onClose: () => void;
+  currentUserId: string;
+  initialContact: MessageContact | null;
+  onUnreadChange: () => void;
+}) {
+  const [contacts, setContacts] = useState<MessageContact[]>([]);
+  const [activeContact, setActiveContact] = useState<MessageContact | null>(null);
+  const [allMessages, setAllMessages] = useState<DirectMessage[]>([]);
+  const [draft, setDraft] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const endRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  async function loadInbox(showLoading = false) {
+    if (showLoading) setLoading(true);
+    const { data: rows, error: messagesError } = await supabase
+      .from("direct_messages")
+      .select("id, sender_id, recipient_id, body, read_at, created_at")
+      .or(`sender_id.eq.${currentUserId},recipient_id.eq.${currentUserId}`)
+      .order("created_at", { ascending: true })
+      .limit(500);
+
+    if (messagesError) {
+      setError("Messages could not be loaded. Please try again.");
+      setLoading(false);
+      return;
+    }
+
+    const messages = (rows || []) as DirectMessage[];
+    setAllMessages(messages);
+    const contactIds = new Set<string>();
+    messages.forEach((message) => {
+      contactIds.add(message.sender_id === currentUserId ? message.recipient_id : message.sender_id);
+    });
+    if (initialContact && initialContact.id !== currentUserId) contactIds.add(initialContact.id);
+
+    const ids = [...contactIds];
+    let profileRows: any[] = [];
+    let businessRows: any[] = [];
+    if (ids.length) {
+      const [profilesResult, businessesResult] = await Promise.all([
+        supabase.from("profiles").select("id, full_name, avatar_url, account_type").in("id", ids),
+        supabase.from("business_profiles").select("user_id, business_name, logo_url").in("user_id", ids),
+      ]);
+      profileRows = profilesResult.data || [];
+      businessRows = businessesResult.data || [];
+    }
+
+    const profilesById = new Map(profileRows.map((profile: any) => [profile.id, profile]));
+    const businessesById = new Map(businessRows.map((business: any) => [business.user_id, business]));
+    const lastMessageAt = new Map<string, number>();
+    messages.forEach((message) => {
+      const otherId = message.sender_id === currentUserId ? message.recipient_id : message.sender_id;
+      lastMessageAt.set(otherId, new Date(message.created_at).getTime());
+    });
+
+    const nextContacts = ids
+      .map((id): MessageContact => {
+        const profile: any = profilesById.get(id);
+        const business: any = businessesById.get(id);
+        const preferred = initialContact?.id === id ? initialContact : null;
+        const isBusiness = !!business || profile?.account_type === "business" || preferred?.accountType === "business";
+        return {
+          id,
+          name: isBusiness
+            ? business?.business_name || preferred?.name || profile?.full_name || "Local Business"
+            : profile?.full_name || preferred?.name || "Neighbor",
+          avatarUrl: isBusiness
+            ? business?.logo_url || preferred?.avatarUrl || profile?.avatar_url || null
+            : profile?.avatar_url || preferred?.avatarUrl || null,
+          accountType: isBusiness ? "business" : "personal",
+        };
+      })
+      .sort((a, b) => (lastMessageAt.get(b.id) || 0) - (lastMessageAt.get(a.id) || 0));
+
+    setContacts(nextContacts);
+    setActiveContact((existing) => {
+      if (!showLoading) return existing ? nextContacts.find((contact) => contact.id === existing.id) || existing : null;
+      if (initialContact) return nextContacts.find((contact) => contact.id === initialContact.id) || initialContact;
+      if (existing) return nextContacts.find((contact) => contact.id === existing.id) || existing;
+      return nextContacts[0] || null;
+    });
+    setError(null);
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    if (!open) return;
+    void loadInbox(true);
+    const timer = window.setInterval(() => { void loadInbox(); }, 5000);
+    return () => window.clearInterval(timer);
+  }, [open, currentUserId, initialContact?.id]);
+
+  const conversation = activeContact
+    ? allMessages.filter((message) =>
+        (message.sender_id === currentUserId && message.recipient_id === activeContact.id)
+        || (message.sender_id === activeContact.id && message.recipient_id === currentUserId),
+      )
+    : [];
+
+  useEffect(() => {
+    if (!open || !activeContact) return;
+    const hasUnread = allMessages.some((message) =>
+      message.sender_id === activeContact.id
+      && message.recipient_id === currentUserId
+      && !message.read_at,
+    );
+    if (!hasUnread) return;
+    let cancelled = false;
+    (async () => {
+      const readAt = new Date().toISOString();
+      const { error: readError } = await supabase
+        .from("direct_messages")
+        .update({ read_at: readAt })
+        .eq("sender_id", activeContact.id)
+        .eq("recipient_id", currentUserId)
+        .is("read_at", null);
+      if (readError || cancelled) return;
+      setAllMessages((current) => current.map((message) =>
+        message.sender_id === activeContact.id && message.recipient_id === currentUserId && !message.read_at
+          ? { ...message, read_at: readAt }
+          : message,
+      ));
+      onUnreadChange();
+    })();
+    return () => { cancelled = true; };
+  }, [open, activeContact?.id, allMessages, currentUserId]);
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [conversation.length, activeContact?.id]);
+
+  async function sendMessage(e: React.FormEvent) {
+    e.preventDefault();
+    const body = draft.trim();
+    if (!activeContact || !body || sending) return;
+    if (activeContact.id === currentUserId) {
+      setError("You cannot send a message to your own account.");
+      return;
+    }
+    setSending(true);
+    setError(null);
+    const { data, error: sendError } = await supabase
+      .from("direct_messages")
+      .insert({ sender_id: currentUserId, recipient_id: activeContact.id, body })
+      .select("id, sender_id, recipient_id, body, read_at, created_at")
+      .single();
+    if (sendError || !data) {
+      setError("Your message was not sent. Please try again.");
+      setSending(false);
+      return;
+    }
+    setDraft("");
+    setAllMessages((current) => [...current, data as DirectMessage]);
+    setSending(false);
+    window.setTimeout(() => inputRef.current?.focus(), 0);
+    void loadInbox();
+  }
+
+  function latestFor(contactId: string) {
+    for (let index = allMessages.length - 1; index >= 0; index -= 1) {
+      const message = allMessages[index];
+      if (message.sender_id === contactId || message.recipient_id === contactId) return message;
+    }
+    return null;
+  }
+
+  function unreadFor(contactId: string) {
+    return allMessages.filter((message) =>
+      message.sender_id === contactId && message.recipient_id === currentUserId && !message.read_at,
+    ).length;
+  }
+
+  return (
+    <Dialog.Root open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onClose(); }}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-[80] bg-black/55 backdrop-blur-sm" />
+        <Dialog.Content
+          className="fixed left-1/2 top-1/2 z-[81] h-[min(760px,92vh)] w-[min(980px,94vw)] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-2xl border border-border bg-white shadow-2xl"
+          aria-describedby={undefined}
+        >
+          <div className="flex h-full flex-col">
+            <div className="flex h-14 flex-shrink-0 items-center justify-between border-b border-border px-4">
+              <Dialog.Title className="flex items-center gap-2 font-semibold">
+                <MessageSquare size={18} className="text-primary" /> Messages
+              </Dialog.Title>
+              <Dialog.Close onClick={onClose} className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Close messages">
+                <X size={17} />
+              </Dialog.Close>
+            </div>
+
+            <div className="grid min-h-0 flex-1 md:grid-cols-[300px_1fr]">
+              <aside className={`${activeContact ? "hidden md:flex" : "flex"} min-h-0 flex-col border-r border-border bg-muted/20`}>
+                <div className="border-b border-border px-4 py-3">
+                  <p className="text-sm font-semibold">Conversations</p>
+                  <p className="text-xs text-muted-foreground">Private messages with your neighbors</p>
+                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto">
+                  {loading ? (
+                    <p className="px-4 py-8 text-center text-sm text-muted-foreground">Loading messages…</p>
+                  ) : contacts.length === 0 ? (
+                    <div className="px-5 py-10 text-center">
+                      <MessageSquare size={28} className="mx-auto mb-3 text-muted-foreground/50" />
+                      <p className="text-sm font-medium">No conversations yet</p>
+                      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Open a neighbor’s profile and choose Message to start one.</p>
+                    </div>
+                  ) : contacts.map((contact) => {
+                    const latest = latestFor(contact.id);
+                    const unread = unreadFor(contact.id);
+                    return (
+                      <button
+                        key={contact.id}
+                        onClick={() => setActiveContact(contact)}
+                        className={`flex w-full items-center gap-3 border-b border-border/70 px-4 py-3 text-left transition-colors hover:bg-secondary/70 ${activeContact?.id === contact.id ? "bg-primary/10" : ""}`}
+                      >
+                        <Avatar name={contact.name} size="sm" src={contact.avatarUrl || null} />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="truncate text-sm font-semibold">{contact.name}</p>
+                            {latest && <span className="flex-shrink-0 text-[11px] text-muted-foreground">{formatMessageTime(latest.created_at)}</span>}
+                          </div>
+                          <p className="mt-0.5 truncate text-xs text-muted-foreground">{latest?.body || "Start a conversation"}</p>
+                        </div>
+                        {unread > 0 && <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">{unread}</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </aside>
+
+              <section className={`${activeContact ? "flex" : "hidden md:flex"} min-h-0 flex-col bg-white`}>
+                {activeContact ? (
+                  <>
+                    <div className="flex h-16 flex-shrink-0 items-center gap-3 border-b border-border px-4">
+                      <button onClick={() => setActiveContact(null)} className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted md:hidden" aria-label="Back to conversations">
+                        <ChevronLeft size={19} />
+                      </button>
+                      <Avatar name={activeContact.name} size="sm" src={activeContact.avatarUrl || null} />
+                      <div>
+                        <p className="text-sm font-semibold">{activeContact.name}</p>
+                        <p className="text-xs text-muted-foreground">{activeContact.accountType === "business" ? "Local business" : "Neighbor"}</p>
+                      </div>
+                    </div>
+                    <div className="min-h-0 flex-1 overflow-y-auto bg-stone-50/70 px-4 py-5 sm:px-6">
+                      {conversation.length === 0 ? (
+                        <div className="flex h-full flex-col items-center justify-center text-center">
+                          <Avatar name={activeContact.name} size="lg" src={activeContact.avatarUrl || null} />
+                          <p className="mt-3 font-semibold">Message {activeContact.name}</p>
+                          <p className="mt-1 max-w-sm text-sm text-muted-foreground">Say hello and start a private conversation.</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {conversation.map((message) => {
+                            const mine = message.sender_id === currentUserId;
+                            return (
+                              <div key={message.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+                                <div className={`max-w-[82%] rounded-2xl px-4 py-2.5 shadow-sm ${mine ? "rounded-br-md bg-primary text-primary-foreground" : "rounded-bl-md border border-border bg-white text-foreground"}`}>
+                                  <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{message.body}</p>
+                                  <p className={`mt-1 text-[10px] ${mine ? "text-primary-foreground/70" : "text-muted-foreground"}`}>{formatMessageTime(message.created_at)}</p>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          <div ref={endRef} />
+                        </div>
+                      )}
+                    </div>
+                    <form onSubmit={sendMessage} className="flex-shrink-0 border-t border-border bg-white p-3 sm:p-4">
+                      {error && <p className="mb-2 text-xs text-red-600">{error}</p>}
+                      <div className="flex items-center gap-2">
+                        <input
+                          ref={inputRef}
+                          value={draft}
+                          onChange={(event) => setDraft(event.target.value)}
+                          maxLength={2000}
+                          autoComplete="off"
+                          placeholder={`Message ${activeContact.name}…`}
+                          className="min-w-0 flex-1 rounded-xl border border-border bg-muted/50 px-4 py-3 text-sm outline-none transition-colors focus:border-primary focus:bg-white"
+                        />
+                        <button
+                          type="submit"
+                          disabled={!draft.trim() || sending}
+                          className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
+                          aria-label="Send message"
+                        >
+                          <Send size={17} />
+                        </button>
+                      </div>
+                    </form>
+                  </>
+                ) : (
+                  <div className="flex h-full flex-col items-center justify-center px-6 text-center">
+                    <MessageSquare size={36} className="mb-3 text-muted-foreground/40" />
+                    <p className="font-semibold">Choose a conversation</p>
+                    <p className="mt-1 text-sm text-muted-foreground">Select a neighbor to read or send messages.</p>
+                  </div>
+                )}
+              </section>
+            </div>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
+
 // ─── Main App ─────────────────────────────────────────────────────────────────
 
 type ActiveTab = "all" | PostCategory;
@@ -2865,6 +3233,8 @@ export default function App() {
   const [commentDraft, setCommentDraft] = useState<Record<number, string>>({});
   const [notifOpen, setNotifOpen] = useState(false);
   const [messagesOpen, setMessagesOpen] = useState(false);
+  const [messageRecipient, setMessageRecipient] = useState<MessageContact | null>(null);
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   const [view, setView] = useState<ActiveView>({ page: "feed" });
   const [advertiseOpen, setAdvertiseOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -2931,6 +3301,7 @@ export default function App() {
       const services = Array.isArray(businessRow?.services) ? businessRow.services : typeof businessRow?.services === "string" && businessRow.services.trim() ? businessRow.services.split(",").map((v: string) => v.trim()).filter(Boolean) : [];
       setCurrentBusiness({
         id: -1,
+        ownerId: user.id,
         name: businessRow?.business_name || m.business_name || profile.name,
         category: businessRow?.category || m.business_category || "Local Business",
         city: businessRow?.city || row?.city || m.city || "Michigan City",
@@ -2968,6 +3339,27 @@ export default function App() {
     });
     return () => { active = false; authListener.subscription.unsubscribe(); };
   }, []);
+
+  async function refreshUnreadMessages() {
+    const userId = currentProfile?.id;
+    if (!userId) {
+      setUnreadMessageCount(0);
+      return;
+    }
+    const { count, error } = await supabase
+      .from("direct_messages")
+      .select("id", { count: "exact", head: true })
+      .eq("recipient_id", userId)
+      .is("read_at", null);
+    if (!error) setUnreadMessageCount(count || 0);
+  }
+
+  useEffect(() => {
+    if (!authReady || !currentProfile?.id) return;
+    void refreshUnreadMessages();
+    const timer = window.setInterval(() => { void refreshUnreadMessages(); }, 15000);
+    return () => window.clearInterval(timer);
+  }, [authReady, currentProfile?.id]);
 
   useEffect(() => {
     if (!authReady) return;
@@ -3159,41 +3551,76 @@ export default function App() {
     setView({ page: "settings" });
     navigate("/settings");
   }
+  function openMessages(contact: MessageContact | null = null) {
+    if (contact?.id === currentProfile?.id) return;
+    setMessageRecipient(contact);
+    setMessagesOpen(true);
+    setNotifOpen(false);
+  }
+
+  const messagingModal = currentProfile?.id ? (
+    <MessagingModal
+      key={messageRecipient?.id || "message-inbox"}
+      open={messagesOpen}
+      onClose={() => setMessagesOpen(false)}
+      currentUserId={currentProfile.id}
+      initialContact={messageRecipient}
+      onUnreadChange={() => { void refreshUnreadMessages(); }}
+    />
+  ) : null;
 
   if (!authReady) return <div className="min-h-screen bg-purple-950 flex items-center justify-center text-white">Loading your Neighborly profile…</div>;
 
   if (view.page === "settings") return <SettingsView onBack={goToFeed} />;
   if (view.page === "me" && currentProfile) return (
-    <UserProfileView profile={currentProfile} onBack={goToFeed} isOwnProfile myAvatarUrl={myAvatarUrl} onAvatarChange={setMyAvatarUrl} onSettings={goToSettings} />
+    <>
+      <UserProfileView profile={currentProfile} onBack={goToFeed} isOwnProfile myAvatarUrl={myAvatarUrl} onAvatarChange={setMyAvatarUrl} onSettings={goToSettings} />
+      {messagingModal}
+    </>
   );
   if (view.page === "my-business" && currentBusiness) return (
-    <BusinessProfileView biz={currentBusiness} onBack={goToFeed} onUserClick={goToUser} isOwnProfile onLogoChange={setMyAvatarUrl} onSettings={goToSettings} />
+    <>
+      <BusinessProfileView biz={currentBusiness} onBack={goToFeed} onUserClick={goToUser} isOwnProfile onLogoChange={setMyAvatarUrl} onSettings={goToSettings} />
+      {messagingModal}
+    </>
   );
   if (view.page === "saved-business") return (
-    <BusinessProfileView
-      biz={view.business}
-      onBack={goToFeed}
-      onUserClick={goToUser}
-    />
+    <>
+      <BusinessProfileView
+        biz={view.business}
+        onBack={goToFeed}
+        onUserClick={goToUser}
+        onMessage={openMessages}
+      />
+      {messagingModal}
+    </>
   );
   if (view.page === "business") {
     const biz = BUSINESSES.find((b) => b.id === view.id);
     if (biz)
       return (
-        <BusinessProfileView
-          biz={biz}
-          onBack={goToFeed}
-          onUserClick={goToUser}
-        />
+        <>
+          <BusinessProfileView
+            biz={biz}
+            onBack={goToFeed}
+            onUserClick={goToUser}
+            onMessage={openMessages}
+          />
+          {messagingModal}
+        </>
       );
   }
   if (view.page === "user") {
     return (
-      <UserProfileView
-        key={view.profile.id || view.profile.name}
-        profile={view.profile}
-        onBack={goToFeed}
-      />
+      <>
+        <UserProfileView
+          key={view.profile.id || view.profile.name}
+          profile={view.profile}
+          onBack={goToFeed}
+          onMessage={openMessages}
+        />
+        {messagingModal}
+      </>
     );
   }
 
@@ -3215,12 +3642,17 @@ export default function App() {
 
   if (view.page === "classifieds") {
     return (
-      <ClassifiedsView
-        posts={classifiedPosts}
-        onBack={goToFeed}
-        onUserClick={goToUser}
-        activeLocation={activeLocation}
-      />
+      <>
+        <ClassifiedsView
+          posts={classifiedPosts}
+          onBack={goToFeed}
+          onUserClick={goToUser}
+          onMessage={openMessages}
+          currentUserId={currentProfile?.id}
+          activeLocation={activeLocation}
+        />
+        {messagingModal}
+      </>
     );
   }
 
@@ -3381,13 +3813,17 @@ export default function App() {
           {/* Right side — messages + bell + avatar */}
           <div className="flex items-center gap-2 ml-auto flex-shrink-0">
             <button
-              onClick={() => { setMessagesOpen(!messagesOpen); setNotifOpen(false); }}
+              onClick={() => openMessages()}
               className="relative p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
               aria-label="Messages"
               title="Messages"
             >
               <MessageSquare size={18} />
-              <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 bg-primary text-primary-foreground text-[10px] font-semibold rounded-full flex items-center justify-center">2</span>
+              {unreadMessageCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 bg-primary text-primary-foreground text-[10px] font-semibold rounded-full flex items-center justify-center">
+                  {unreadMessageCount > 99 ? "99+" : unreadMessageCount}
+                </span>
+              )}
             </button>
             <button
               onClick={() => { setNotifOpen(!notifOpen); setMessagesOpen(false); }}
@@ -3465,53 +3901,7 @@ export default function App() {
         </div>
       )}
 
-      {messagesOpen && (
-        <div className="fixed inset-0 z-50" onClick={() => setMessagesOpen(false)}>
-          <div
-            className="absolute top-14 right-4 w-[min(24rem,calc(100vw-2rem))] bg-white rounded-xl shadow-2xl border border-border overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-              <div className="flex items-center gap-2">
-                <MessageSquare size={16} className="text-primary" />
-                <h3 className="font-semibold text-sm">Messages</h3>
-              </div>
-              <button
-                onClick={() => setMessagesOpen(false)}
-                className="text-muted-foreground hover:text-foreground"
-                aria-label="Close messages"
-              >
-                <X size={15} />
-              </button>
-            </div>
-            {[
-              { name: "James Whitfield", preview: "Sounds good — Saturday works for me.", time: "5m", unread: true },
-              { name: "Grace Okonkwo", preview: "Thanks for the recommendation!", time: "1h", unread: true },
-              { name: "Nadia Petrov", preview: "I sent you the event details.", time: "Yesterday", unread: false },
-            ].map((m) => (
-              <button
-                key={m.name}
-                className={`w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-secondary/50 transition-colors ${m.unread ? "bg-blue-50/60" : ""}`}
-              >
-                <Avatar name={m.name} size="sm" />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-semibold truncate">{m.name}</p>
-                    <span className="text-xs text-muted-foreground flex-shrink-0">{m.time}</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground truncate mt-0.5">{m.preview}</p>
-                </div>
-                {m.unread && <span className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />}
-              </button>
-            ))}
-            <div className="p-3 border-t border-border bg-muted/30">
-              <button className="w-full py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity">
-                Open Messages
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {messagingModal}
 
       <main className="max-w-screen-2xl mx-auto px-6 py-6 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
         
