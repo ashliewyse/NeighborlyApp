@@ -3534,12 +3534,14 @@ function MessagingModal({
   currentUserId,
   initialContact,
   onUnreadChange,
+  onProfileOpen,
 }: {
   open: boolean;
   onClose: () => void;
   currentUserId: string;
   initialContact: MessageContact | null;
   onUnreadChange: () => void;
+  onProfileOpen: (contact: MessageContact) => void;
 }) {
   const [contacts, setContacts] = useState<MessageContact[]>([]);
   const [activeContact, setActiveContact] = useState<MessageContact | null>(null);
@@ -3732,6 +3734,14 @@ function MessagingModal({
             <div className="grid min-h-0 flex-1 md:grid-cols-[300px_1fr]">
               <aside className={`${activeContact ? "hidden md:flex" : "flex"} min-h-0 flex-col border-r border-border bg-muted/20`}>
                 <div className="border-b border-border px-4 py-3">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="mb-2 inline-flex items-center gap-1 rounded-lg py-1 pr-2 text-sm font-medium text-primary hover:bg-secondary md:hidden"
+                    aria-label="Close messages and go back"
+                  >
+                    <ChevronLeft size={18} /> Back
+                  </button>
                   <p className="text-sm font-semibold">Conversations</p>
                   <p className="text-xs text-muted-foreground">Private messages with your neighbors</p>
                 </div>
@@ -3775,11 +3785,27 @@ function MessagingModal({
                       <button onClick={() => setActiveContact(null)} className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted md:hidden" aria-label="Back to conversations">
                         <ChevronLeft size={19} />
                       </button>
-                      <Avatar name={activeContact.name} size="sm" src={activeContact.avatarUrl || null} />
-                      <div>
-                        <p className="text-sm font-semibold">{activeContact.name}</p>
-                        <p className="text-xs text-muted-foreground">{activeContact.accountType === "business" ? "Local business" : "Neighbor"}</p>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => onProfileOpen(activeContact)}
+                        className="flex min-w-0 flex-1 items-center gap-3 rounded-lg p-1 text-left hover:bg-muted"
+                        aria-label={`View ${activeContact.name}'s profile`}
+                      >
+                        <Avatar name={activeContact.name} size="sm" src={activeContact.avatarUrl || null} />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold">{activeContact.name}</p>
+                          <p className="text-xs text-primary">View profile</p>
+                        </div>
+                        <ChevronRight size={16} className="flex-shrink-0 text-muted-foreground" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={onClose}
+                        className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground md:hidden"
+                        aria-label="Close messages"
+                      >
+                        <X size={18} />
+                      </button>
                     </div>
                     <div className="min-h-0 flex-1 overflow-y-auto bg-stone-50/70 px-4 py-5 sm:px-6">
                       {conversation.length === 0 ? (
@@ -4294,6 +4320,12 @@ export default function App() {
     setNotifOpen(false);
   }
 
+  function openProfileFromMessages(contact: MessageContact) {
+    setMessagesOpen(false);
+    setMessageRecipient(null);
+    void goToUser(contact.name, contact.id);
+  }
+
   function startHelpWantedPost() {
     setSelectedCategory("helpwanted");
     setComposing(true);
@@ -4399,6 +4431,7 @@ export default function App() {
       currentUserId={currentProfile.id}
       initialContact={messageRecipient}
       onUnreadChange={() => { void refreshUnreadMessages(); }}
+      onProfileOpen={openProfileFromMessages}
     />
   ) : null;
 
