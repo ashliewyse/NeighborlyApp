@@ -53,6 +53,8 @@ import {
   MapPinned,
   ExternalLink,
   LogOut,
+  UserPlus,
+  UserCheck,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -154,6 +156,23 @@ interface DirectMessage {
   body: string;
   read_at: string | null;
   created_at: string;
+}
+
+interface FriendshipRow {
+  id: string;
+  requester_id: string;
+  addressee_id: string;
+  status: "pending" | "accepted";
+  created_at: string;
+  responded_at: string | null;
+}
+
+interface PendingFriendRequest {
+  id: string;
+  requesterId: string;
+  name: string;
+  avatarUrl?: string | null;
+  createdAt: string;
 }
 
 type PostCategory =
@@ -1932,6 +1951,182 @@ function CropModal({
   );
 }
 
+function ProfileConnectionActions({
+  targetId,
+  targetName,
+  followButtonClass,
+}: {
+  targetId: string;
+  targetName: string;
+  followButtonClass: string;
+}) {
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [following, setFollowing] = useState(false);
+  const [friendship, setFriendship] = useState<FriendshipRow | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState<"follow" | "friend" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function loadConnectionStatus(showLoading = false) {
+    if (showLoading) setLoading(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user || user.id === targetId) {
+      setCurrentUserId(user?.id || null);
+      setLoading(false);
+      return;
+    }
+    setCurrentUserId(user.id);
+    const [followResult, friendResult] = await Promise.all([
+      supabase.from("profile_follows").select("follower_id").eq("follower_id", user.id).eq("followed_id", targetId).maybeSingle(),
+      supabase
+        .from("friendships")
+        .select("id, requester_id, addressee_id, status, created_at, responded_at")
+        .or(`and(requester_id.eq.${user.id},addressee_id.eq.${targetId}),and(requester_id.eq.${targetId},addressee_id.eq.${user.id})`)
+        .maybeSingle(),
+    ]);
+    setFollowing(!!followResult.data);
+    setFriendship((friendResult.data as FriendshipRow | null) || null);
+    setError(followResult.error || friendResult.error ? "Connection status could not be loaded." : null);
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    void loadConnectionStatus(true);
+    const timer = window.setInterval(() => { void loadConnectionStatus(); }, 10000);
+    return () => window.clearInterval(timer);
+  }, [targetId]);
+
+  async function toggleFollow() {
+    if (!currentUserId || busy) return;
+    setBusy("follow");
+    setError(null);
+    if (following) {
+      const { error: followError } = await supabase.from("profile_follows").delete().eq("follower_id", currentUserId).eq("followed_id", targetId);
+      if (followError) setError("Could not unfollow this profile.");
+      else setFollowing(false);
+    } else {
+      const { error: followError } = await supabase.from("profile_follows").insert({ follower_id: currentUserId, followed_id: targetId });
+      if (followError && followError.code !== "23505") setError("Could not follow this profile.");
+      else setFollowing(true);
+    }
+    setBusy(null);
+  }
+
+  async function sendFriendRequest() {
+    if (!currentUserId || busy) return;
+    setBusy("friend");
+    setError(null);
+    const { data, error: friendError } = await supabase
+      .from("friendships")
+      .insert({ requester_id: currentUserId, addressee_id: targetId, status: "pending" })
+      .select("id, requester_id, addressee_id, status, created_at, responded_at")
+      .single();
+    if (friendError) {
+      if (friendError.code === "23505") await loadConnectionStatus();
+      else setError("Could not send the friend request.");
+    } else setFriendship(data as FriendshipRow);
+    setBusy(null);
+  }
+
+  async function acceptFriendRequest() {
+    if (!friendship || !currentUserId || busy) return;
+    setBusy("friend");
+    setError(null);
+    const { data, error: friendError } = await supabase
+      .from("friendships")
+      .update({ status: "accepted", responded_at: new Date().toISOString() })
+      .eq("id", friendship.id)
+      .select("id, requester_id, addressee_id, status, created_at, responded_at")
+      .single();
+    if (friendError) setError("Could not accept the friend request.");
+    else setFriendship(data as FriendshipRow);
+    setBusy(null);
+  }
+
+  async function removeFriendship() {
+    if (!friendship || busy) return;
+    setBusy("friend");
+    setError(null);
+    const { error: friendError } = await supabase.from("friendships").delete().eq("id", friendship.id);
+    if (friendError) setError("Could not update the friend request.");
+    else setFriendship(null);
+    setBusy(null);
+  }
+
+  if (!currentUserId || currentUserId === targetId) return null;
+
+  const incomingRequest = friendship?.status === "pending" && friendship.addressee_id === currentUserId;
+  const outgoingRequest = friendship?.status === "pending" && friendship.requester_id === currentUserId;
+
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      <button
+        onClick={() => { void toggleFollow(); }}
+        disabled={loading || busy === "follow"}
+        className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${following ? "border border-primary bg-primary/10 text-primary hover:bg-primary/15" : `${followButtonClass} text-white`}`}
+      >
+        {following ? <CheckCircle2 size={13} /> : <Users size={13} />}
+        {following ? "Following" : "Follow"}
+      </button>
+
+      {!friendship && (
+        <button
+          onClick={() => { void sendFriendRequest(); }}
+          disabled={loading || busy === "friend"}
+          className="flex items-center gap-1.5 rounded-lg border border-border bg-white px-3 py-2 text-sm font-medium transition-colors hover:bg-muted disabled:opacity-50"
+        >
+          <UserPlus size={13} /> <span><span className="hidden sm:inline">Add </span>Friend</span>
+        </button>
+      )}
+
+      {outgoingRequest && (
+        <button
+          onClick={() => { if (window.confirm(`Cancel your friend request to ${targetName}?`)) void removeFriendship(); }}
+          disabled={busy === "friend"}
+          title="Cancel friend request"
+          className="flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/10 disabled:opacity-50"
+        >
+          <Clock size={13} /> <span className="hidden sm:inline">Request </span>Sent
+        </button>
+      )}
+
+      {incomingRequest && (
+        <>
+          <button
+            onClick={() => { void acceptFriendRequest(); }}
+            disabled={busy === "friend"}
+            className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
+          >
+            <UserCheck size={13} /> Accept
+          </button>
+          <button
+            onClick={() => { void removeFriendship(); }}
+            disabled={busy === "friend"}
+            aria-label={`Decline friend request from ${targetName}`}
+            title="Decline request"
+            className="rounded-lg border border-border bg-white p-2 text-muted-foreground transition-colors hover:bg-muted disabled:opacity-50"
+          >
+            <X size={16} />
+          </button>
+        </>
+      )}
+
+      {friendship?.status === "accepted" && (
+        <button
+          onClick={() => { if (window.confirm(`Remove ${targetName} from your friends?`)) void removeFriendship(); }}
+          disabled={busy === "friend"}
+          title="Remove friend"
+          className="flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-50"
+        >
+          <UserCheck size={13} /> Friends
+        </button>
+      )}
+
+      {error && <p className="w-full text-right text-xs text-red-600">{error}</p>}
+    </div>
+  );
+}
+
 // ─── Profile theme definitions ────────────────────────────────────────────────
 const PROFILE_THEMES = {
   "Classic Blue":   { cover: "from-blue-700 to-blue-400",     btn: "bg-blue-600 hover:bg-blue-700",       accent: "text-blue-600",   bar: "bg-blue-600",    scrollbarColor: "#2563eb", tint: "bg-blue-50"    },
@@ -2200,14 +2395,13 @@ function UserProfileView({
                   {profile.id && (
                     <button
                       onClick={() => onMessage?.({ id: profile.id!, name: profile.name, avatarUrl, accountType: "personal" })}
-                      className="flex items-center gap-1.5 border border-border bg-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-muted transition-colors"
+                      className="flex items-center gap-1.5 border border-border bg-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-muted transition-colors"
+                      aria-label={`Message ${profile.name}`}
                     >
-                      <MessageSquare size={13} /> Message
+                      <MessageSquare size={13} /> <span className="hidden sm:inline">Message</span>
                     </button>
                   )}
-                  <button className={`flex items-center gap-1.5 ${T.btn} text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors`}>
-                    <Users size={13} /> Follow
-                  </button>
+                  {profile.id && <ProfileConnectionActions targetId={profile.id} targetName={profile.name} followButtonClass={T.btn} />}
                 </>
               )}
             </div>
@@ -3235,6 +3429,9 @@ export default function App() {
   const [messagesOpen, setMessagesOpen] = useState(false);
   const [messageRecipient, setMessageRecipient] = useState<MessageContact | null>(null);
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
+  const [pendingFriendRequests, setPendingFriendRequests] = useState<PendingFriendRequest[]>([]);
+  const [friendRequestBusy, setFriendRequestBusy] = useState<string | null>(null);
+  const [friendRequestError, setFriendRequestError] = useState<string | null>(null);
   const [view, setView] = useState<ActiveView>({ page: "feed" });
   const [advertiseOpen, setAdvertiseOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -3360,6 +3557,71 @@ export default function App() {
     const timer = window.setInterval(() => { void refreshUnreadMessages(); }, 15000);
     return () => window.clearInterval(timer);
   }, [authReady, currentProfile?.id]);
+
+  async function refreshFriendRequests() {
+    const userId = currentProfile?.id;
+    if (!userId) {
+      setPendingFriendRequests([]);
+      return;
+    }
+    const { data: requests, error } = await supabase
+      .from("friendships")
+      .select("id, requester_id, created_at")
+      .eq("addressee_id", userId)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false });
+    if (error) {
+      setFriendRequestError("Friend requests could not be loaded.");
+      return;
+    }
+
+    const requesterIds = [...new Set((requests || []).map((request: any) => request.requester_id))];
+    let profileRows: any[] = [];
+    let businessRows: any[] = [];
+    if (requesterIds.length) {
+      const [profilesResult, businessesResult] = await Promise.all([
+        supabase.from("profiles").select("id, full_name, avatar_url, account_type").in("id", requesterIds),
+        supabase.from("business_profiles").select("user_id, business_name, logo_url").in("user_id", requesterIds),
+      ]);
+      profileRows = profilesResult.data || [];
+      businessRows = businessesResult.data || [];
+    }
+
+    const profilesById = new Map(profileRows.map((profile: any) => [profile.id, profile]));
+    const businessesById = new Map(businessRows.map((business: any) => [business.user_id, business]));
+    setPendingFriendRequests((requests || []).map((request: any) => {
+      const profile: any = profilesById.get(request.requester_id);
+      const business: any = businessesById.get(request.requester_id);
+      const isBusiness = !!business || profile?.account_type === "business";
+      return {
+        id: request.id,
+        requesterId: request.requester_id,
+        name: isBusiness ? business?.business_name || profile?.full_name || "Local Business" : profile?.full_name || "Neighbor",
+        avatarUrl: isBusiness ? business?.logo_url || profile?.avatar_url || null : profile?.avatar_url || null,
+        createdAt: request.created_at,
+      };
+    }));
+    setFriendRequestError(null);
+  }
+
+  useEffect(() => {
+    if (!authReady || !currentProfile?.id) return;
+    void refreshFriendRequests();
+    const timer = window.setInterval(() => { void refreshFriendRequests(); }, 15000);
+    return () => window.clearInterval(timer);
+  }, [authReady, currentProfile?.id]);
+
+  async function respondToFriendRequest(requestId: string, accept: boolean) {
+    if (friendRequestBusy) return;
+    setFriendRequestBusy(requestId);
+    setFriendRequestError(null);
+    const result = accept
+      ? await supabase.from("friendships").update({ status: "accepted", responded_at: new Date().toISOString() }).eq("id", requestId)
+      : await supabase.from("friendships").delete().eq("id", requestId);
+    if (result.error) setFriendRequestError(accept ? "Could not accept this friend request." : "Could not decline this friend request.");
+    else setPendingFriendRequests((current) => current.filter((request) => request.id !== requestId));
+    setFriendRequestBusy(null);
+  }
 
   useEffect(() => {
     if (!authReady) return;
@@ -3828,9 +4090,15 @@ export default function App() {
             <button
               onClick={() => { setNotifOpen(!notifOpen); setMessagesOpen(false); }}
               className="relative p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="Notifications"
+              title="Notifications"
             >
               <Bell size={18} />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-600 rounded-full border-2 border-white" />
+              {pendingFriendRequests.length > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 bg-blue-600 text-white text-[10px] font-semibold rounded-full flex items-center justify-center">
+                  {pendingFriendRequests.length > 99 ? "99+" : pendingFriendRequests.length}
+                </span>
+              )}
             </button>
             <button onClick={goToOwnProfile} aria-label="View profile">
               <Avatar name={currentAccountType === "business" ? (currentBusiness?.name || "Business") : (currentProfile?.name || "Neighbor")} size="sm" src={myAvatarUrl} />
@@ -3860,7 +4128,7 @@ export default function App() {
           onClick={() => setNotifOpen(false)}
         >
           <div
-            className="absolute top-14 right-4 w-80 bg-white rounded-xl shadow-2xl border border-border overflow-hidden"
+            className="absolute top-14 right-4 w-[min(22rem,calc(100vw-2rem))] bg-white rounded-xl shadow-2xl border border-border overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-4 py-3 border-b border-border">
@@ -3872,28 +4140,41 @@ export default function App() {
                 <X size={15} />
               </button>
             </div>
-            {[
-              {
-                msg: "James liked your comment on the cleanup post",
-                time: "5m ago",
-                unread: true,
-              },
-              {
-                msg: "Priya commented on a Safety post you follow",
-                time: "1h ago",
-                unread: true,
-              },
-            ].map((n, i) => (
-              <div
-                key={i}
-                className={`px-4 py-3 flex gap-3 items-start hover:bg-secondary/50 cursor-pointer transition-colors ${n.unread ? "bg-blue-50/60" : ""}`}
-              >
-                {n.unread && (
-                  <span className="w-2 h-2 rounded-full bg-blue-600 mt-1.5 flex-shrink-0" />
-                )}
-                <div>
-                  <p className="text-sm">{n.msg}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{n.time}</p>
+            {friendRequestError && <p className="border-b border-red-100 bg-red-50 px-4 py-2 text-xs text-red-700">{friendRequestError}</p>}
+            {pendingFriendRequests.length === 0 ? (
+              <div className="px-5 py-8 text-center">
+                <Bell size={24} className="mx-auto mb-2 text-muted-foreground/50" />
+                <p className="text-sm font-medium">No new notifications</p>
+                <p className="mt-1 text-xs text-muted-foreground">Friend requests will appear here.</p>
+              </div>
+            ) : pendingFriendRequests.map((request) => (
+              <div key={request.id} className="border-b border-border bg-blue-50/50 px-4 py-3 last:border-b-0">
+                <div className="flex items-start gap-3">
+                  <button onClick={() => { setNotifOpen(false); void goToUser(request.name, request.requesterId); }} aria-label={`View ${request.name}'s profile`}>
+                    <Avatar name={request.name} size="sm" src={request.avatarUrl || null} />
+                  </button>
+                  <div className="min-w-0 flex-1">
+                    <button onClick={() => { setNotifOpen(false); void goToUser(request.name, request.requesterId); }} className="text-left text-sm leading-snug">
+                      <span className="font-semibold">{request.name}</span> sent you a friend request.
+                    </button>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{formatMessageTime(request.createdAt)}</p>
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        onClick={() => { void respondToFriendRequest(request.id, true); }}
+                        disabled={friendRequestBusy === request.id}
+                        className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                      >
+                        Accept
+                      </button>
+                      <button
+                        onClick={() => { void respondToFriendRequest(request.id, false); }}
+                        disabled={friendRequestBusy === request.id}
+                        className="rounded-lg border border-border bg-white px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-muted disabled:opacity-50"
+                      >
+                        Decline
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}
