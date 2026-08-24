@@ -57,6 +57,10 @@ import {
   UserCheck,
   Pencil,
   Trash2,
+  LayoutDashboard,
+  CircleDollarSign,
+  Reply,
+  RefreshCw,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -191,6 +195,43 @@ interface LiveAdvertisement {
   targetCity: string;
 }
 
+type FeedbackCategory = "idea" | "problem" | "question" | "safety" | "other";
+
+interface SiteFeedback {
+  id: string;
+  user_id: string;
+  sender_name: string;
+  contact_email: string;
+  category: FeedbackCategory;
+  subject: string;
+  message: string;
+  status: "unread" | "read" | "resolved";
+  admin_response: string | null;
+  responded_at: string | null;
+  created_at: string;
+}
+
+interface AdminAdvertisement {
+  id: string;
+  user_id: string;
+  tier: AdvertisingTier;
+  business_name: string;
+  headline: string;
+  description: string;
+  image_url: string;
+  destination_url: string | null;
+  phone: string | null;
+  contact_email: string;
+  target_city: string;
+  status: "pending" | "approved" | "active" | "paused" | "rejected" | "expired";
+  billing_status: "unpaid" | "pending" | "paid" | "past_due" | "canceled" | "refunded";
+  payment_method: "stripe" | "cash_app" | "bank_transfer" | "complimentary" | "other" | null;
+  payment_reference: string | null;
+  starts_at: string | null;
+  ends_at: string | null;
+  created_at: string;
+}
+
 type PostCategory =
   | "news"
   | "safety"
@@ -207,6 +248,7 @@ type ActiveView =
   | { page: "me" }
   | { page: "my-business" }
   | { page: "settings" }
+  | { page: "admin" }
   | { page: "search" }
   | { page: "events" }
   | { page: "helpwanted" }
@@ -251,6 +293,22 @@ const ADVERTISING_TIERS: Array<{
   { id: "spotlight", name: "Spotlight", price: 35, placement: "Priority sidebar", reach: "Citywide reach" },
   { id: "featured", name: "Featured", price: 75, placement: "Highest priority", reach: "All Neighborly areas" },
 ];
+
+const FEEDBACK_CATEGORY_LABELS: Record<FeedbackCategory, string> = {
+  idea: "Suggestion or idea",
+  problem: "Something isn't working",
+  question: "Question",
+  safety: "Safety concern",
+  other: "Other feedback",
+};
+
+const PAYMENT_METHOD_LABELS: Record<NonNullable<AdminAdvertisement["payment_method"]>, string> = {
+  stripe: "Stripe",
+  cash_app: "Cash App Business",
+  bank_transfer: "First Source business bank payment",
+  complimentary: "Complimentary / no charge",
+  other: "Other",
+};
 
 // ─── Badge Meta ───────────────────────────────────────────────────────────────
 
@@ -1249,6 +1307,7 @@ function BusinessProfileView({
   isOwnProfile = false,
   onLogoChange,
   onSettings,
+  onAdmin,
 }: {
   biz: Business;
   onBack: () => void;
@@ -1257,6 +1316,7 @@ function BusinessProfileView({
   isOwnProfile?: boolean;
   onLogoChange?: (url: string) => void;
   onSettings?: () => void;
+  onAdmin?: () => void;
 }) {
   const [tab, setTab] = useState<
     "about" | "posts" | "services" | "photos" | "contact" | "reviews"
@@ -1363,11 +1423,18 @@ function BusinessProfileView({
             >
               <ChevronLeft size={16} /> Back to feed
             </button>
-            {isOwnProfile && onSettings && (
-              <button onClick={onSettings} className="inline-flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-medium text-foreground hover:bg-muted">
-                ⚙️ Settings
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              {isOwnProfile && onAdmin && (
+                <button onClick={onAdmin} className="inline-flex items-center gap-2 rounded-lg bg-purple-700 px-3 py-2 text-sm font-semibold text-white hover:bg-purple-800">
+                  <LayoutDashboard size={15} /> Admin
+                </button>
+              )}
+              {isOwnProfile && onSettings && (
+                <button onClick={onSettings} className="inline-flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-medium text-foreground hover:bg-muted">
+                  ⚙️ Settings
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Hero area */}
@@ -2380,6 +2447,7 @@ function UserProfileView({
   myAvatarUrl = null,
   onAvatarChange,
   onSettings,
+  onAdmin,
 }: {
   profile: UserProfile;
   onBack: () => void;
@@ -2388,6 +2456,7 @@ function UserProfileView({
   myAvatarUrl?: string | null;
   onAvatarChange?: (url: string) => void;
   onSettings?: () => void;
+  onAdmin?: () => void;
 }) {
   const [tab, setTab] = useState<"about" | "posts" | "photos" | "reviews">("about");
   const [theme, setTheme] = useState<ThemeName>(() => resolveProfileTheme(profile.theme));
@@ -2536,11 +2605,18 @@ function UserProfileView({
           <button onClick={onBack} className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
             <ChevronLeft size={16} /> Back to feed
           </button>
-          {isOwnProfile && onSettings && (
-            <button onClick={onSettings} className="inline-flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-medium text-foreground hover:bg-muted">
-              ⚙️ Settings
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {isOwnProfile && onAdmin && (
+              <button onClick={onAdmin} className="inline-flex items-center gap-2 rounded-lg bg-purple-700 px-3 py-2 text-sm font-semibold text-white hover:bg-purple-800">
+                <LayoutDashboard size={15} /> Admin
+              </button>
+            )}
+            {isOwnProfile && onSettings && (
+              <button onClick={onSettings} className="inline-flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-medium text-foreground hover:bg-muted">
+                ⚙️ Settings
+              </button>
+            )}
+          </div>
         </div>
       </div>
       {mediaError && isOwnProfile && <div className="mx-auto max-w-5xl px-4 pt-3"><div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{mediaError}</div></div>}
@@ -3528,6 +3604,515 @@ function ClassifiedsView({
   );
 }
 
+// ─── Feedback and Admin ──────────────────────────────────────────────────────
+
+function FeedbackModal({
+  open,
+  onClose,
+  senderName,
+}: {
+  open: boolean;
+  onClose: () => void;
+  senderName: string;
+}) {
+  const [category, setCategory] = useState<FeedbackCategory>("idea");
+  const [subject, setSubject] = useState("");
+  const [message, setMessage] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [recentFeedback, setRecentFeedback] = useState<SiteFeedback[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  async function loadMyFeedback() {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      setError("Please sign in again to send feedback.");
+      setLoading(false);
+      return;
+    }
+    setContactEmail((current) => current || user.email || "");
+    const { data, error: loadError } = await supabase
+      .from("site_feedback")
+      .select("id, user_id, sender_name, contact_email, category, subject, message, status, admin_response, responded_at, created_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(10);
+    if (loadError) setError("Your feedback history could not be loaded.");
+    else setRecentFeedback((data || []) as SiteFeedback[]);
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    if (!open) return;
+    setLoading(true);
+    setError(null);
+    void loadMyFeedback();
+  }, [open]);
+
+  async function submitFeedback(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (submitting) return;
+    setSubmitting(true);
+    setError(null);
+    setSuccess(null);
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      setError("Please sign in again to send feedback.");
+      setSubmitting(false);
+      return;
+    }
+    const { error: insertError } = await supabase.from("site_feedback").insert({
+      user_id: user.id,
+      sender_name: senderName.trim() || "Neighbor",
+      contact_email: contactEmail.trim(),
+      category,
+      subject: subject.trim(),
+      message: message.trim(),
+    });
+    if (insertError) {
+      console.error("Could not submit site feedback", insertError);
+      setError("Your feedback could not be sent. Please try again.");
+    } else {
+      setSubject("");
+      setMessage("");
+      setCategory("idea");
+      setSuccess("Thank you—your feedback is now in the admin inbox.");
+      await loadMyFeedback();
+    }
+    setSubmitting(false);
+  }
+
+  return (
+    <Dialog.Root open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onClose(); }}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm" />
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-[71] max-h-[90dvh] w-[min(42rem,calc(100vw-1.5rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl bg-white shadow-2xl" aria-describedby={undefined}>
+          <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-white px-5 py-4">
+            <Dialog.Title className="flex items-center gap-2 text-lg font-semibold">
+              <MessageSquare size={18} className="text-purple-700" /> Send Feedback
+            </Dialog.Title>
+            <Dialog.Close className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted" aria-label="Close feedback">
+              <X size={16} />
+            </Dialog.Close>
+          </div>
+          <div className="space-y-6 p-5 sm:p-6">
+            <form onSubmit={(event) => { void submitFeedback(event); }} className="space-y-4" aria-busy={submitting}>
+              <p className="text-sm text-muted-foreground">Share an idea, report a problem, or ask a question. The Neighborly administrator will see it in the private admin inbox.</p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="feedback-category" className="mb-1 block text-xs font-semibold text-muted-foreground">Feedback type</label>
+                  <select id="feedback-category" value={category} onChange={(event) => setCategory(event.target.value as FeedbackCategory)} className="w-full rounded-lg border border-border bg-muted px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-purple-600/30">
+                    {(Object.keys(FEEDBACK_CATEGORY_LABELS) as FeedbackCategory[]).map((item) => <option key={item} value={item}>{FEEDBACK_CATEGORY_LABELS[item]}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="feedback-email" className="mb-1 block text-xs font-semibold text-muted-foreground">Reply email</label>
+                  <input id="feedback-email" required type="email" maxLength={254} value={contactEmail} onChange={(event) => setContactEmail(event.target.value)} className="w-full rounded-lg border border-border bg-muted px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-purple-600/30" />
+                </div>
+              </div>
+              <div>
+                <label htmlFor="feedback-subject" className="mb-1 block text-xs font-semibold text-muted-foreground">Subject</label>
+                <input id="feedback-subject" required minLength={2} maxLength={120} value={subject} onChange={(event) => setSubject(event.target.value)} placeholder="What would you like us to know?" className="w-full rounded-lg border border-border bg-muted px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-purple-600/30" />
+              </div>
+              <div>
+                <label htmlFor="feedback-message" className="mb-1 block text-xs font-semibold text-muted-foreground">Message</label>
+                <textarea id="feedback-message" required minLength={5} maxLength={5000} rows={5} value={message} onChange={(event) => setMessage(event.target.value)} placeholder="Include the details that will help us understand your feedback." className="w-full resize-none rounded-lg border border-border bg-muted px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-purple-600/30" />
+                <p className="mt-1 text-right text-[11px] text-muted-foreground">{message.length}/5000</p>
+              </div>
+              {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+              {success && <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{success}</p>}
+              <button type="submit" disabled={submitting} className="w-full rounded-lg bg-purple-700 py-3 text-sm font-semibold text-white hover:bg-purple-800 disabled:opacity-50">
+                {submitting ? "Sending Feedback…" : "Send Feedback"}
+              </button>
+            </form>
+
+            <section className="border-t border-border pt-5">
+              <h3 className="mb-3 text-sm font-semibold">Your recent feedback</h3>
+              {loading ? (
+                <p className="text-sm text-muted-foreground">Loading your messages…</p>
+              ) : recentFeedback.length === 0 ? (
+                <p className="rounded-xl bg-muted px-4 py-5 text-center text-sm text-muted-foreground">You haven't sent feedback yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {recentFeedback.map((item) => (
+                    <article key={item.id} className="rounded-xl border border-border p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <p className="font-semibold text-sm">{item.subject}</p>
+                          <p className="text-xs text-muted-foreground">{FEEDBACK_CATEGORY_LABELS[item.category]} · {new Date(item.created_at).toLocaleDateString()}</p>
+                        </div>
+                        <span className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase ${item.status === "resolved" ? "bg-emerald-100 text-emerald-700" : item.status === "read" ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700"}`}>{item.status}</span>
+                      </div>
+                      <p className="mt-2 whitespace-pre-wrap text-sm text-foreground/80">{item.message}</p>
+                      {item.admin_response && (
+                        <div className="mt-3 rounded-lg border border-purple-200 bg-purple-50 px-3 py-2">
+                          <p className="text-xs font-semibold text-purple-700">Administrator response</p>
+                          <p className="mt-1 whitespace-pre-wrap text-sm text-purple-950">{item.admin_response}</p>
+                        </div>
+                      )}
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
+
+function AdminDashboard({
+  onBack,
+  profile,
+  business,
+  accountType,
+  defaultCity,
+  defaultNeighborhood,
+  avatarUrl,
+  onPostCreated,
+}: {
+  onBack: () => void;
+  profile: UserProfile;
+  business: Business | null;
+  accountType: "personal" | "business";
+  defaultCity: string;
+  defaultNeighborhood: string;
+  avatarUrl?: string | null;
+  onPostCreated: (post: Post) => void;
+}) {
+  const [tab, setTab] = useState<"posts" | "feedback" | "advertising">("posts");
+  const [feedbackItems, setFeedbackItems] = useState<SiteFeedback[]>([]);
+  const [advertisements, setAdvertisements] = useState<AdminAdvertisement[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [actionBusyId, setActionBusyId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [responseDrafts, setResponseDrafts] = useState<Record<string, string>>({});
+  const [paymentMethods, setPaymentMethods] = useState<Record<string, NonNullable<AdminAdvertisement["payment_method"]>>>({});
+  const [paymentReferences, setPaymentReferences] = useState<Record<string, string>>({});
+
+  const [postBody, setPostBody] = useState("");
+  const [postCategory, setPostCategory] = useState<PostCategory>("news");
+  const [postCity, setPostCity] = useState(defaultCity);
+  const [postNeighborhood, setPostNeighborhood] = useState(defaultNeighborhood);
+  const [postImage, setPostImage] = useState<File | null>(null);
+  const [postImagePreview, setPostImagePreview] = useState<string | null>(null);
+  const [postBusy, setPostBusy] = useState(false);
+  const [postError, setPostError] = useState<string | null>(null);
+  const [postSuccess, setPostSuccess] = useState<string | null>(null);
+  const adminPostImageRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setLoadError(null);
+    const feedbackRequest = supabase
+      .from("site_feedback")
+      .select("id, user_id, sender_name, contact_email, category, subject, message, status, admin_response, responded_at, created_at")
+      .order("created_at", { ascending: false })
+      .limit(100);
+    const advertisingRequest = supabase
+      .from("advertising_campaigns")
+      .select("id, user_id, tier, business_name, headline, description, image_url, destination_url, phone, contact_email, target_city, status, billing_status, payment_method, payment_reference, starts_at, ends_at, created_at")
+      .order("created_at", { ascending: false })
+      .limit(100);
+    void Promise.all([feedbackRequest, advertisingRequest]).then(([feedbackResult, advertisingResult]) => {
+      if (cancelled) return;
+      if (feedbackResult.error || advertisingResult.error) {
+        console.error("Could not load admin dashboard", feedbackResult.error || advertisingResult.error);
+        setLoadError("Some admin information could not be loaded. Please refresh.");
+      }
+      setFeedbackItems((feedbackResult.data || []) as SiteFeedback[]);
+      setAdvertisements((advertisingResult.data || []) as AdminAdvertisement[]);
+      setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [refreshKey]);
+
+  useEffect(() => () => {
+    if (postImagePreview) URL.revokeObjectURL(postImagePreview);
+  }, [postImagePreview]);
+
+  function choosePostImage(file: File | null) {
+    setPostError(null);
+    if (!file) {
+      setPostImage(null);
+      setPostImagePreview(null);
+      return;
+    }
+    if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type)) {
+      setPostError("Choose a JPG, PNG, WebP, or GIF image.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setPostError("The post image must be 5 MB or smaller.");
+      return;
+    }
+    setPostImage(file);
+    setPostImagePreview(URL.createObjectURL(file));
+  }
+
+  async function publishAdminPost(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (postBusy || (!postBody.trim() && !postImage)) return;
+    setPostBusy(true);
+    setPostError(null);
+    setPostSuccess(null);
+    let uploadedPath: string | null = null;
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) throw new Error("Your session expired. Please sign in again.");
+      let imageUrl: string | null = null;
+      if (postImage) {
+        const ext = (postImage.name.split(".").pop() || "jpg").replace(/[^a-z0-9]/gi, "").toLowerCase() || "jpg";
+        uploadedPath = `${user.id}/posts/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+        const { error: uploadError } = await supabase.storage.from("neighborly-media").upload(uploadedPath, postImage, { upsert: false, contentType: postImage.type });
+        if (uploadError) throw uploadError;
+        imageUrl = supabase.storage.from("neighborly-media").getPublicUrl(uploadedPath).data.publicUrl;
+      }
+      const { data: saved, error: insertError } = await supabase.from("posts").insert({
+        author_id: user.id,
+        post_type: postTypeForCategory(postCategory),
+        category: postCategory,
+        content: postBody.trim(),
+        image_url: imageUrl,
+        city: postCity.trim(),
+        neighborhood: postNeighborhood.trim(),
+      }).select("id, created_at").single();
+      if (insertError) {
+        if (uploadedPath) await supabase.storage.from("neighborly-media").remove([uploadedPath]);
+        throw insertError;
+      }
+      const authorName = accountType === "business" ? business?.name || profile.name : profile.name;
+      onPostCreated({
+        id: new Date(saved.created_at).getTime(),
+        databaseId: saved.id,
+        author: authorName,
+        authorId: user.id,
+        authorBadges: [],
+        authorAvatar: avatarUrl || null,
+        neighborhood: postNeighborhood.trim(),
+        city: postCity.trim(),
+        time: "Just now",
+        category: postCategory,
+        body: postBody.trim(),
+        image: imageUrl || undefined,
+        likes: 0,
+        comments: [],
+        bookmarked: false,
+        liked: false,
+      });
+      setPostBody("");
+      choosePostImage(null);
+      if (adminPostImageRef.current) adminPostImageRef.current.value = "";
+      setPostSuccess("Your post is live in the Neighborly feed.");
+    } catch (postFailure: any) {
+      console.error("Could not publish admin post", postFailure);
+      setPostError(postFailure?.message || "The post could not be published.");
+    } finally {
+      setPostBusy(false);
+    }
+  }
+
+  async function markFeedbackRead(item: SiteFeedback) {
+    if (actionBusyId) return;
+    setActionBusyId(item.id);
+    setActionError(null);
+    const { error } = await supabase.from("site_feedback").update({ status: "read", updated_at: new Date().toISOString() }).eq("id", item.id).select("id").single();
+    if (error) setActionError("That feedback item could not be updated.");
+    else setFeedbackItems((current) => current.map((row) => row.id === item.id ? { ...row, status: "read" } : row));
+    setActionBusyId(null);
+  }
+
+  async function saveFeedbackResponse(item: SiteFeedback) {
+    const response = (responseDrafts[item.id] ?? item.admin_response ?? "").trim();
+    if (!response || actionBusyId) return;
+    setActionBusyId(item.id);
+    setActionError(null);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setActionError("Please sign in again before replying.");
+      setActionBusyId(null);
+      return;
+    }
+    const respondedAt = new Date().toISOString();
+    const { error } = await supabase.from("site_feedback").update({
+      admin_response: response,
+      responded_by: user.id,
+      responded_at: respondedAt,
+      status: "resolved",
+      updated_at: respondedAt,
+    }).eq("id", item.id).select("id").single();
+    if (error) setActionError("Your response could not be saved.");
+    else setFeedbackItems((current) => current.map((row) => row.id === item.id ? { ...row, admin_response: response, responded_at: respondedAt, status: "resolved" } : row));
+    setActionBusyId(null);
+  }
+
+  async function updateAdvertisement(id: string, changes: Partial<AdminAdvertisement>) {
+    if (actionBusyId) return;
+    setActionBusyId(id);
+    setActionError(null);
+    const { error } = await supabase.from("advertising_campaigns").update({ ...changes, updated_at: new Date().toISOString() }).eq("id", id).select("id").single();
+    if (error) {
+      console.error("Could not update advertisement", error);
+      setActionError("That advertisement could not be updated.");
+    } else setAdvertisements((current) => current.map((item) => item.id === id ? { ...item, ...changes } : item));
+    setActionBusyId(null);
+  }
+
+  function activatePaidAdvertisement(item: AdminAdvertisement) {
+    const method = paymentMethods[item.id] || item.payment_method || "bank_transfer";
+    const reference = (paymentReferences[item.id] ?? item.payment_reference ?? "").trim();
+    void updateAdvertisement(item.id, {
+      status: "active",
+      billing_status: "paid",
+      payment_method: method,
+      payment_reference: reference || null,
+      starts_at: item.starts_at || new Date().toISOString(),
+    });
+  }
+
+  const unreadFeedback = feedbackItems.filter((item) => item.status === "unread").length;
+  const pendingAds = advertisements.filter((item) => item.status === "pending").length;
+  const activeAds = advertisements.filter((item) => item.status === "active" && item.billing_status === "paid").length;
+
+  return (
+    <div className="min-h-screen bg-purple-950 pb-10 font-['DM_Sans',sans-serif]">
+      <header className="sticky top-0 z-40 border-b border-purple-800 bg-purple-950/95 px-4 py-3 text-white backdrop-blur-sm">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
+          <button onClick={onBack} className="inline-flex items-center gap-1.5 text-sm font-semibold text-purple-200 hover:text-white"><ChevronLeft size={17} /> Back to feed</button>
+          <div className="flex items-center gap-2">
+            <LayoutDashboard size={18} className="text-blue-300" />
+            <h1 className="font-['Playfair_Display',serif] text-lg font-bold sm:text-xl">Neighborly Admin</h1>
+          </div>
+          <button onClick={() => setRefreshKey((value) => value + 1)} className="rounded-lg p-2 text-purple-200 hover:bg-purple-900 hover:text-white" aria-label="Refresh admin dashboard"><RefreshCw size={17} /></button>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-6xl space-y-5 px-4 py-5 sm:px-6">
+        <section className="grid grid-cols-3 gap-3">
+          <div className="rounded-xl bg-white p-4 shadow-sm"><p className="text-xs font-semibold uppercase text-muted-foreground">Unread feedback</p><p className="mt-1 text-2xl font-bold text-purple-700">{unreadFeedback}</p></div>
+          <div className="rounded-xl bg-white p-4 shadow-sm"><p className="text-xs font-semibold uppercase text-muted-foreground">Pending ads</p><p className="mt-1 text-2xl font-bold text-amber-600">{pendingAds}</p></div>
+          <div className="rounded-xl bg-white p-4 shadow-sm"><p className="text-xs font-semibold uppercase text-muted-foreground">Active ads</p><p className="mt-1 text-2xl font-bold text-emerald-600">{activeAds}</p></div>
+        </section>
+
+        <nav className="grid grid-cols-3 overflow-hidden rounded-xl bg-white p-1 shadow-sm" aria-label="Admin sections">
+          {([
+            { id: "posts" as const, label: "Create Posts", icon: <Megaphone size={16} /> },
+            { id: "feedback" as const, label: `Feedback${unreadFeedback ? ` (${unreadFeedback})` : ""}`, icon: <MessageSquare size={16} /> },
+            { id: "advertising" as const, label: `Advertising${pendingAds ? ` (${pendingAds})` : ""}`, icon: <CircleDollarSign size={16} /> },
+          ]).map((item) => (
+            <button key={item.id} onClick={() => setTab(item.id)} aria-pressed={tab === item.id} className={`flex items-center justify-center gap-2 rounded-lg px-2 py-3 text-xs font-semibold sm:text-sm ${tab === item.id ? "bg-purple-700 text-white" : "text-muted-foreground hover:bg-muted"}`}>{item.icon}<span>{item.label}</span></button>
+          ))}
+        </nav>
+
+        {loadError && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{loadError}</p>}
+        {actionError && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{actionError}</p>}
+
+        {tab === "posts" && (
+          <section className="rounded-2xl bg-white p-5 shadow-sm sm:p-6">
+            <div className="mb-5 flex items-center gap-3">
+              <Avatar name={accountType === "business" ? business?.name || profile.name : profile.name} size="md" src={avatarUrl} />
+              <div><h2 className="font-semibold">Create a feed post</h2><p className="text-xs text-muted-foreground">Posts publish as the account you are currently signed into.</p></div>
+            </div>
+            <form onSubmit={(event) => { void publishAdminPost(event); }} className="space-y-4" aria-busy={postBusy}>
+              <textarea required={!postImage} maxLength={5000} rows={6} value={postBody} onChange={(event) => setPostBody(event.target.value)} placeholder="Write a community announcement, update, or other post…" className="w-full resize-none rounded-xl border border-border bg-muted px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-purple-600/30" />
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Category</p>
+                <div className="flex flex-wrap gap-2">
+                  {(Object.keys(CATEGORY_META) as PostCategory[]).map((item) => (
+                    <button key={item} type="button" disabled={postBusy} onClick={() => setPostCategory(item)} aria-pressed={postCategory === item} className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-semibold ${CATEGORY_META[item].color} ${postCategory === item ? "ring-2 ring-current ring-offset-1" : "opacity-60 hover:opacity-100"}`}>{CATEGORY_META[item].icon}{CATEGORY_META[item].label}</button>
+                  ))}
+                </div>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div><label htmlFor="admin-post-city" className="mb-1 block text-xs font-semibold text-muted-foreground">City / area</label><input id="admin-post-city" required maxLength={120} value={postCity} onChange={(event) => setPostCity(event.target.value)} className="w-full rounded-lg border border-border bg-muted px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-purple-600/30" /></div>
+                <div><label htmlFor="admin-post-neighborhood" className="mb-1 block text-xs font-semibold text-muted-foreground">Neighborhood</label><input id="admin-post-neighborhood" required maxLength={120} value={postNeighborhood} onChange={(event) => setPostNeighborhood(event.target.value)} className="w-full rounded-lg border border-border bg-muted px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-purple-600/30" /></div>
+              </div>
+              <input ref={adminPostImageRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={(event) => choosePostImage(event.target.files?.[0] || null)} />
+              {postImagePreview ? (
+                <div className="relative overflow-hidden rounded-xl border border-border"><img src={postImagePreview} alt="Post preview" className="max-h-80 w-full object-cover" /><button type="button" onClick={() => { choosePostImage(null); if (adminPostImageRef.current) adminPostImageRef.current.value = ""; }} className="absolute right-2 top-2 rounded-full bg-black/70 p-1.5 text-white" aria-label="Remove post image"><X size={14} /></button></div>
+              ) : (
+                <button type="button" onClick={() => adminPostImageRef.current?.click()} className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2.5 text-sm font-semibold text-muted-foreground hover:bg-muted"><Camera size={16} /> Add photo</button>
+              )}
+              {postError && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{postError}</p>}
+              {postSuccess && <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{postSuccess}</p>}
+              <button type="submit" disabled={postBusy || (!postBody.trim() && !postImage)} className="w-full rounded-lg bg-purple-700 py-3 text-sm font-semibold text-white hover:bg-purple-800 disabled:opacity-50">{postBusy ? "Publishing…" : "Publish Post"}</button>
+            </form>
+          </section>
+        )}
+
+        {tab === "feedback" && (
+          <section className="space-y-3">
+            {loading ? <div className="rounded-xl bg-white p-8 text-center text-sm text-muted-foreground">Loading feedback…</div> : feedbackItems.length === 0 ? <div className="rounded-xl bg-white p-8 text-center text-sm text-muted-foreground">No feedback has been submitted yet.</div> : feedbackItems.map((item) => (
+              <article key={item.id} className={`rounded-2xl bg-white p-5 shadow-sm ${item.status === "unread" ? "border-2 border-amber-300" : "border border-transparent"}`}>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div><p className="font-semibold">{item.subject}</p><p className="mt-0.5 text-xs text-muted-foreground">{item.sender_name} · <a href={`mailto:${item.contact_email}`} className="text-blue-600 hover:underline">{item.contact_email}</a> · {new Date(item.created_at).toLocaleString()}</p></div>
+                  <span className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase ${item.status === "resolved" ? "bg-emerald-100 text-emerald-700" : item.status === "read" ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700"}`}>{item.status}</span>
+                </div>
+                <p className="mt-1 text-xs font-semibold text-purple-700">{FEEDBACK_CATEGORY_LABELS[item.category]}</p>
+                <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground/85">{item.message}</p>
+                <div className="mt-4 border-t border-border pt-4">
+                  <label htmlFor={`feedback-response-${item.id}`} className="mb-1 flex items-center gap-1 text-xs font-semibold text-muted-foreground"><Reply size={13} /> Response visible to this user</label>
+                  <textarea id={`feedback-response-${item.id}`} rows={3} maxLength={5000} value={responseDrafts[item.id] ?? item.admin_response ?? ""} onChange={(event) => setResponseDrafts((current) => ({ ...current, [item.id]: event.target.value }))} className="w-full resize-none rounded-lg border border-border bg-muted px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-purple-600/30" placeholder="Write your response…" />
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button onClick={() => { void saveFeedbackResponse(item); }} disabled={actionBusyId === item.id || !(responseDrafts[item.id] ?? item.admin_response ?? "").trim()} className="rounded-lg bg-purple-700 px-4 py-2 text-xs font-semibold text-white hover:bg-purple-800 disabled:opacity-50">Save response & resolve</button>
+                    {item.status === "unread" && <button onClick={() => { void markFeedbackRead(item); }} disabled={actionBusyId === item.id} className="rounded-lg border border-border px-4 py-2 text-xs font-semibold text-muted-foreground hover:bg-muted disabled:opacity-50">Mark read</button>}
+                  </div>
+                </div>
+              </article>
+            ))}
+          </section>
+        )}
+
+        {tab === "advertising" && (
+          <section className="space-y-4">
+            {loading ? <div className="rounded-xl bg-white p-8 text-center text-sm text-muted-foreground">Loading advertisement requests…</div> : advertisements.length === 0 ? <div className="rounded-xl bg-white p-8 text-center text-sm text-muted-foreground">No advertisement requests have been submitted yet.</div> : advertisements.map((item) => {
+              const selectedMethod = paymentMethods[item.id] || item.payment_method || "bank_transfer";
+              return (
+                <article key={item.id} className="overflow-hidden rounded-2xl bg-white shadow-sm">
+                  <div className="grid gap-0 md:grid-cols-[18rem_1fr]">
+                    <img src={item.image_url} alt={`${item.business_name} advertisement`} className="aspect-video h-full max-h-72 w-full object-cover md:aspect-auto" />
+                    <div className="space-y-4 p-5">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div><p className="text-xs font-semibold uppercase tracking-wide text-blue-600">{item.tier} plan · {item.target_city}</p><h2 className="mt-1 text-lg font-bold">{item.business_name}</h2><p className="font-semibold text-foreground/85">{item.headline}</p></div>
+                        <div className="flex gap-2"><span className="rounded-full bg-purple-100 px-2 py-1 text-[10px] font-semibold uppercase text-purple-700">{item.status}</span><span className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase ${item.billing_status === "paid" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{item.billing_status}</span></div>
+                      </div>
+                      <p className="text-sm leading-relaxed text-muted-foreground">{item.description}</p>
+                      <div className="grid gap-1 text-xs text-muted-foreground sm:grid-cols-2"><a href={`mailto:${item.contact_email}`} className="text-blue-600 hover:underline">{item.contact_email}</a><span>{item.phone || "No phone provided"}</span><span>Requested {new Date(item.created_at).toLocaleDateString()}</span>{item.destination_url && <a href={item.destination_url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">Open business link</a>}</div>
+
+                      {item.status === "pending" && <div className="flex flex-wrap gap-2"><button onClick={() => { void updateAdvertisement(item.id, { status: "approved" }); }} disabled={actionBusyId === item.id} className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50">Approve request</button><button onClick={() => { void updateAdvertisement(item.id, { status: "rejected" }); }} disabled={actionBusyId === item.id} className="rounded-lg border border-red-200 px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50">Reject</button></div>}
+
+                      {item.status === "approved" && item.billing_status !== "paid" && (
+                        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                          <p className="mb-3 text-xs font-semibold text-emerald-800">Record a confirmed payment, then activate the ad</p>
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <select value={selectedMethod} onChange={(event) => setPaymentMethods((current) => ({ ...current, [item.id]: event.target.value as NonNullable<AdminAdvertisement["payment_method"]> }))} className="rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs outline-none"><option value="bank_transfer">First Source business bank payment</option><option value="cash_app">Cash App Business</option><option value="stripe">Stripe</option><option value="complimentary">Complimentary / no charge</option><option value="other">Other</option></select>
+                            <input value={paymentReferences[item.id] ?? item.payment_reference ?? ""} onChange={(event) => setPaymentReferences((current) => ({ ...current, [item.id]: event.target.value }))} maxLength={200} placeholder="Payment reference or note (optional)" className="rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs outline-none" />
+                          </div>
+                          <button onClick={() => activatePaidAdvertisement(item)} disabled={actionBusyId === item.id} className="mt-3 w-full rounded-lg bg-emerald-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">Mark confirmed & activate</button>
+                        </div>
+                      )}
+
+                      {item.status === "active" && <button onClick={() => { void updateAdvertisement(item.id, { status: "paused" }); }} disabled={actionBusyId === item.id} className="rounded-lg border border-border px-4 py-2 text-xs font-semibold text-muted-foreground hover:bg-muted disabled:opacity-50">Pause advertisement</button>}
+                      {item.status === "paused" && item.billing_status === "paid" && <button onClick={() => { void updateAdvertisement(item.id, { status: "active" }); }} disabled={actionBusyId === item.id} className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">Resume advertisement</button>}
+                      {item.payment_method && <p className="text-xs text-muted-foreground">Payment: {PAYMENT_METHOD_LABELS[item.payment_method]}{item.payment_reference ? ` · ${item.payment_reference}` : ""}</p>}
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </section>
+        )}
+      </main>
+    </div>
+  );
+}
+
 // ─── Advertise Modal ─────────────────────────────────────────────────────────
 function AdvertiseModal({
   onClose,
@@ -4218,6 +4803,7 @@ export default function App() {
   const [friendRequestError, setFriendRequestError] = useState<string | null>(null);
   const [view, setView] = useState<ActiveView>({ page: "feed" });
   const [advertiseOpen, setAdvertiseOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [liveAdvertisements, setLiveAdvertisements] = useState<LiveAdvertisement[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [myAvatarUrl, setMyAvatarUrl] = useState<string | null>(null);
@@ -4226,6 +4812,9 @@ export default function App() {
   const [currentBusiness, setCurrentBusiness] = useState<Business | null>(null);
   const [currentAccountType, setCurrentAccountType] = useState<"personal" | "business">("personal");
   const [authReady, setAuthReady] = useState(false);
+  const [isSiteAdmin, setIsSiteAdmin] = useState(false);
+  const [adminStatusReady, setAdminStatusReady] = useState(false);
+  const [adminAttentionCount, setAdminAttentionCount] = useState(0);
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   const [activeLocation, setActiveLocation] = useState<LocationName>("All Areas");
   const [locationOpen, setLocationOpen] = useState(false);
@@ -4455,11 +5044,57 @@ export default function App() {
         setCurrentProfile(null);
         setCurrentBusiness(null);
         setCurrentAccountType("personal");
+        setIsSiteAdmin(false);
+        setAdminStatusReady(false);
         navigate("/sign-in", { replace: true });
       }
     });
     return () => { active = false; authListener.subscription.unsubscribe(); };
   }, []);
+
+  useEffect(() => {
+    if (!authReady || !currentProfile?.id) {
+      setIsSiteAdmin(false);
+      setAdminStatusReady(authReady);
+      return;
+    }
+    let cancelled = false;
+    setAdminStatusReady(false);
+    void supabase
+      .from("site_admins")
+      .select("user_id")
+      .eq("user_id", currentProfile.id)
+      .eq("enabled", true)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) console.error("Could not check administrator access", error);
+        setIsSiteAdmin(!!data && !error);
+        setAdminStatusReady(true);
+      });
+    return () => { cancelled = true; };
+  }, [authReady, currentProfile?.id]);
+
+  useEffect(() => {
+    if (!isSiteAdmin) {
+      setAdminAttentionCount(0);
+      return;
+    }
+    let cancelled = false;
+    async function refreshAdminAttention() {
+      const [feedbackResult, advertisingResult] = await Promise.all([
+        supabase.from("site_feedback").select("id", { count: "exact", head: true }).eq("status", "unread"),
+        supabase.from("advertising_campaigns").select("id", { count: "exact", head: true }).eq("status", "pending"),
+      ]);
+      if (cancelled) return;
+      if (!feedbackResult.error && !advertisingResult.error) {
+        setAdminAttentionCount((feedbackResult.count || 0) + (advertisingResult.count || 0));
+      }
+    }
+    void refreshAdminAttention();
+    const timer = window.setInterval(() => { void refreshAdminAttention(); }, 30000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [isSiteAdmin]);
 
   async function refreshUnreadMessages() {
     const userId = currentProfile?.id;
@@ -4549,14 +5184,21 @@ export default function App() {
 
   useEffect(() => {
     if (!authReady) return;
-    if (location.pathname === "/settings") {
+    if (location.pathname === "/admin") {
+      if (!adminStatusReady) return;
+      if (isSiteAdmin) setView({ page: "admin" });
+      else {
+        setView({ page: "feed" });
+        navigate("/", { replace: true });
+      }
+    } else if (location.pathname === "/settings") {
       setView({ page: "settings" });
     } else if (location.pathname === "/profile") {
       setView({ page: currentAccountType === "business" ? "my-business" : "me" });
-    } else if (location.pathname === "/" && ["settings", "me", "my-business"].includes(view.page)) {
+    } else if (location.pathname === "/" && ["settings", "admin", "me", "my-business"].includes(view.page)) {
       setView({ page: "feed" });
     }
-  }, [authReady, currentAccountType, location.pathname]);
+  }, [adminStatusReady, authReady, currentAccountType, isSiteAdmin, location.pathname]);
 
   useEffect(() => {
     if (!authReady || postsLoadedRef.current) return;
@@ -4738,6 +5380,11 @@ export default function App() {
     setView({ page: "settings" });
     navigate("/settings");
   }
+  function goToAdmin() {
+    if (!isSiteAdmin) return;
+    setView({ page: "admin" });
+    navigate("/admin");
+  }
   function openMessages(contact: MessageContact | null = null) {
     if (contact?.id === currentProfile?.id) return;
     setMessageRecipient(contact);
@@ -4863,16 +5510,31 @@ export default function App() {
 
   if (!authReady) return <div className="min-h-screen bg-purple-950 flex items-center justify-center text-white">Loading your Neighborly profile…</div>;
 
+  if (view.page === "admin" && currentProfile && isSiteAdmin) return (
+    <AdminDashboard
+      onBack={goToFeed}
+      profile={currentProfile}
+      business={currentBusiness}
+      accountType={currentAccountType}
+      defaultCity={browsingLocation}
+      defaultNeighborhood={currentBusiness?.address.split(",")[0] || currentProfile.neighborhood || browsingLocation}
+      avatarUrl={myAvatarUrl}
+      onPostCreated={(post) => {
+        setPosts((current) => [post, ...current]);
+        if (post.category === "forsale") setClassifiedPosts((current) => [post, ...current]);
+      }}
+    />
+  );
   if (view.page === "settings") return <SettingsView onBack={goToFeed} onProfileSaved={() => { void loadCurrentProfile(false); }} />;
   if (view.page === "me" && currentProfile) return (
     <>
-      <UserProfileView profile={currentProfile} onBack={goToFeed} isOwnProfile myAvatarUrl={myAvatarUrl} onAvatarChange={setMyAvatarUrl} onSettings={goToSettings} />
+      <UserProfileView profile={currentProfile} onBack={goToFeed} isOwnProfile myAvatarUrl={myAvatarUrl} onAvatarChange={setMyAvatarUrl} onSettings={goToSettings} onAdmin={isSiteAdmin ? goToAdmin : undefined} />
       {messagingModal}
     </>
   );
   if (view.page === "my-business" && currentBusiness) return (
     <>
-      <BusinessProfileView biz={currentBusiness} onBack={goToFeed} onUserClick={goToUser} isOwnProfile onLogoChange={setMyAvatarUrl} onSettings={goToSettings} />
+      <BusinessProfileView biz={currentBusiness} onBack={goToFeed} onUserClick={goToUser} isOwnProfile onLogoChange={setMyAvatarUrl} onSettings={goToSettings} onAdmin={isSiteAdmin ? goToAdmin : undefined} />
       {messagingModal}
     </>
   );
@@ -5199,6 +5861,17 @@ export default function App() {
 
           {/* Right side — messages + bell + avatar */}
           <div className="flex items-center gap-2 ml-auto flex-shrink-0">
+            {isSiteAdmin && (
+              <button
+                onClick={goToAdmin}
+                className="hidden items-center gap-1.5 rounded-lg bg-purple-700 px-3 py-2 text-xs font-semibold text-white hover:bg-purple-800 sm:inline-flex"
+                aria-label="Open admin dashboard"
+                title="Admin dashboard"
+              >
+                <Shield size={15} /> Admin
+                {adminAttentionCount > 0 && <span className="flex min-w-4 items-center justify-center rounded-full bg-white px-1 text-[10px] font-bold text-purple-700">{adminAttentionCount > 99 ? "99+" : adminAttentionCount}</span>}
+              </button>
+            )}
             <button
               onClick={() => openMessages()}
               className="relative p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
@@ -5668,6 +6341,10 @@ export default function App() {
 
             <AdvertisingSidebarCard ad={activeAdvertisement} onAdvertise={() => setAdvertiseOpen(true)} />
 
+            <button onClick={() => setFeedbackOpen(true)} className="flex w-full items-center justify-center gap-2 rounded-xl border border-purple-200 bg-white px-4 py-3 text-sm font-semibold text-purple-700 shadow-sm hover:bg-purple-50">
+              <MessageSquare size={16} /> Send Feedback
+            </button>
+
             <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-semibold text-sm">Community Groups</h3>
@@ -5783,6 +6460,16 @@ export default function App() {
           {/* Grow Your Business */}
           <AdvertisingSidebarCard ad={activeAdvertisement} onAdvertise={() => setAdvertiseOpen(true)} />
 
+          {isSiteAdmin && (
+            <button onClick={() => { goToAdmin(); setSidebarOpen(false); }} className="flex w-full items-center justify-center gap-2 rounded-xl bg-purple-700 px-4 py-3 text-sm font-semibold text-white hover:bg-purple-800">
+              <LayoutDashboard size={16} /> Admin Dashboard
+            </button>
+          )}
+
+          <button onClick={() => { setFeedbackOpen(true); setSidebarOpen(false); }} className="flex w-full items-center justify-center gap-2 rounded-xl border border-purple-300 bg-white px-4 py-3 text-sm font-semibold text-purple-700 hover:bg-purple-50">
+            <MessageSquare size={16} /> Send Feedback
+          </button>
+
           {/* Community Groups */}
           <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
             <div className="flex items-center justify-between mb-3">
@@ -5873,6 +6560,14 @@ export default function App() {
           defaultWebsite={currentBusiness?.website || ""}
           defaultPhone={currentBusiness?.phone || ""}
           defaultCity={browsingLocation}
+        />
+      )}
+
+      {feedbackOpen && (
+        <FeedbackModal
+          open={feedbackOpen}
+          onClose={() => setFeedbackOpen(false)}
+          senderName={currentAccountType === "business" ? currentBusiness?.name || currentProfile?.name || "Neighbor" : currentProfile?.name || "Neighbor"}
         />
       )}
 
