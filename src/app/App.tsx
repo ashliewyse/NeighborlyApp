@@ -996,12 +996,14 @@ function BusinessProfileView({
   onUserClick,
   isOwnProfile = false,
   onLogoChange,
+  onSettings,
 }: {
   biz: Business;
   onBack: () => void;
   onUserClick: (name: string, authorId?: string) => void;
   isOwnProfile?: boolean;
   onLogoChange?: (url: string) => void;
+  onSettings?: () => void;
 }) {
   const [tab, setTab] = useState<
     "about" | "posts" | "services" | "photos" | "contact" | "reviews"
@@ -1101,12 +1103,19 @@ function BusinessProfileView({
       {/* Profile header */}
       <div className="bg-white border-b border-border">
         <div className="max-w-4xl mx-auto px-4">
-          <button
-            onClick={onBack}
-            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors py-4 font-['DM_Sans',sans-serif]"
-          >
-            <ChevronLeft size={16} /> Back to feed
-          </button>
+          <div className="flex items-center justify-between py-3">
+            <button
+              onClick={onBack}
+              className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-primary transition-colors font-['DM_Sans',sans-serif]"
+            >
+              <ChevronLeft size={16} /> Back to feed
+            </button>
+            {isOwnProfile && onSettings && (
+              <button onClick={onSettings} className="inline-flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-medium text-foreground hover:bg-muted">
+                ⚙️ Settings
+              </button>
+            )}
+          </div>
 
           {/* Hero area */}
           <div className="pb-0">
@@ -1935,12 +1944,14 @@ function UserProfileView({
   isOwnProfile = false,
   myAvatarUrl = null,
   onAvatarChange,
+  onSettings,
 }: {
   profile: UserProfile;
   onBack: () => void;
   isOwnProfile?: boolean;
   myAvatarUrl?: string | null;
   onAvatarChange?: (url: string) => void;
+  onSettings?: () => void;
 }) {
   const [tab, setTab] = useState<"about" | "posts" | "photos" | "reviews">("about");
   const [theme, setTheme] = useState<ThemeName>(() => resolveProfileTheme(profile.theme));
@@ -2084,6 +2095,18 @@ function UserProfileView({
 
   return (
     <div className="min-h-screen bg-background">
+      <div className="bg-white border-b border-border">
+        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
+          <button onClick={onBack} className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
+            <ChevronLeft size={16} /> Back to feed
+          </button>
+          {isOwnProfile && onSettings && (
+            <button onClick={onSettings} className="inline-flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-medium text-foreground hover:bg-muted">
+              ⚙️ Settings
+            </button>
+          )}
+        </div>
+      </div>
       {mediaError && isOwnProfile && <div className="mx-auto max-w-5xl px-4 pt-3"><div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{mediaError}</div></div>}
       {mediaBusy && isOwnProfile && <div className="mx-auto max-w-5xl px-4 pt-3 text-xs text-muted-foreground">Saving photo…</div>}
       <div className="relative h-44 md:h-56 overflow-hidden">
@@ -2197,7 +2220,7 @@ function UserProfileView({
         </div>
       </div>
 
-      <div className="max-w-3xl mx-auto px-4 py-6 pb-24">
+      <div className="max-w-3xl mx-auto px-4 py-6 pb-10">
         {tab === "posts" && <ProfilePostsFeed profileName={profile.name} profileType="personal" profileOwnerId={profile.id} />}
 
         {tab === "about" && (
@@ -2405,26 +2428,6 @@ function UserProfileView({
         />
       )}
 
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-border flex items-stretch h-16">
-        {[
-          { label: "Home", icon: <Home size={20} />, action: onBack },
-          { label: "Search", icon: <Search size={20} />, action: () => {} },
-          { label: "Post", icon: <Plus size={20} />, action: () => {} },
-        ].map(({ label, icon, action }) => (
-          <button
-            key={label}
-            onClick={action}
-            className={`flex-1 flex flex-col items-center justify-center gap-1 text-xs font-medium transition-colors ${
-              label === "Post"
-                ? `${T.btn} text-white mx-4 my-2 rounded-xl`
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {icon}
-            {label}
-          </button>
-        ))}
-      </div>
     </div>
   );
 }
@@ -3161,16 +3164,10 @@ export default function App() {
 
   if (view.page === "settings") return <SettingsView onBack={goToFeed} />;
   if (view.page === "me" && currentProfile) return (
-    <div className="min-h-screen bg-background">
-      <div className="bg-white border-b border-border"><div className="max-w-5xl mx-auto px-4 py-2.5 flex justify-end"><button onClick={goToSettings} className="inline-flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-medium text-foreground hover:bg-muted">⚙️ Settings</button></div></div>
-      <UserProfileView profile={currentProfile} onBack={goToFeed} isOwnProfile myAvatarUrl={myAvatarUrl} onAvatarChange={setMyAvatarUrl} />
-    </div>
+    <UserProfileView profile={currentProfile} onBack={goToFeed} isOwnProfile myAvatarUrl={myAvatarUrl} onAvatarChange={setMyAvatarUrl} onSettings={goToSettings} />
   );
   if (view.page === "my-business" && currentBusiness) return (
-    <div className="min-h-screen bg-background">
-      <div className="bg-white border-b border-border"><div className="max-w-5xl mx-auto px-4 py-2.5 flex justify-end"><button onClick={goToSettings} className="inline-flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-medium text-foreground hover:bg-muted">⚙️ Settings</button></div></div>
-      <BusinessProfileView biz={currentBusiness} onBack={goToFeed} onUserClick={goToUser} isOwnProfile onLogoChange={setMyAvatarUrl} />
-    </div>
+    <BusinessProfileView biz={currentBusiness} onBack={goToFeed} onUserClick={goToUser} isOwnProfile onLogoChange={setMyAvatarUrl} onSettings={goToSettings} />
   );
   if (view.page === "saved-business") return (
     <BusinessProfileView
