@@ -3083,7 +3083,7 @@ function MessagingModal({
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-[80] bg-black/55 backdrop-blur-sm" />
         <Dialog.Content
-          className="fixed left-1/2 top-1/2 z-[81] h-[min(760px,92vh)] w-[min(980px,94vw)] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-2xl border border-border bg-white shadow-2xl"
+          className="fixed inset-0 z-[81] h-[100dvh] max-h-[100dvh] w-screen overflow-hidden bg-white shadow-2xl sm:inset-auto sm:left-1/2 sm:top-1/2 sm:h-[min(760px,92dvh)] sm:max-h-[92dvh] sm:w-[min(980px,94vw)] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:border sm:border-border"
           aria-describedby={undefined}
         >
           <div className="flex h-full flex-col">
@@ -3172,7 +3172,7 @@ function MessagingModal({
                         </div>
                       )}
                     </div>
-                    <form onSubmit={sendMessage} className="flex-shrink-0 border-t border-border bg-white p-3 sm:p-4">
+                    <form onSubmit={sendMessage} className="sticky bottom-0 z-10 flex-shrink-0 border-t border-border bg-white px-3 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:p-4">
                       {error && <p className="mb-2 text-xs text-red-600">{error}</p>}
                       <div className="flex items-center gap-2">
                         <input
