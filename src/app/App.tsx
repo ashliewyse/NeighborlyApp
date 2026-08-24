@@ -55,6 +55,8 @@ import {
   LogOut,
   UserPlus,
   UserCheck,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -193,6 +195,7 @@ type ActiveView =
   | { page: "settings" }
   | { page: "search" }
   | { page: "events" }
+  | { page: "helpwanted" }
   | { page: "classifieds" };
 
 interface Comment {
@@ -205,6 +208,7 @@ interface Comment {
 }
 interface Post {
   id: number;
+  databaseId?: string;
   author: string;
   authorId?: string;
   authorBadges: UserBadgeType[];
@@ -727,6 +731,25 @@ const CATEGORY_META: Record<
     icon: <Briefcase size={11} />,
   },
 };
+
+function postTypeForCategory(category: PostCategory) {
+  if (category === "safety") return "alert";
+  if (category === "recommendation") return "recommendation";
+  if (category === "helpwanted") return "help_wanted";
+  return "discussion";
+}
+
+function postImageStoragePath(imageUrl?: string) {
+  if (!imageUrl) return null;
+  try {
+    const marker = "/storage/v1/object/public/neighborly-media/";
+    const path = new URL(imageUrl).pathname;
+    const markerIndex = path.indexOf(marker);
+    return markerIndex >= 0 ? decodeURIComponent(path.slice(markerIndex + marker.length)) : null;
+  } catch {
+    return null;
+  }
+}
 
 const INITIAL_POSTS: Post[] = [
   {
@@ -2773,42 +2796,117 @@ function UserProfileView({
 function SearchView({
   onBack,
   onUserClick,
-  onBusinessClick,
   groups,
   activeLocation,
 }: {
   onBack: () => void;
   onUserClick: (name: string, authorId?: string) => void;
-  onBusinessClick: (id: number) => void;
   groups: { id: number; name: string; description: string; members: number; joined: boolean; city: string }[];
   activeLocation: LocationName;
 }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"all" | "people" | "businesses" | "groups">("all");
+  const [people, setPeople] = useState<{
+    id: string;
+    name: string;
+    city: string;
+    neighborhood: string;
+    avatarUrl?: string | null;
+  }[]>([]);
+  const [businesses, setBusinesses] = useState<{
+    userId: string;
+    name: string;
+    category: string;
+    city: string;
+    neighborhood: string;
+    logoUrl?: string | null;
+  }[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
-  const q = query.toLowerCase().trim();
+  const searchTerm = query.replace(/[%_]/g, " ").trim();
+  const q = searchTerm.toLocaleLowerCase();
   const locFilter = (city: string) => activeLocation === "All Areas" || sameLocation(city, activeLocation);
 
-  const matchedPeople = Object.values(USER_PROFILES).filter(
-    (p) =>
-      locFilter(p.city) &&
-      (filter === "all" || filter === "people") &&
-      (q === "" || p.name.toLowerCase().includes(q) || p.neighborhood.toLowerCase().includes(q)),
-  );
-
-  const matchedBusinesses = BUSINESSES.filter(
-    (b) =>
-      locFilter(b.city) &&
-      (filter === "all" || filter === "businesses") &&
-      (q === "" || b.name.toLowerCase().includes(q) || b.category.toLowerCase().includes(q)),
-  );
-
-  const matchedGroups = groups.filter(
+  const matchedGroups = searchTerm ? groups.filter(
     (g) =>
       locFilter(g.city) &&
       (filter === "all" || filter === "groups") &&
-      (q === "" || g.name.toLowerCase().includes(q) || g.description.toLowerCase().includes(q)),
-  );
+      (g.name.toLocaleLowerCase().includes(q) || g.description.toLocaleLowerCase().includes(q)),
+  ) : [];
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!searchTerm || filter === "groups") {
+      setPeople([]);
+      setBusinesses([]);
+      setLoading(false);
+      setSearchError(null);
+      return () => { cancelled = true; };
+    }
+
+    setLoading(true);
+    setSearchError(null);
+
+    const timer = window.setTimeout(async () => {
+      const peoplePromise = filter === "all" || filter === "people"
+        ? (() => {
+            let request = supabase
+              .from("profiles")
+              .select("id, full_name, city, neighborhood, avatar_url")
+              .eq("account_type", "personal")
+              .ilike("full_name", `%${searchTerm}%`)
+              .limit(20);
+            if (activeLocation !== "All Areas") request = request.ilike("city", activeLocation);
+            return request;
+          })()
+        : Promise.resolve({ data: [], error: null });
+
+      const businessesPromise = filter === "all" || filter === "businesses"
+        ? (() => {
+            let request = supabase
+              .from("business_profiles")
+              .select("user_id, business_name, category, city, neighborhood, logo_url")
+              .ilike("business_name", `%${searchTerm}%`)
+              .limit(20);
+            if (activeLocation !== "All Areas") request = request.ilike("city", activeLocation);
+            return request;
+          })()
+        : Promise.resolve({ data: [], error: null });
+
+      const [peopleResult, businessesResult] = await Promise.all([peoplePromise, businessesPromise]);
+      if (cancelled) return;
+
+      if (peopleResult.error || businessesResult.error) {
+        setPeople([]);
+        setBusinesses([]);
+        setSearchError("Search is temporarily unavailable. Please try again.");
+      } else {
+        setPeople((peopleResult.data || []).map((person: any) => ({
+          id: person.id,
+          name: person.full_name || "Neighbor",
+          city: canonicalLocation(person.city),
+          neighborhood: person.neighborhood || "Local neighbor",
+          avatarUrl: person.avatar_url,
+        })));
+        setBusinesses((businessesResult.data || []).map((business: any) => ({
+          userId: business.user_id,
+          name: business.business_name || "Local Business",
+          category: business.category || "Local Business",
+          city: canonicalLocation(business.city),
+          neighborhood: business.neighborhood || "Local business",
+          logoUrl: business.logo_url,
+        })));
+      }
+      setLoading(false);
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [activeLocation, filter, searchTerm]);
 
   const filters: { key: typeof filter; label: string }[] = [
     { key: "all", label: "All" },
@@ -2858,21 +2956,34 @@ function SearchView({
       </div>
 
       <div className="px-4 flex flex-col gap-4 pb-6">
+        {searchError && (
+          <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {searchError}
+          </div>
+        )}
+
+        {loading && (
+          <div className="text-center py-12" aria-live="polite">
+            <Search size={32} className="text-purple-400 mx-auto mb-3 animate-pulse" />
+            <p className="text-purple-200 font-medium">Searching Neighborly…</p>
+          </div>
+        )}
+
         {/* People */}
-        {matchedPeople.length > 0 && (
+        {!loading && people.length > 0 && (
           <section>
             {(filter === "all") && <h3 className="text-xs font-semibold uppercase tracking-wide text-purple-300 mb-2">People</h3>}
             <div className="flex flex-col gap-2">
-              {matchedPeople.map((p) => (
+              {people.map((p) => (
                 <button
-                  key={p.name}
-                  onClick={() => onUserClick(p.name)}
+                  key={p.id}
+                  onClick={() => onUserClick(p.name, p.id)}
                   className="bg-card rounded-xl border border-border p-3 flex items-center gap-3 text-left hover:border-primary/30 transition-colors"
                 >
-                  <Avatar name={p.name} size="md" />
+                  <Avatar name={p.name} size="md" src={p.avatarUrl} />
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-sm text-foreground truncate">{p.name}</p>
-                    <p className="text-xs text-muted-foreground truncate">{p.neighborhood} · {p.posts} posts</p>
+                    <p className="text-xs text-muted-foreground truncate">{p.neighborhood} · {p.city}</p>
                   </div>
                   <ChevronRight size={16} className="text-muted-foreground flex-shrink-0" />
                 </button>
@@ -2882,22 +2993,20 @@ function SearchView({
         )}
 
         {/* Businesses */}
-        {matchedBusinesses.length > 0 && (
+        {!loading && businesses.length > 0 && (
           <section>
             {(filter === "all") && <h3 className="text-xs font-semibold uppercase tracking-wide text-purple-300 mb-2">Businesses</h3>}
             <div className="flex flex-col gap-2">
-              {matchedBusinesses.map((b) => (
+              {businesses.map((b) => (
                 <button
-                  key={b.id}
-                  onClick={() => onBusinessClick(b.id)}
+                  key={b.userId}
+                  onClick={() => onUserClick(b.name, b.userId)}
                   className="bg-card rounded-xl border border-border p-3 flex items-center gap-3 text-left hover:border-primary/30 transition-colors"
                 >
-                  <div className="w-10 h-10 rounded-xl bg-secondary text-primary flex items-center justify-center flex-shrink-0 font-bold text-sm">
-                    {b.name.slice(0, 2).toUpperCase()}
-                  </div>
+                  <Avatar name={b.name} size="md" src={b.logoUrl} />
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-sm text-foreground truncate">{b.name}</p>
-                    <p className="text-xs text-muted-foreground">{b.category} · ⭐ {b.rating} ({b.reviewCount})</p>
+                    <p className="text-xs text-muted-foreground truncate">{b.category} · {b.neighborhood} · {b.city}</p>
                   </div>
                   <ChevronRight size={16} className="text-muted-foreground flex-shrink-0" />
                 </button>
@@ -2927,15 +3036,15 @@ function SearchView({
           </section>
         )}
 
-        {q && matchedPeople.length === 0 && matchedBusinesses.length === 0 && matchedGroups.length === 0 && (
+        {!loading && !searchError && searchTerm && people.length === 0 && businesses.length === 0 && matchedGroups.length === 0 && (
           <div className="text-center py-12">
             <Search size={32} className="text-purple-400 mx-auto mb-3" />
             <p className="text-purple-200 font-medium">No results for "{query}"</p>
-            <p className="text-purple-400 text-sm mt-1">Try a different name or category</p>
+            <p className="text-purple-400 text-sm mt-1">Try another name or switch to All Areas</p>
           </div>
         )}
 
-        {!q && (
+        {!searchTerm && (
           <div className="text-center py-12">
             <Search size={32} className="text-purple-400 mx-auto mb-3" />
             <p className="text-purple-200 font-medium">Search Neighborly</p>
@@ -3012,6 +3121,222 @@ function EventsView({ onBack, activeLocation }: { onBack: () => void; activeLoca
   );
 }
 
+function PostOwnerMenu({
+  post,
+  currentUserId,
+  busy,
+  onEdit,
+  onDelete,
+}: {
+  post: Post;
+  currentUserId?: string;
+  busy?: boolean;
+  onEdit: (post: Post) => void;
+  onDelete: (post: Post) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  if (!post.databaseId || !currentUserId || post.authorId !== currentUserId) return null;
+
+  return (
+    <div className="relative flex-shrink-0">
+      <button
+        onClick={() => setOpen((current) => !current)}
+        className="text-muted-foreground hover:text-foreground hover:bg-muted p-1.5 rounded-lg transition-colors"
+        aria-label="Post options"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        disabled={busy}
+      >
+        <MoreHorizontal size={17} />
+      </button>
+      {open && (
+        <>
+          <button className="fixed inset-0 z-10 cursor-default" onClick={() => setOpen(false)} aria-label="Close post options" />
+          <div className="absolute right-0 top-full z-20 mt-1 w-36 overflow-hidden rounded-xl border border-border bg-white py-1 shadow-xl" role="menu">
+            <button
+              onClick={() => { setOpen(false); onEdit(post); }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted"
+              role="menuitem"
+            >
+              <Pencil size={14} /> Edit post
+            </button>
+            <button
+              onClick={() => { setOpen(false); onDelete(post); }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+              role="menuitem"
+            >
+              <Trash2 size={14} /> Delete post
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function EditPostDialog({
+  post,
+  busy,
+  error,
+  onClose,
+  onSave,
+}: {
+  post: Post;
+  busy: boolean;
+  error: string | null;
+  onClose: () => void;
+  onSave: (body: string, category: PostCategory) => void;
+}) {
+  const [body, setBody] = useState(post.body);
+  const [category, setCategory] = useState<PostCategory>(post.category);
+
+  return (
+    <Dialog.Root open onOpenChange={(open) => { if (!open && !busy) onClose(); }}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm" />
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-[71] w-[min(34rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white shadow-2xl" aria-describedby={undefined}>
+          <div className="flex items-center justify-between border-b border-border px-5 py-4">
+            <Dialog.Title className="font-semibold text-lg">Edit post</Dialog.Title>
+            <button onClick={onClose} disabled={busy} className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted disabled:opacity-50" aria-label="Close edit post">
+              <X size={17} />
+            </button>
+          </div>
+          <div className="p-5">
+            <label className="mb-2 block text-sm font-medium" htmlFor="edit-post-body">Post</label>
+            <textarea
+              id="edit-post-body"
+              autoFocus
+              maxLength={5000}
+              value={body}
+              onChange={(event) => setBody(event.target.value)}
+              className="min-h-32 w-full resize-y rounded-xl border border-border bg-muted/30 px-4 py-3 text-sm outline-none focus:border-primary focus:bg-white"
+            />
+            <p className="mb-4 mt-1 text-right text-xs text-muted-foreground">{body.length}/5000</p>
+            <p className="mb-2 text-sm font-medium">Category</p>
+            <div className="flex flex-wrap gap-2">
+              {(Object.keys(CATEGORY_META) as PostCategory[]).map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => setCategory(option)}
+                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium ${CATEGORY_META[option].color} ${category === option ? "ring-2 ring-current ring-offset-1" : "opacity-60 hover:opacity-100"}`}
+                >
+                  {CATEGORY_META[option].icon} {CATEGORY_META[option].label}
+                </button>
+              ))}
+            </div>
+            {error && <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+          </div>
+          <div className="flex justify-end gap-2 border-t border-border px-5 py-4">
+            <button onClick={onClose} disabled={busy} className="rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted disabled:opacity-50">Cancel</button>
+            <button
+              onClick={() => onSave(body.trim(), category)}
+              disabled={busy || !body.trim()}
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-40"
+            >
+              {busy ? "Saving…" : "Save changes"}
+            </button>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
+
+function HelpWantedView({
+  posts,
+  onBack,
+  onCreate,
+  onUserClick,
+  onMessage,
+  onEdit,
+  onDelete,
+  busyPostId,
+  currentUserId,
+  activeLocation,
+}: {
+  posts: Post[];
+  onBack: () => void;
+  onCreate: () => void;
+  onUserClick: (name: string, authorId?: string) => void;
+  onMessage: (contact: MessageContact) => void;
+  onEdit: (post: Post) => void;
+  onDelete: (post: Post) => void;
+  busyPostId: string | null;
+  currentUserId?: string;
+  activeLocation: LocationName;
+}) {
+  const [search, setSearch] = useState("");
+  const locationPosts = activeLocation === "All Areas" ? posts : posts.filter((post) => sameLocation(post.city, activeLocation));
+  const filtered = locationPosts.filter((post) => {
+    const query = search.trim().toLocaleLowerCase();
+    return !query || post.body.toLocaleLowerCase().includes(query) || post.neighborhood.toLocaleLowerCase().includes(query);
+  });
+
+  return (
+    <div className="min-h-screen bg-purple-950 font-['DM_Sans',sans-serif] pb-20">
+      <div className="sticky top-0 z-40 border-b border-border bg-card shadow-sm">
+        <div className="flex min-h-14 items-center gap-3 px-4 py-2">
+          <button onClick={onBack} className="rounded-lg p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label="Back to feed">
+            <ChevronLeft size={20} />
+          </button>
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <HandHeart size={19} className="text-primary" />
+            <h1 className="truncate font-['Playfair_Display',serif] text-lg font-bold text-foreground">Help Wanted</h1>
+          </div>
+          <button onClick={onCreate} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90">
+            <Plus size={14} /> Post a Request
+          </button>
+        </div>
+        <div className="px-4 pb-3">
+          <div className="flex items-center gap-2 rounded-xl bg-muted px-3 py-2">
+            <Search size={14} className="flex-shrink-0 text-muted-foreground" />
+            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search requests…" className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground" />
+          </div>
+        </div>
+      </div>
+
+      <div className="mx-auto flex max-w-3xl flex-col gap-3 px-4 py-4">
+        {filtered.length === 0 ? (
+          <div className="py-14 text-center">
+            <HandHeart size={34} className="mx-auto mb-3 text-purple-400" />
+            <p className="font-medium text-purple-100">No help requests here yet</p>
+            <p className="mt-1 text-sm text-purple-400">Be the first neighbor to ask for help</p>
+            <button onClick={onCreate} className="mt-4 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Post a Request</button>
+          </div>
+        ) : filtered.map((post) => (
+          <article key={post.id} className="overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-primary/30">
+            <div className="p-4">
+              <div className="flex items-start gap-3">
+                <button onClick={() => onUserClick(post.author, post.authorId)}>
+                  <Avatar name={post.author} size="sm" src={post.authorAvatar || null} />
+                </button>
+                <div className="min-w-0 flex-1">
+                  <button onClick={() => onUserClick(post.author, post.authorId)} className="text-sm font-semibold hover:text-primary">{post.author}</button>
+                  <p className="text-xs text-muted-foreground">{post.neighborhood} · {post.time}</p>
+                </div>
+                <PostOwnerMenu post={post} currentUserId={currentUserId} busy={busyPostId === post.databaseId} onEdit={onEdit} onDelete={onDelete} />
+              </div>
+              <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground/85">{post.body}</p>
+              {post.image && <img src={post.image} alt="Help wanted post" className="mt-3 max-h-72 w-full rounded-xl object-cover" />}
+              <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-3">
+                <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700"><HandHeart size={12} /> Help Wanted</span>
+                <button
+                  onClick={() => post.authorId && onMessage({ id: post.authorId, name: post.author, avatarUrl: post.authorAvatar || null })}
+                  disabled={!post.authorId || post.authorId === currentUserId}
+                  className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {post.authorId === currentUserId ? "Your Request" : "Offer Help"}
+                </button>
+              </div>
+            </div>
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Classifieds View ─────────────────────────────────────────────────────────
 
 function ClassifiedsView({
@@ -3019,6 +3344,9 @@ function ClassifiedsView({
   onBack,
   onUserClick,
   onMessage,
+  onEdit,
+  onDelete,
+  busyPostId,
   currentUserId,
   activeLocation,
 }: {
@@ -3026,6 +3354,9 @@ function ClassifiedsView({
   onBack: () => void;
   onUserClick: (name: string, authorId?: string) => void;
   onMessage: (contact: MessageContact) => void;
+  onEdit: (post: Post) => void;
+  onDelete: (post: Post) => void;
+  busyPostId: string | null;
   currentUserId?: string;
   activeLocation: LocationName;
 }) {
@@ -3083,6 +3414,7 @@ function ClassifiedsView({
                     <button onClick={() => onUserClick(post.author, post.authorId)} className="font-semibold text-sm text-foreground hover:text-primary transition-colors">{post.author}</button>
                     <p className="text-xs text-muted-foreground">{post.neighborhood} · {post.time}</p>
                   </div>
+                  <PostOwnerMenu post={post} currentUserId={currentUserId} busy={busyPostId === post.databaseId} onEdit={onEdit} onDelete={onDelete} />
                 </div>
                 {post.title && <p className="font-semibold text-foreground mt-2">{post.title}</p>}
                 <p className="text-sm text-foreground/80 mt-1">{post.body}</p>
@@ -3522,6 +3854,9 @@ export default function App() {
   const [posts, setPosts] = useState<Post[]>(INITIAL_POSTS);
   const [activeTab, setActiveTab] = useState<ActiveTab>("all");
   const [expandedPost, setExpandedPost] = useState<number | null>(null);
+  const [editingPost, setEditingPost] = useState<Post | null>(null);
+  const [postActionBusyId, setPostActionBusyId] = useState<string | null>(null);
+  const [postActionError, setPostActionError] = useState<string | null>(null);
   const [composing, setComposing] = useState(false);
   const [newPostText, setNewPostText] = useState("");
   const [newPostImage, setNewPostImage] = useState<File | null>(null);
@@ -3798,6 +4133,7 @@ export default function App() {
         const created = new Date(r.created_at);
         return {
           id: created.getTime() + index,
+          databaseId: r.id,
           author: isBiz ? (b?.business_name || p?.full_name || "Local Business") : (p?.full_name || "Neighbor"),
           authorId: r.author_id,
           authorAvatar: isBiz ? (b?.logo_url || p?.avatar_url || null) : (p?.avatar_url || null),
@@ -3958,6 +4294,103 @@ export default function App() {
     setNotifOpen(false);
   }
 
+  function startHelpWantedPost() {
+    setSelectedCategory("helpwanted");
+    setComposing(true);
+    goToFeed();
+  }
+
+  function openEditPost(post: Post) {
+    setPostActionError(null);
+    setEditingPost(post);
+  }
+
+  async function savePostEdits(body: string, category: PostCategory) {
+    if (!editingPost?.databaseId || postActionBusyId) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user || editingPost.authorId !== user.id) {
+      setPostActionError("Only the author can edit this post.");
+      return;
+    }
+
+    setPostActionBusyId(editingPost.databaseId);
+    setPostActionError(null);
+    const { error } = await supabase
+      .from("posts")
+      .update({ content: body, category, post_type: postTypeForCategory(category) })
+      .eq("id", editingPost.databaseId)
+      .eq("author_id", user.id)
+      .select("id")
+      .single();
+
+    if (error) {
+      console.error("Could not edit post", error);
+      setPostActionError("Your post could not be updated. Please try again.");
+      setPostActionBusyId(null);
+      return;
+    }
+
+    const updatedPost = { ...editingPost, body, category };
+    setPosts((current) => current.map((post) => post.databaseId === updatedPost.databaseId ? updatedPost : post));
+    setClassifiedPosts((current) => {
+      if (category !== "forsale") return current.filter((post) => post.databaseId !== updatedPost.databaseId);
+      return current.some((post) => post.databaseId === updatedPost.databaseId)
+        ? current.map((post) => post.databaseId === updatedPost.databaseId ? updatedPost : post)
+        : [updatedPost, ...current];
+    });
+    setEditingPost(null);
+    setPostActionBusyId(null);
+  }
+
+  async function deletePost(post: Post) {
+    if (!post.databaseId || postActionBusyId) return;
+    if (!window.confirm("Delete this post? This cannot be undone.")) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user || post.authorId !== user.id) {
+      window.alert("Only the author can delete this post.");
+      return;
+    }
+
+    setPostActionBusyId(post.databaseId);
+    setPostActionError(null);
+    const { error } = await supabase
+      .from("posts")
+      .delete()
+      .eq("id", post.databaseId)
+      .eq("author_id", user.id)
+      .select("id")
+      .single();
+
+    if (error) {
+      console.error("Could not delete post", error);
+      setPostActionError("Your post could not be deleted. Please try again.");
+      window.alert("Your post could not be deleted. Please try again.");
+      setPostActionBusyId(null);
+      return;
+    }
+
+    const storagePath = postImageStoragePath(post.image);
+    if (storagePath) {
+      const { error: storageError } = await supabase.storage.from("neighborly-media").remove([storagePath]);
+      if (storageError) console.error("The post was deleted, but its photo could not be removed", storageError);
+    }
+    setPosts((current) => current.filter((item) => item.databaseId !== post.databaseId));
+    setClassifiedPosts((current) => current.filter((item) => item.databaseId !== post.databaseId));
+    if (editingPost?.databaseId === post.databaseId) setEditingPost(null);
+    setPostActionBusyId(null);
+  }
+
+  const postEditDialog = editingPost ? (
+    <EditPostDialog
+      key={editingPost.databaseId}
+      post={editingPost}
+      busy={postActionBusyId === editingPost.databaseId}
+      error={postActionError}
+      onClose={() => { setEditingPost(null); setPostActionError(null); }}
+      onSave={(body, category) => { void savePostEdits(body, category); }}
+    />
+  ) : null;
+
   const messagingModal = currentProfile?.id ? (
     <MessagingModal
       key={messageRecipient?.id || "message-inbox"}
@@ -4029,7 +4462,6 @@ export default function App() {
       <SearchView
         onBack={goToFeed}
         onUserClick={goToUser}
-        onBusinessClick={(id) => setView({ page: "business", id })}
         groups={groups}
         activeLocation={activeLocation}
       />
@@ -4040,6 +4472,27 @@ export default function App() {
     return <EventsView onBack={goToFeed} activeLocation={activeLocation} />;
   }
 
+  if (view.page === "helpwanted") {
+    return (
+      <>
+        <HelpWantedView
+          posts={posts.filter((post) => post.category === "helpwanted")}
+          onBack={goToFeed}
+          onCreate={startHelpWantedPost}
+          onUserClick={goToUser}
+          onMessage={openMessages}
+          onEdit={openEditPost}
+          onDelete={(post) => { void deletePost(post); }}
+          busyPostId={postActionBusyId}
+          currentUserId={currentProfile?.id}
+          activeLocation={activeLocation}
+        />
+        {messagingModal}
+        {postEditDialog}
+      </>
+    );
+  }
+
   if (view.page === "classifieds") {
     return (
       <>
@@ -4048,10 +4501,14 @@ export default function App() {
           onBack={goToFeed}
           onUserClick={goToUser}
           onMessage={openMessages}
+          onEdit={openEditPost}
+          onDelete={(post) => { void deletePost(post); }}
+          busyPostId={postActionBusyId}
           currentUserId={currentProfile?.id}
           activeLocation={activeLocation}
         />
         {messagingModal}
+        {postEditDialog}
       </>
     );
   }
@@ -4106,12 +4563,12 @@ export default function App() {
     const postNeighborhood = activeLocation === "All Areas"
       ? (currentBusiness?.address.split(",")[0] || currentProfile?.neighborhood || postCity)
       : postCity;
-    const postType = selectedCategory === "safety" ? "alert" : selectedCategory === "recommendation" ? "recommendation" : selectedCategory === "helpwanted" ? "help_wanted" : "discussion";
+    const postType = postTypeForCategory(selectedCategory);
     const { data: saved, error } = await supabase.from("posts").insert({ author_id:user.id, post_type:postType, category:selectedCategory, content:text, image_url:imageUrl, city:postCity, neighborhood:postNeighborhood }).select("id, created_at").single();
     if (error) { console.error("Could not save post",error); return; }
 
     const authorName=currentAccountType === "business" ? (currentBusiness?.name || "Business") : (currentProfile?.name || "You");
-    const newPost: Post={ id:new Date(saved.created_at).getTime(), author:authorName, authorId:user.id, authorAvatar:myAvatarUrl, authorBadges:[], neighborhood:postNeighborhood, city:postCity, time:"Just now", category:selectedCategory, body:text, image:imageUrl || undefined, likes:0, comments:[], bookmarked:false, liked:false };
+    const newPost: Post={ id:new Date(saved.created_at).getTime(), databaseId:saved.id, author:authorName, authorId:user.id, authorAvatar:myAvatarUrl, authorBadges:[], neighborhood:postNeighborhood, city:postCity, time:"Just now", category:selectedCategory, body:text, image:imageUrl || undefined, likes:0, comments:[], bookmarked:false, liked:false };
     setPosts(prev=>[newPost,...prev]);
     if(selectedCategory === "forsale") setClassifiedPosts(prev=>[newPost,...prev]);
     setNewPostText(""); setSelectedCategory("general"); setComposing(false);
@@ -4193,10 +4650,11 @@ export default function App() {
           {/* Desktop nav — center */}
           <nav className="hidden lg:flex items-center gap-1 mx-auto">
             {[
-              { icon: <Home size={16} />, label: "Home", page: "feed" as const },
+              { icon: <HandHeart size={16} />, label: "Help Wanted", page: "helpwanted" as const },
               { icon: <CalendarDays size={16} />, label: "Events", page: "events" as const },
               { icon: <Briefcase size={16} />, label: "Businesses", page: "feed" as const },
               { icon: <ShoppingBag size={16} />, label: "Classifieds", page: "classifieds" as const },
+              { icon: <Search size={16} />, label: "Search", page: "search" as const },
             ].map((item) => (
               <button
                 key={item.label}
@@ -4324,6 +4782,7 @@ export default function App() {
       )}
 
       {messagingModal}
+      {postEditDialog}
 
       <main className="max-w-screen-2xl mx-auto px-6 py-6 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
         
@@ -4385,6 +4844,11 @@ export default function App() {
                     {selectedCategory === "forsale" && (
                       <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1.5 rounded-lg mb-2 flex items-center gap-1.5 font-['DM_Sans',sans-serif]">
                         <ShoppingBag size={11} /> This post will also appear in Classifieds
+                      </p>
+                    )}
+                    {selectedCategory === "helpwanted" && (
+                      <p className="text-xs text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-1.5 rounded-lg mb-2 flex items-center gap-1.5 font-['DM_Sans',sans-serif]">
+                        <HandHeart size={11} /> This post will also appear on the Help Wanted page
                       </p>
                     )}
                     <div className="flex justify-end gap-2">
@@ -4486,9 +4950,13 @@ export default function App() {
                         </p>
                       </div>
                     </div>
-                    <button className="text-muted-foreground hover:text-foreground p-1 rounded">
-                      <MoreHorizontal size={16} />
-                    </button>
+                    <PostOwnerMenu
+                      post={post}
+                      currentUserId={currentProfile?.id}
+                      busy={postActionBusyId === post.databaseId}
+                      onEdit={openEditPost}
+                      onDelete={(ownedPost) => { void deletePost(ownedPost); }}
+                    />
                   </div>
                   <div className="mt-3 mb-3">
                     {post.title && (
