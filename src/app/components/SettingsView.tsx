@@ -24,7 +24,7 @@ const emptyProfile: ProfileForm = {
   businessName: "", category: "", phone: "", website: "", description: "", services: "",
 };
 
-export function SettingsView({ onBack }: { onBack: () => void }) {
+export function SettingsView({ onBack, onProfileSaved }: { onBack: () => void; onProfileSaved?: () => void }) {
   const [email, setEmail] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -125,7 +125,8 @@ export function SettingsView({ onBack }: { onBack: () => void }) {
       } : {}),
     }});
 
-    setBusy(false); setEditingProfile(false); setMessage("Your profile has been updated.");
+    setBusy(false); setEditingProfile(false); setMessage("Your profile and neighborhood have been updated.");
+    onProfileSaved?.();
   }
 
   async function updateEmail() {
@@ -172,7 +173,7 @@ export function SettingsView({ onBack }: { onBack: () => void }) {
               {accountType === "business" && <><div><label className={label}>Business Name</label><input className={input} value={profile.businessName} onChange={(e) => setField("businessName", e.target.value)} /></div><div><label className={label}>Category</label><input className={input} value={profile.category} onChange={(e) => setField("category", e.target.value)} /></div></>}
               <div><label className={label}>City</label><input className={input} value={profile.city} onChange={(e) => setField("city", e.target.value)} /></div>
               <div><label className={label}>ZIP Code</label><input className={input} value={profile.zipCode} onChange={(e) => setField("zipCode", e.target.value)} /></div>
-              <div className="sm:col-span-2"><label className={label}>Neighborhood</label><input className={input} value={profile.neighborhood} onChange={(e) => setField("neighborhood", e.target.value)} /></div>
+              <div className="sm:col-span-2"><label className={label}>Neighborhood</label><input className={input} value={profile.neighborhood} onChange={(e) => setField("neighborhood", e.target.value)} /><p className="mt-1 text-xs text-muted-foreground">Your city and neighborhood become available in the Neighborly area chooser. Do not enter your street address.</p></div>
               {accountType === "business" ? <>
                 <div><label className={label}>Phone</label><input type="tel" className={input} value={profile.phone} onChange={(e) => setField("phone", e.target.value)} /></div>
                 <div><label className={label}>Website</label><input className={input} value={profile.website} onChange={(e) => setField("website", e.target.value)} /></div>

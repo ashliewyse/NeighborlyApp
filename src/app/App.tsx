@@ -309,6 +309,15 @@ const LOCATIONS = [
 ] as const;
 type LocationName = string;
 
+interface AreaOption {
+  value: LocationName;
+  city: string;
+  neighborhood: string | null;
+  label: string;
+}
+
+const NEIGHBORHOOD_LOCATION_PREFIX = "neighborhood:";
+
 interface WeatherSnapshot {
   status: "loading" | "ready" | "error";
   temperature: number | null;
@@ -334,14 +343,65 @@ function locationKey(value?: string | null) {
   return (value || "").trim().toLocaleLowerCase();
 }
 
+function tidyAreaName(value?: string | null) {
+  const trimmed = (value || "").trim().replace(/\s+/g, " ");
+  if (!trimmed) return "";
+  if (trimmed !== trimmed.toLocaleLowerCase() && trimmed !== trimmed.toLocaleUpperCase()) return trimmed;
+  return trimmed.toLocaleLowerCase().replace(/\b\p{L}/gu, (letter) => letter.toLocaleUpperCase());
+}
+
 function canonicalLocation(value?: string | null) {
   const trimmed = (value || "").trim();
   if (!trimmed) return "Michigan City";
-  return LOCATIONS.find((locationName) => locationKey(locationName) === locationKey(trimmed)) || trimmed;
+  return LOCATIONS.find((locationName) => locationKey(locationName) === locationKey(trimmed)) || tidyAreaName(trimmed);
 }
 
 function sameLocation(left?: string | null, right?: string | null) {
   return locationKey(left) === locationKey(right);
+}
+
+function neighborhoodLocationValue(city?: string | null, neighborhood?: string | null): LocationName {
+  const resolvedCity = canonicalLocation(city);
+  const resolvedNeighborhood = tidyAreaName(neighborhood);
+  if (!resolvedNeighborhood || sameLocation(resolvedCity, resolvedNeighborhood)) return resolvedCity;
+  return `${NEIGHBORHOOD_LOCATION_PREFIX}${encodeURIComponent(resolvedCity)}:${encodeURIComponent(resolvedNeighborhood)}`;
+}
+
+function selectedLocationParts(value: LocationName) {
+  if (value === "All Areas") return { city: null, neighborhood: null };
+  if (!value.startsWith(NEIGHBORHOOD_LOCATION_PREFIX)) {
+    return { city: canonicalLocation(value), neighborhood: null };
+  }
+
+  const encoded = value.slice(NEIGHBORHOOD_LOCATION_PREFIX.length);
+  const separator = encoded.indexOf(":");
+  if (separator < 0) return { city: canonicalLocation(value), neighborhood: null };
+  try {
+    return {
+      city: canonicalLocation(decodeURIComponent(encoded.slice(0, separator))),
+      neighborhood: decodeURIComponent(encoded.slice(separator + 1)).trim() || null,
+    };
+  } catch {
+    return { city: canonicalLocation(value), neighborhood: null };
+  }
+}
+
+function locationMenuLabel(value: LocationName) {
+  if (value === "All Areas") return value;
+  const { city, neighborhood } = selectedLocationParts(value);
+  return neighborhood ? `${neighborhood}, ${city}` : city || "All Areas";
+}
+
+function locationPromptLabel(value: LocationName) {
+  const { city, neighborhood } = selectedLocationParts(value);
+  return neighborhood || city || "your area";
+}
+
+function matchesSelectedLocation(city: string | null | undefined, neighborhood: string | null | undefined, selected: LocationName) {
+  if (selected === "All Areas") return true;
+  const selectedParts = selectedLocationParts(selected);
+  if (!sameLocation(city, selectedParts.city)) return false;
+  return !selectedParts.neighborhood || sameLocation(neighborhood, selectedParts.neighborhood);
 }
 
 function weatherCondition(code: number, isDay: boolean) {
@@ -2826,11 +2886,11 @@ function SearchView({
 
   const searchTerm = query.replace(/[%_]/g, " ").trim();
   const q = searchTerm.toLocaleLowerCase();
-  const locFilter = (city: string) => activeLocation === "All Areas" || sameLocation(city, activeLocation);
+  const activeArea = selectedLocationParts(activeLocation);
 
   const matchedGroups = searchTerm ? groups.filter(
     (g) =>
-      locFilter(g.city) &&
+      (activeLocation === "All Areas" || sameLocation(g.city, activeArea.city)) &&
       (filter === "all" || filter === "groups") &&
       (g.name.toLocaleLowerCase().includes(q) || g.description.toLocaleLowerCase().includes(q)),
   ) : [];
@@ -2858,7 +2918,8 @@ function SearchView({
               .eq("account_type", "personal")
               .ilike("full_name", `%${searchTerm}%`)
               .limit(20);
-            if (activeLocation !== "All Areas") request = request.ilike("city", activeLocation);
+            if (activeArea.city) request = request.ilike("city", activeArea.city);
+            if (activeArea.neighborhood) request = request.ilike("neighborhood", activeArea.neighborhood);
             return request;
           })()
         : Promise.resolve({ data: [], error: null });
@@ -2870,7 +2931,8 @@ function SearchView({
               .select("user_id, business_name, category, city, neighborhood, logo_url")
               .ilike("business_name", `%${searchTerm}%`)
               .limit(20);
-            if (activeLocation !== "All Areas") request = request.ilike("city", activeLocation);
+            if (activeArea.city) request = request.ilike("city", activeArea.city);
+            if (activeArea.neighborhood) request = request.ilike("neighborhood", activeArea.neighborhood);
             return request;
           })()
         : Promise.resolve({ data: [], error: null });
@@ -2906,7 +2968,7 @@ function SearchView({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [activeLocation, filter, searchTerm]);
+  }, [activeLocation, activeArea.city, activeArea.neighborhood, filter, searchTerm]);
 
   const filters: { key: typeof filter; label: string }[] = [
     { key: "all", label: "All" },
@@ -3066,7 +3128,8 @@ function EventsView({ onBack, activeLocation }: { onBack: () => void; activeLoca
     { id: 4, city: "New Buffalo", title: "Book Club Meetup", date: "Thu Aug 21", time: "6:30 PM", location: "Public Library", going: 15, icon: <Star size={16} />, color: "bg-purple-50 text-purple-700", desc: "This month: 'The Midnight Library'. Newcomers always welcome." },
     { id: 5, city: "Long Beach", title: "Youth Soccer Practice", date: "Sat Aug 23", time: "10:00 AM", location: "Elm Street Field", going: 28, icon: <Zap size={16} />, color: "bg-rose-50 text-rose-700", desc: "Open practice for kids ages 6–12. Bring water and sunscreen." },
   ];
-  const visibleEvents = activeLocation === "All Areas" ? allEvents : allEvents.filter((e) => sameLocation(e.city, activeLocation));
+  const selectedCity = selectedLocationParts(activeLocation).city;
+  const visibleEvents = activeLocation === "All Areas" ? allEvents : allEvents.filter((e) => sameLocation(e.city, selectedCity));
 
   return (
     <div className="min-h-screen bg-purple-950 font-['DM_Sans',sans-serif] pb-20">
@@ -3085,13 +3148,13 @@ function EventsView({ onBack, activeLocation }: { onBack: () => void; activeLoca
       {activeLocation !== "All Areas" && (
         <div className="px-4 pt-3 flex items-center gap-2">
           <MapPin size={13} className="text-purple-300" />
-          <span className="text-xs font-semibold uppercase tracking-wide text-purple-300 font-['DM_Sans',sans-serif]">{activeLocation}</span>
+          <span className="text-xs font-semibold uppercase tracking-wide text-purple-300 font-['DM_Sans',sans-serif]">{locationMenuLabel(activeLocation)}</span>
         </div>
       )}
       {visibleEvents.length === 0 && (
         <div className="text-center py-14 px-4">
           <CalendarDays size={32} className="text-purple-400 mx-auto mb-3" />
-          <p className="text-purple-100 font-semibold font-['DM_Sans',sans-serif]">No events in {activeLocation}</p>
+          <p className="text-purple-100 font-semibold font-['DM_Sans',sans-serif]">No events in {locationPromptLabel(activeLocation)}</p>
           <p className="text-purple-400 text-sm mt-1 font-['DM_Sans',sans-serif]">Check back soon or switch to All Areas</p>
         </div>
       )}
@@ -3267,7 +3330,7 @@ function HelpWantedView({
   activeLocation: LocationName;
 }) {
   const [search, setSearch] = useState("");
-  const locationPosts = activeLocation === "All Areas" ? posts : posts.filter((post) => sameLocation(post.city, activeLocation));
+  const locationPosts = posts.filter((post) => matchesSelectedLocation(post.city, post.neighborhood, activeLocation));
   const filtered = locationPosts.filter((post) => {
     const query = search.trim().toLocaleLowerCase();
     return !query || post.body.toLocaleLowerCase().includes(query) || post.neighborhood.toLocaleLowerCase().includes(query);
@@ -3361,7 +3424,7 @@ function ClassifiedsView({
   activeLocation: LocationName;
 }) {
   const [search, setSearch] = useState("");
-  const locationPosts = activeLocation === "All Areas" ? posts : posts.filter((p) => sameLocation(p.city, activeLocation));
+  const locationPosts = posts.filter((post) => matchesSelectedLocation(post.city, post.neighborhood, activeLocation));
   const filtered = locationPosts.filter(
     (p) => search === "" || p.body.toLowerCase().includes(search.toLowerCase()) || (p.title ?? "").toLowerCase().includes(search.toLowerCase()),
   );
@@ -3912,6 +3975,16 @@ export default function App() {
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   const [activeLocation, setActiveLocation] = useState<LocationName>("All Areas");
   const [locationOpen, setLocationOpen] = useState(false);
+  const [locationSearch, setLocationSearch] = useState("");
+  const [areaOptions, setAreaOptions] = useState<AreaOption[]>(() => [
+    { value: "All Areas", city: "", neighborhood: null, label: "All Areas" },
+    ...LOCATIONS.filter((locationName) => locationName !== "All Areas").map((city) => ({
+      value: city,
+      city,
+      neighborhood: null,
+      label: city,
+    })),
+  ]);
   const [weather, setWeather] = useState<WeatherSnapshot>(INITIAL_WEATHER);
   const [groups, setGroups] = useState([
     { id: 1, name: "🪴 Plant & Garden Club", description: "Share tips, seeds, and local plant swaps", members: 142, joined: false, city: "Michigan City" },
@@ -3921,8 +3994,65 @@ export default function App() {
   ]);
 
   const homeLocation = canonicalLocation(currentBusiness?.city || currentProfile?.city);
-  const browsingLocation = activeLocation === "All Areas" ? homeLocation : canonicalLocation(activeLocation);
-  const availableLocations = Array.from(new Set<string>([...LOCATIONS, homeLocation]));
+  const homeArea = neighborhoodLocationValue(homeLocation, currentProfile?.neighborhood);
+  const selectedArea = selectedLocationParts(activeLocation);
+  const browsingLocation = activeLocation === "All Areas" ? homeLocation : canonicalLocation(selectedArea.city || homeLocation);
+  const normalizedLocationSearch = locationSearch.trim().toLocaleLowerCase();
+  const visibleAreaOptions = normalizedLocationSearch
+    ? areaOptions.filter((option) => option.label.toLocaleLowerCase().includes(normalizedLocationSearch))
+    : areaOptions;
+
+  useEffect(() => {
+    if (!authReady) return;
+    let cancelled = false;
+
+    (async () => {
+      const [profilesResult, businessesResult, postsResult] = await Promise.all([
+        supabase.from("profiles").select("city, neighborhood").limit(500),
+        supabase.from("business_profiles").select("city, neighborhood").limit(500),
+        supabase.from("posts").select("city, neighborhood").limit(500),
+      ]);
+      if (cancelled) return;
+
+      const options = new Map<string, AreaOption>();
+      const addArea = (cityValue?: string | null, neighborhoodValue?: string | null) => {
+        const trimmedCity = (cityValue || "").trim();
+        if (!trimmedCity) return;
+        const city = canonicalLocation(trimmedCity);
+        const neighborhood = tidyAreaName(neighborhoodValue);
+        const normalizedNeighborhood = neighborhood && !sameLocation(city, neighborhood) ? neighborhood : null;
+        const value = normalizedNeighborhood ? neighborhoodLocationValue(city, normalizedNeighborhood) : city;
+        const key = `${locationKey(city)}::${locationKey(normalizedNeighborhood)}`;
+        options.set(key, {
+          value,
+          city,
+          neighborhood: normalizedNeighborhood,
+          label: normalizedNeighborhood ? `${normalizedNeighborhood}, ${city}` : city,
+        });
+      };
+
+      LOCATIONS.filter((locationName) => locationName !== "All Areas").forEach((city) => addArea(city));
+      addArea(homeLocation);
+      addArea(homeLocation, currentProfile?.neighborhood);
+      [profilesResult.data, businessesResult.data, postsResult.data].forEach((rows) => {
+        (rows || []).forEach((row: any) => {
+          addArea(row.city);
+          addArea(row.city, row.neighborhood);
+        });
+      });
+
+      const sorted = [...options.values()].sort((left, right) => {
+        const cityOrder = left.city.localeCompare(right.city);
+        if (cityOrder) return cityOrder;
+        if (!left.neighborhood) return -1;
+        if (!right.neighborhood) return 1;
+        return left.neighborhood.localeCompare(right.neighborhood);
+      });
+      setAreaOptions([{ value: "All Areas", city: "", neighborhood: null, label: "All Areas" }, ...sorted]);
+    })();
+
+    return () => { cancelled = true; };
+  }, [authReady, currentProfile?.city, currentProfile?.neighborhood, currentBusiness?.city, homeLocation]);
 
   useEffect(() => {
     if (!authReady) return;
@@ -3985,7 +4115,7 @@ export default function App() {
 
     setCurrentProfile(profile);
     setMyAvatarUrl(row?.avatar_url || null);
-    let defaultLocation = profile.city;
+    let defaultLocation = neighborhoodLocationValue(profile.city, row?.neighborhood || m.neighborhood);
 
     if (accountType === "business") {
       const { data: businessRow } = await supabase
@@ -4007,7 +4137,10 @@ export default function App() {
         address: [businessRow?.neighborhood || row?.neighborhood || m.neighborhood, businessRow?.city || row?.city || m.city, businessRow?.zip_code || row?.zip_code || m.zip_code].filter(Boolean).join(", "),
         hours: [], founded: String(created.getFullYear()), owner: businessRow?.owner_name || profile.name, reviews: [],
       });
-      defaultLocation = canonicalLocation(businessRow?.city || row?.city || m.city);
+      defaultLocation = neighborhoodLocationValue(
+        businessRow?.city || row?.city || m.city,
+        businessRow?.neighborhood || row?.neighborhood || m.neighborhood,
+      );
     } else setCurrentBusiness(null);
 
     setActiveLocation(defaultLocation);
@@ -4437,7 +4570,7 @@ export default function App() {
 
   if (!authReady) return <div className="min-h-screen bg-purple-950 flex items-center justify-center text-white">Loading your Neighborly profile…</div>;
 
-  if (view.page === "settings") return <SettingsView onBack={goToFeed} />;
+  if (view.page === "settings") return <SettingsView onBack={goToFeed} onProfileSaved={() => { void loadCurrentProfile(false); }} />;
   if (view.page === "me" && currentProfile) return (
     <>
       <UserProfileView profile={currentProfile} onBack={goToFeed} isOwnProfile myAvatarUrl={myAvatarUrl} onAvatarChange={setMyAvatarUrl} onSettings={goToSettings} />
@@ -4546,10 +4679,9 @@ export default function App() {
     );
   }
 
-  const locationFilteredPosts =
-    activeLocation === "All Areas"
-      ? posts
-      : posts.filter((p) => sameLocation(p.city, activeLocation));
+  const locationFilteredPosts = posts.filter((post) =>
+    matchesSelectedLocation(post.city, post.neighborhood, activeLocation),
+  );
 
   const filteredPosts =
     activeTab === "all"
@@ -4593,9 +4725,9 @@ export default function App() {
     }
 
     const postCity = browsingLocation;
-    const postNeighborhood = activeLocation === "All Areas"
-      ? (currentBusiness?.address.split(",")[0] || currentProfile?.neighborhood || postCity)
-      : postCity;
+    const homeNeighborhood = currentBusiness?.address.split(",")[0] || currentProfile?.neighborhood || postCity;
+    const postNeighborhood = selectedArea.neighborhood
+      || (sameLocation(postCity, homeLocation) ? homeNeighborhood : postCity);
     const postType = postTypeForCategory(selectedCategory);
     const { data: saved, error } = await supabase.from("posts").insert({ author_id:user.id, post_type:postType, category:selectedCategory, content:text, image_url:imageUrl, city:postCity, neighborhood:postNeighborhood }).select("id, created_at").single();
     if (error) { console.error("Could not save post",error); return; }
@@ -4638,45 +4770,89 @@ export default function App() {
     <div className="min-h-screen bg-purple-950 font-['DM_Sans',sans-serif] relative">
       {/* Top Header */}
       <header className="sticky top-0 z-40 bg-white border-b border-border shadow-sm">
-        <div className="max-w-screen-2xl mx-auto px-6 h-16 flex items-center gap-4">
+        <div className="max-w-screen-2xl mx-auto px-3 sm:px-6 h-16 flex items-center gap-2 sm:gap-4">
 
           {/* Neighborly wordmark */}
           <div className="flex-shrink-0 flex items-center gap-2">
-            <span className="font-['Playfair_Display',serif] font-bold text-2xl bg-gradient-to-r from-purple-700 to-blue-500 bg-clip-text text-transparent tracking-tight leading-none">Neighborly</span>
+            <span className="font-['Playfair_Display',serif] font-bold text-xl sm:text-2xl bg-gradient-to-r from-purple-700 to-blue-500 bg-clip-text text-transparent tracking-tight leading-none">Neighborly</span>
           </div>
 
           {/* Location switcher */}
           <div className="relative flex-shrink-0">
             <button
-              onClick={() => setLocationOpen((o) => !o)}
+              onClick={() => {
+                setLocationOpen((open) => !open);
+                setLocationSearch("");
+              }}
               className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors font-['DM_Sans',sans-serif]"
+              aria-expanded={locationOpen}
+              aria-haspopup="listbox"
             >
               <MapPin size={14} className="text-primary" />
-              <span className="font-medium">{activeLocation}</span>
+              <span className="max-w-28 truncate font-medium sm:max-w-48">{locationMenuLabel(activeLocation)}</span>
               <ChevronDown size={13} className={`transition-transform ${locationOpen ? "rotate-180" : ""}`} />
             </button>
             {locationOpen && (
-              <div className="absolute top-full left-0 mt-2 w-52 bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden">
-                <p className="px-3 pt-2.5 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground font-['DM_Sans',sans-serif]">Choose Area</p>
-                {availableLocations.map((loc) => (
-                  <button
-                    key={loc}
-                    onClick={() => { setActiveLocation(loc); setLocationOpen(false); }}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors font-['DM_Sans',sans-serif] ${
-                      activeLocation === loc
-                        ? "bg-primary/10 text-primary font-semibold"
-                        : "text-foreground hover:bg-secondary"
-                    }`}
-                  >
-                    <MapPin size={13} className={activeLocation === loc ? "text-primary" : "text-muted-foreground"} />
-                    {loc}
-                    {activeLocation === loc && <CheckCircle2 size={13} className="ml-auto text-primary" />}
-                  </button>
-                ))}
+              <div className="absolute left-0 top-full z-50 mt-2 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border bg-card shadow-xl">
+                <div className="border-b border-border p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground font-['DM_Sans',sans-serif]">Areas &amp; neighborhoods</p>
+                  <div className="mt-2 flex items-center gap-2 rounded-lg bg-muted px-3 py-2">
+                    <Search size={14} className="flex-shrink-0 text-muted-foreground" />
+                    <input
+                      autoFocus
+                      value={locationSearch}
+                      onChange={(event) => setLocationSearch(event.target.value)}
+                      placeholder="Search city or neighborhood"
+                      className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                    />
+                  </div>
+                </div>
+                <div className="max-h-72 overflow-y-auto" role="listbox" aria-label="Choose an area or neighborhood">
+                  {visibleAreaOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      role="option"
+                      aria-selected={activeLocation === option.value}
+                      onClick={() => {
+                        setActiveLocation(option.value);
+                        setLocationOpen(false);
+                        setLocationSearch("");
+                      }}
+                      className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm transition-colors font-['DM_Sans',sans-serif] ${
+                        activeLocation === option.value
+                          ? "bg-primary/10 text-primary font-semibold"
+                          : "text-foreground hover:bg-secondary"
+                      }`}
+                    >
+                      {option.neighborhood ? <Users size={13} /> : <MapPin size={13} />}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate">{option.label}</span>
+                        {option.neighborhood && <span className="block text-[11px] font-normal text-muted-foreground">Neighborhood</span>}
+                      </span>
+                      {option.value === homeArea && <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">Home</span>}
+                      {activeLocation === option.value && <CheckCircle2 size={13} className="flex-shrink-0 text-primary" />}
+                    </button>
+                  ))}
+                  {visibleAreaOptions.length === 0 && (
+                    <div className="px-4 py-8 text-center text-sm text-muted-foreground">No matching areas yet</div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLocationOpen(false);
+                    setLocationSearch("");
+                    goToSettings();
+                  }}
+                  className="flex w-full items-center gap-2 border-t border-border bg-secondary/40 px-3 py-3 text-left text-sm font-semibold text-primary hover:bg-secondary"
+                >
+                  <Plus size={14} /> Add or update my neighborhood
+                </button>
               </div>
             )}
             {locationOpen && (
-              <div className="fixed inset-0 z-40" onClick={() => setLocationOpen(false)} />
+              <div className="fixed inset-0 z-40" onClick={() => { setLocationOpen(false); setLocationSearch(""); }} />
             )}
           </div>
 
@@ -4828,7 +5004,7 @@ export default function App() {
             >
               <Avatar name={currentAccountType === "business" ? (currentBusiness?.name || "Business") : (currentProfile?.name || "Neighbor")} size="md" src={myAvatarUrl} />
               <div className="flex-1 bg-muted rounded-lg px-4 py-2.5 text-sm text-muted-foreground font-['DM_Sans',sans-serif]">
-                What's happening in {browsingLocation}?
+                What's happening in {activeLocation === "All Areas" ? homeLocation : locationPromptLabel(activeLocation)}?
               </div>
               <button className="flex items-center gap-1.5 bg-primary text-primary-foreground px-3 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
                 <Plus size={14} /> Post
@@ -4917,7 +5093,7 @@ export default function App() {
           {filteredPosts.length === 0 && (
             <div className="text-center py-14">
               <MapPin size={32} className="text-purple-400 mx-auto mb-3" />
-              <p className="text-purple-100 font-semibold font-['DM_Sans',sans-serif]">No posts in {activeLocation}</p>
+              <p className="text-purple-100 font-semibold font-['DM_Sans',sans-serif]">No posts in {locationPromptLabel(activeLocation)}</p>
               <p className="text-purple-400 text-sm mt-1 font-['DM_Sans',sans-serif]">Be the first to post something here</p>
             </div>
           )}
@@ -5190,7 +5366,7 @@ export default function App() {
                 </button>
               </div>
               <div className="flex flex-col gap-2">
-                {(activeLocation === "All Areas" ? groups : groups.filter(g => sameLocation(g.city, activeLocation))).map((group) => (
+                {(activeLocation === "All Areas" ? groups : groups.filter((group) => sameLocation(group.city, selectedArea.city))).map((group) => (
                   <div key={group.id} className="p-2.5 rounded-lg border border-border/60 hover:bg-secondary/30 transition-colors">
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-xs font-semibold truncate flex-1 mr-2">{group.name}</span>
@@ -5312,7 +5488,7 @@ export default function App() {
               <button onClick={() => setIsCreateGroupOpen(true)} className="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 font-semibold px-2.5 py-1 rounded-lg transition-colors">+ Create</button>
             </div>
             <div className="flex flex-col gap-2">
-              {(activeLocation === "All Areas" ? groups : groups.filter(g => sameLocation(g.city, activeLocation))).map((group) => (
+              {(activeLocation === "All Areas" ? groups : groups.filter((group) => sameLocation(group.city, selectedArea.city))).map((group) => (
                 <div key={group.id} className="p-2.5 rounded-lg border border-border/60 hover:bg-secondary/30 transition-colors">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-semibold truncate flex-1 mr-2">{group.name}</span>
