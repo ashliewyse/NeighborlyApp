@@ -177,6 +177,20 @@ interface PendingFriendRequest {
   createdAt: string;
 }
 
+type AdvertisingTier = "starter" | "spotlight" | "featured";
+
+interface LiveAdvertisement {
+  id: string;
+  tier: AdvertisingTier;
+  businessName: string;
+  headline: string;
+  description: string;
+  imageUrl: string;
+  destinationUrl?: string | null;
+  phone?: string | null;
+  targetCity: string;
+}
+
 type PostCategory =
   | "news"
   | "safety"
@@ -225,6 +239,18 @@ interface Post {
   bookmarked: boolean;
   liked: boolean;
 }
+
+const ADVERTISING_TIERS: Array<{
+  id: AdvertisingTier;
+  name: string;
+  price: number;
+  placement: string;
+  reach: string;
+}> = [
+  { id: "starter", name: "Starter", price: 15, placement: "Sidebar rotation", reach: "One local area" },
+  { id: "spotlight", name: "Spotlight", price: 35, placement: "Priority sidebar", reach: "Citywide reach" },
+  { id: "featured", name: "Featured", price: 75, placement: "Highest priority", reach: "All Neighborly areas" },
+];
 
 // ─── Badge Meta ───────────────────────────────────────────────────────────────
 
@@ -3503,15 +3529,146 @@ function ClassifiedsView({
 }
 
 // ─── Advertise Modal ─────────────────────────────────────────────────────────
-function AdvertiseModal({ onClose }: { onClose: () => void }) {
+function AdvertiseModal({
+  onClose,
+  defaultBusinessName,
+  defaultWebsite,
+  defaultPhone,
+  defaultCity,
+}: {
+  onClose: () => void;
+  defaultBusinessName: string;
+  defaultWebsite: string;
+  defaultPhone: string;
+  defaultCity: string;
+}) {
   const [submitted, setSubmitted] = useState(false);
-  const [pkg, setPkg] = useState("spotlight");
+  const [tier, setTier] = useState<AdvertisingTier>("starter");
+  const [businessName, setBusinessName] = useState(defaultBusinessName);
+  const [headline, setHeadline] = useState("");
+  const [description, setDescription] = useState("");
+  const [website, setWebsite] = useState(defaultWebsite);
+  const [phone, setPhone] = useState(defaultPhone);
+  const [contactEmail, setContactEmail] = useState("");
+  const [targetCity, setTargetCity] = useState(defaultCity);
+  const [adImage, setAdImage] = useState<File | null>(null);
+  const [adImagePreview, setAdImagePreview] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const adImageInputRef = useRef<HTMLInputElement | null>(null);
+  const selectedTier = ADVERTISING_TIERS.find((option) => option.id === tier) || ADVERTISING_TIERS[0];
+
+  useEffect(() => {
+    let cancelled = false;
+    void supabase.auth.getUser().then(({ data }) => {
+      if (!cancelled && data.user?.email) setContactEmail((current) => current || data.user?.email || "");
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => () => {
+    if (adImagePreview) URL.revokeObjectURL(adImagePreview);
+  }, [adImagePreview]);
+
+  function selectAdImage(file: File | null) {
+    setSubmitError(null);
+    if (!file) {
+      setAdImage(null);
+      setAdImagePreview(null);
+      return;
+    }
+    if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)) {
+      setSubmitError("Please choose a JPG, PNG, WebP, or GIF image.");
+      if (adImageInputRef.current) adImageInputRef.current.value = "";
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setSubmitError("The ad image must be 5 MB or smaller.");
+      if (adImageInputRef.current) adImageInputRef.current.value = "";
+      return;
+    }
+    setAdImage(file);
+    setAdImagePreview(URL.createObjectURL(file));
+  }
+
+  async function submitAdRequest(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (submitting) return;
+    if (!adImage) {
+      setSubmitError("Please add a photo for your advertisement.");
+      return;
+    }
+
+    let destinationUrl: string | null = null;
+    if (website.trim()) {
+      try {
+        const parsed = new URL(website.trim());
+        if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error("Unsupported protocol");
+        destinationUrl = parsed.toString();
+      } catch {
+        setSubmitError("Please enter a complete website address beginning with https://");
+        return;
+      }
+    }
+
+    setSubmitting(true);
+    setSubmitError(null);
+    let uploadedPath: string | null = null;
+
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        setSubmitError("Your session expired. Please sign in again before submitting an ad.");
+        return;
+      }
+
+      const ext = (adImage.name.split(".").pop() || "jpg").toLowerCase();
+      uploadedPath = `${user.id}/advertising/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from("neighborly-media")
+        .upload(uploadedPath, adImage, { upsert: false, contentType: adImage.type });
+      if (uploadError) {
+        console.error("Could not upload advertisement image", uploadError);
+        setSubmitError("We couldn't upload that photo. Please try again.");
+        return;
+      }
+
+      const { data: publicImage } = supabase.storage.from("neighborly-media").getPublicUrl(uploadedPath);
+      const { error: insertError } = await supabase.from("advertising_campaigns").insert({
+        user_id: user.id,
+        tier,
+        business_name: businessName.trim(),
+        headline: headline.trim(),
+        description: description.trim(),
+        image_url: publicImage.publicUrl,
+        destination_url: destinationUrl,
+        phone: phone.trim() || null,
+        contact_email: contactEmail.trim(),
+        target_city: targetCity.trim(),
+      });
+
+      if (insertError) {
+        await supabase.storage.from("neighborly-media").remove([uploadedPath]);
+        console.error("Could not save advertisement request", insertError);
+        setSubmitError("We couldn't submit your advertisement. Please try again.");
+        return;
+      }
+
+      setSubmitted(true);
+    } catch (unexpectedError) {
+      if (uploadedPath) await supabase.storage.from("neighborly-media").remove([uploadedPath]);
+      console.error("Unexpected advertisement submission error", unexpectedError);
+      setSubmitError("Something went wrong while submitting your ad. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
     <Dialog.Root open onOpenChange={(o) => { if (!o) onClose(); }}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/60 z-[60] backdrop-blur-sm animate-in fade-in-0" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[61] bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in-0 zoom-in-95" aria-describedby={undefined}>
+        <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[61] bg-white rounded-2xl shadow-xl w-[calc(100%-1.5rem)] max-w-3xl max-h-[90dvh] overflow-y-auto animate-in fade-in-0 zoom-in-95" aria-describedby={undefined}>
           
           <div className="flex items-center justify-between px-5 py-4 border-b border-border">
             <Dialog.Title className="font-semibold text-lg flex items-center gap-2">
@@ -3522,63 +3679,157 @@ function AdvertiseModal({ onClose }: { onClose: () => void }) {
             </Dialog.Close>
           </div>
 
-          <div className="p-5">
+          <div className="p-5 sm:p-6">
             {submitted ? (
               <div className="text-center py-6">
                 <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-3">
                   <CheckCircle2 size={24} />
                 </div>
-                <h3 className="font-semibold text-lg mb-2">Request Received!</h3>
+                <h3 className="font-semibold text-lg mb-2">Advertisement Submitted!</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Our team will review your ad request and reach out via email within 24 hours.
+                  Your {selectedTier.name} request is saved for review. After approval, we'll send a secure monthly payment link to {contactEmail}.
+                </p>
+                <p className="mx-auto mb-5 max-w-md rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+                  Your ad will only go live after it is approved and payment is confirmed.
                 </p>
                 <button onClick={onClose} className="bg-blue-600 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">
                   Done
                 </button>
               </div>
             ) : (
-              <div className="flex flex-col gap-4">
-                <p className="text-sm text-muted-foreground">Reach neighbors directly by promoting your local business on the Neighborly feed.</p>
-                
+              <form onSubmit={(event) => { void submitAdRequest(event); }} className="flex flex-col gap-5" aria-busy={submitting}>
+                <p className="text-sm text-muted-foreground">Create a local advertisement with a photo, business details, and a clear call to action. Every ad is reviewed before payment and publication.</p>
+
                 <div>
-                  <label className="text-xs font-semibold uppercase text-muted-foreground mb-2 block">Select a Package</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button 
-                      onClick={() => setPkg("spotlight")}
-                      className={`p-3 text-left border rounded-xl transition-colors ${pkg === "spotlight" ? "border-blue-600 bg-blue-50 ring-1 ring-blue-600" : "border-border hover:border-blue-600/40"}`}
-                    >
-                      <p className="font-semibold text-sm text-blue-700">Sidebar Spotlight</p>
-                      <p className="text-xs text-muted-foreground mt-1">$15 / week</p>
-                    </button>
-                    <button 
-                      onClick={() => setPkg("takeover")}
-                      className={`p-3 text-left border rounded-xl transition-colors ${pkg === "takeover" ? "border-amber-500 bg-amber-50 ring-1 ring-amber-500" : "border-border hover:border-amber-500/40"}`}
-                    >
-                      <p className="font-semibold text-sm text-amber-700">Feed Takeover</p>
-                      <p className="text-xs text-muted-foreground mt-1">$30 / week</p>
-                    </button>
+                  <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">Choose a Monthly Plan</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {ADVERTISING_TIERS.map((option) => (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() => setTier(option.id)}
+                        aria-pressed={tier === option.id}
+                        disabled={submitting}
+                        className={`relative p-3 text-left border rounded-xl transition-colors ${tier === option.id ? "border-blue-600 bg-blue-50 ring-1 ring-blue-600" : "border-border hover:border-blue-600/40"}`}
+                      >
+                        {tier === option.id && <CheckCircle2 size={16} className="absolute right-3 top-3 text-blue-600" />}
+                        <p className="font-semibold text-sm text-blue-700">{option.name}</p>
+                        <p className="mt-1 text-xl font-bold text-foreground">${option.price}<span className="text-xs font-medium text-muted-foreground">/month</span></p>
+                        <p className="mt-2 text-xs text-muted-foreground">{option.placement}</p>
+                        <p className="text-xs text-muted-foreground">{option.reach}</p>
+                      </button>
+                    ))}
                   </div>
                 </div>
 
-                <div className="space-y-3 mt-2">
-                  <input type="text" placeholder="Business Name" className="w-full bg-muted rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600/30 border border-transparent" />
-                  <input type="text" placeholder="Headline (e.g., Grand Opening!)" className="w-full bg-muted rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600/30 border border-transparent" />
-                  <textarea rows={2} placeholder="Ad description..." className="w-full bg-muted rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600/30 border border-transparent resize-none" />
-                  <input type="url" placeholder="Website Link (Optional)" className="w-full bg-muted rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600/30 border border-transparent" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-3">
+                    <div>
+                      <label htmlFor="ad-business-name" className="mb-1 block text-xs font-semibold text-muted-foreground">Business name</label>
+                      <input id="ad-business-name" required minLength={2} maxLength={100} value={businessName} onChange={(event) => setBusinessName(event.target.value)} className="w-full bg-muted rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600/30 border border-transparent" />
+                    </div>
+                    <div>
+                      <label htmlFor="ad-headline" className="mb-1 block text-xs font-semibold text-muted-foreground">Ad headline</label>
+                      <input id="ad-headline" required minLength={2} maxLength={100} value={headline} onChange={(event) => setHeadline(event.target.value)} placeholder="Example: $50 off your first service" className="w-full bg-muted rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600/30 border border-transparent" />
+                    </div>
+                    <div>
+                      <label htmlFor="ad-description" className="mb-1 block text-xs font-semibold text-muted-foreground">Description</label>
+                      <textarea id="ad-description" required minLength={10} maxLength={500} rows={4} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Tell neighbors what you offer and why they should contact you." className="w-full bg-muted rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600/30 border border-transparent resize-none" />
+                      <p className="mt-1 text-right text-[11px] text-muted-foreground">{description.length}/500</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold text-muted-foreground">Advertisement photo</label>
+                      <input ref={adImageInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={(event) => selectAdImage(event.target.files?.[0] || null)} />
+                      {adImagePreview ? (
+                        <div className="relative overflow-hidden rounded-xl border border-border bg-muted">
+                          <img src={adImagePreview} alt="Advertisement preview" className="aspect-video w-full object-cover" />
+                          <button type="button" disabled={submitting} onClick={() => { selectAdImage(null); if (adImageInputRef.current) adImageInputRef.current.value = ""; }} className="absolute right-2 top-2 rounded-full bg-black/70 p-1.5 text-white disabled:opacity-50" aria-label="Remove advertisement photo"><X size={14} /></button>
+                        </div>
+                      ) : (
+                        <button type="button" disabled={submitting} onClick={() => adImageInputRef.current?.click()} className="flex aspect-video w-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-50">
+                          <Camera size={24} />
+                          <span className="mt-2 text-sm font-semibold">Add ad photo</span>
+                          <span className="text-xs text-blue-600">JPG, PNG, WebP, or GIF · max 5 MB</span>
+                        </button>
+                      )}
+                    </div>
+                    <div>
+                      <label htmlFor="ad-website" className="mb-1 block text-xs font-semibold text-muted-foreground">Website or booking link <span className="font-normal">(optional)</span></label>
+                      <input id="ad-website" type="url" maxLength={2000} value={website} onChange={(event) => setWebsite(event.target.value)} placeholder="https://yourbusiness.com" className="w-full bg-muted rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600/30 border border-transparent" />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label htmlFor="ad-phone" className="mb-1 block text-xs font-semibold text-muted-foreground">Phone <span className="font-normal">(optional)</span></label>
+                        <input id="ad-phone" type="tel" maxLength={30} value={phone} onChange={(event) => setPhone(event.target.value)} className="w-full bg-muted rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600/30 border border-transparent" />
+                      </div>
+                      <div>
+                        <label htmlFor="ad-city" className="mb-1 block text-xs font-semibold text-muted-foreground">Primary area</label>
+                        <input id="ad-city" required maxLength={120} value={targetCity} onChange={(event) => setTargetCity(event.target.value)} className="w-full bg-muted rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600/30 border border-transparent" />
+                      </div>
+                    </div>
+                    <div>
+                      <label htmlFor="ad-email" className="mb-1 block text-xs font-semibold text-muted-foreground">Payment and approval email</label>
+                      <input id="ad-email" required type="email" maxLength={254} value={contactEmail} onChange={(event) => setContactEmail(event.target.value)} className="w-full bg-muted rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600/30 border border-transparent" />
+                    </div>
+                  </div>
                 </div>
 
-                <button 
-                  onClick={() => setSubmitted(true)}
-                  className="w-full mt-2 bg-blue-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-                >
-                  Submit Ad Request
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-800">
+                  <strong>Payment after approval:</strong> submit your ad now. If approved, you'll receive a secure ${selectedTier.price}/month checkout link. You can cancel before the next renewal.
+                </div>
+
+                {submitError && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{submitError}</p>}
+
+                <button type="submit" disabled={submitting} className="w-full bg-blue-600 text-white py-3 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50">
+                  {submitting ? "Submitting Advertisement…" : "Submit Advertisement for Review"}
                 </button>
-              </div>
+              </form>
             )}
           </div>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
+  );
+}
+
+function AdvertisingSidebarCard({ ad, onAdvertise }: { ad: LiveAdvertisement | null; onAdvertise: () => void }) {
+  if (!ad) {
+    return (
+      <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl p-4 text-white shadow-sm">
+        <div className="flex items-center gap-2 mb-2">
+          <Megaphone size={16} className="text-blue-200" />
+          <h3 className="font-semibold text-sm">Grow Your Business</h3>
+        </div>
+        <p className="text-xs text-blue-100 mb-3 leading-relaxed">Create a photo ad for local neighbors. Plans start at $15/month.</p>
+        <button onClick={onAdvertise} className="w-full bg-white text-blue-700 font-semibold text-xs py-2 rounded-lg hover:bg-blue-50 transition-colors">Advertise Here</button>
+      </div>
+    );
+  }
+
+  const safeWebsite = ad.destinationUrl && /^https?:\/\//i.test(ad.destinationUrl) ? ad.destinationUrl : null;
+  const contactHref = safeWebsite || (ad.phone ? `tel:${ad.phone.replace(/[^+\d]/g, "")}` : null);
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-blue-200 bg-white shadow-sm">
+      <div className="relative">
+        <img src={ad.imageUrl} alt={`${ad.businessName} advertisement`} className="aspect-video w-full object-cover" />
+        <span className="absolute left-2 top-2 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">Sponsored</span>
+      </div>
+      <div className="p-4">
+        <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">{ad.businessName}</p>
+        <h3 className="mt-1 text-sm font-bold text-foreground">{ad.headline}</h3>
+        <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-muted-foreground">{ad.description}</p>
+        {contactHref && (
+          <a href={contactHref} target={safeWebsite ? "_blank" : undefined} rel={safeWebsite ? "noreferrer" : undefined} className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg bg-blue-600 py-2 text-xs font-semibold text-white hover:bg-blue-700">
+            Learn More {safeWebsite && <ExternalLink size={12} />}
+          </a>
+        )}
+        <button onClick={onAdvertise} className="mt-2 w-full text-center text-[11px] font-semibold text-blue-600 hover:underline">Advertise Here</button>
+      </div>
+    </div>
   );
 }
 
@@ -3967,6 +4218,7 @@ export default function App() {
   const [friendRequestError, setFriendRequestError] = useState<string | null>(null);
   const [view, setView] = useState<ActiveView>({ page: "feed" });
   const [advertiseOpen, setAdvertiseOpen] = useState(false);
+  const [liveAdvertisements, setLiveAdvertisements] = useState<LiveAdvertisement[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [myAvatarUrl, setMyAvatarUrl] = useState<string | null>(null);
   const postsLoadedRef = useRef(false);
@@ -4003,6 +4255,44 @@ export default function App() {
   const visibleAreaOptions = normalizedLocationSearch
     ? areaOptions.filter((option) => option.label.toLocaleLowerCase().includes(normalizedLocationSearch))
     : areaOptions;
+  const visibleAdvertisements = liveAdvertisements
+    .filter((ad) => ad.tier === "featured" || sameLocation(ad.targetCity, browsingLocation))
+    .sort((left, right) => {
+      const priority: Record<AdvertisingTier, number> = { starter: 1, spotlight: 2, featured: 3 };
+      return priority[right.tier] - priority[left.tier];
+    });
+  const activeAdvertisement = visibleAdvertisements[0] || null;
+
+  useEffect(() => {
+    if (!authReady) return;
+    let cancelled = false;
+    void supabase
+      .from("advertising_campaigns")
+      .select("id, tier, business_name, headline, description, image_url, destination_url, phone, target_city")
+      .eq("status", "active")
+      .eq("billing_status", "paid")
+      .order("created_at", { ascending: false })
+      .limit(25)
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) {
+          console.error("Could not load advertisements", error);
+          return;
+        }
+        setLiveAdvertisements((data || []).map((row: any) => ({
+          id: row.id,
+          tier: row.tier as AdvertisingTier,
+          businessName: row.business_name,
+          headline: row.headline,
+          description: row.description,
+          imageUrl: row.image_url,
+          destinationUrl: row.destination_url,
+          phone: row.phone,
+          targetCity: row.target_city,
+        })));
+      });
+    return () => { cancelled = true; };
+  }, [authReady]);
 
   useEffect(() => {
     if (!authReady) return;
@@ -5376,18 +5666,7 @@ export default function App() {
 
             <WeatherCard locationName={browsingLocation} weather={weather} />
 
-            <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl p-4 text-white shadow-sm">
-              <div className="flex items-center gap-2 mb-2">
-                <Megaphone size={16} className="text-blue-200" />
-                <h3 className="font-semibold text-sm">Grow Your Business</h3>
-              </div>
-              <p className="text-xs text-blue-100 mb-3 leading-relaxed">
-                Reach thousands of neighbors in the feed. Packages start at $15/week.
-              </p>
-              <button onClick={() => setAdvertiseOpen(true)} className="w-full bg-white text-blue-700 font-semibold text-xs py-2 rounded-lg hover:bg-blue-50 transition-colors">
-                Advertise With Us
-              </button>
-            </div>
+            <AdvertisingSidebarCard ad={activeAdvertisement} onAdvertise={() => setAdvertiseOpen(true)} />
 
             <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
               <div className="flex items-center justify-between mb-3">
@@ -5502,18 +5781,7 @@ export default function App() {
           <WeatherCard locationName={browsingLocation} weather={weather} />
 
           {/* Grow Your Business */}
-          <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl p-4 text-white shadow-sm">
-            <div className="flex items-center gap-2 mb-2">
-              <Megaphone size={16} className="text-blue-200" />
-              <h3 className="font-semibold text-sm">Grow Your Business</h3>
-            </div>
-            <p className="text-xs text-blue-100 mb-3 leading-relaxed">
-              Reach thousands of neighbors directly in the feed. Packages start at just $15/week.
-            </p>
-            <button onClick={() => setAdvertiseOpen(true)} className="w-full bg-white text-blue-700 font-semibold text-sm py-2 rounded-lg hover:bg-blue-50 transition-colors shadow-sm">
-              Advertise With Us
-            </button>
-          </div>  
+          <AdvertisingSidebarCard ad={activeAdvertisement} onAdvertise={() => setAdvertiseOpen(true)} />
 
           {/* Community Groups */}
           <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
@@ -5598,7 +5866,15 @@ export default function App() {
           <p className="text-xs text-muted-foreground text-center px-2 pb-2">© 2026 Neighborly · Privacy · Terms · Help</p>
       </aside>
 
-      {advertiseOpen && <AdvertiseModal onClose={() => setAdvertiseOpen(false)} />}
+      {advertiseOpen && (
+        <AdvertiseModal
+          onClose={() => setAdvertiseOpen(false)}
+          defaultBusinessName={currentBusiness?.name || ""}
+          defaultWebsite={currentBusiness?.website || ""}
+          defaultPhone={currentBusiness?.phone || ""}
+          defaultCity={browsingLocation}
+        />
+      )}
 
       {/* Fixed bottom nav — mobile */}
       <div className="fixed bottom-0 left-0 right-0 z-50 lg:hidden bg-purple-800 border-t border-purple-700 flex items-stretch h-16">
