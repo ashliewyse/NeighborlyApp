@@ -5569,7 +5569,7 @@ export default function App() {
       {/* Fixed bottom nav — mobile */}
       <div className="fixed bottom-0 left-0 right-0 z-50 lg:hidden bg-purple-800 border-t border-purple-700 flex items-stretch h-16">
         {[
-          { label: "Home", icon: <Home size={20} />, action: goToFeed, page: "feed" },
+          { label: "Help Wanted", icon: <HandHeart size={20} />, action: () => setView({ page: "helpwanted" }), page: "helpwanted" },
           { label: "Search", icon: <Search size={20} />, action: () => setView({ page: "search" }), page: "search" },
           { label: "Post", icon: <Plus size={20} />, action: () => { goToFeed(); setComposing(true); }, page: null },
           { label: "Events", icon: <CalendarDays size={20} />, action: () => setView({ page: "events" }), page: "events" },
