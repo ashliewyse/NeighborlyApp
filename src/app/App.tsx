@@ -119,6 +119,7 @@ interface NeighborReview {
 }
 
 interface UserProfile {
+  id?: string;
   name: string;
   neighborhood: string;
   city: string;
@@ -134,6 +135,9 @@ interface UserProfile {
   neighborReviews: NeighborReview[];
   galleryPhotos: { url: string; alt: string }[];
   recentActivity: { type: string; text: string; time: string }[];
+  avatarUrl?: string | null;
+  coverUrl?: string | null;
+  theme?: string | null;
 }
 
 type PostCategory =
@@ -148,7 +152,7 @@ type ActiveView =
   | { page: "feed" }
   | { page: "business"; id: number }
   | { page: "saved-business"; business: Business }
-  | { page: "user"; name: string }
+  | { page: "user"; profile: UserProfile }
   | { page: "me" }
   | { page: "my-business" }
   | { page: "settings" }
@@ -1907,6 +1911,24 @@ const PROFILE_THEMES = {
 } as const;
 type ThemeName = keyof typeof PROFILE_THEMES;
 
+function resolveProfileTheme(value?: string | null): ThemeName {
+  if (value && Object.prototype.hasOwnProperty.call(PROFILE_THEMES, value)) return value as ThemeName;
+  const aliases: Record<string, ThemeName> = {
+    "classic-blue": "Classic Blue",
+    purple: "Royal Purple",
+    "royal-purple": "Royal Purple",
+    ocean: "Ocean Breeze",
+    "ocean-breeze": "Ocean Breeze",
+    sunset: "Sunset Glow",
+    "sunset-glow": "Sunset Glow",
+    emerald: "Emerald Forest",
+    "emerald-forest": "Emerald Forest",
+    midnight: "Midnight Dark",
+    "midnight-dark": "Midnight Dark",
+  };
+  return aliases[value || ""] || "Classic Blue";
+}
+
 function UserProfileView({
   profile,
   onBack,
@@ -1921,9 +1943,9 @@ function UserProfileView({
   onAvatarChange?: (url: string) => void;
 }) {
   const [tab, setTab] = useState<"about" | "posts" | "photos" | "reviews">("about");
-  const [theme, setTheme] = useState<ThemeName>("Classic Blue");
-  const [coverUrl, setCoverUrl] = useState<string | null>(null);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(myAvatarUrl);
+  const [theme, setTheme] = useState<ThemeName>(() => resolveProfileTheme(profile.theme));
+  const [coverUrl, setCoverUrl] = useState<string | null>(profile.coverUrl || null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(myAvatarUrl || profile.avatarUrl || null);
   const [gallery, setGallery] = useState(profile.galleryPhotos);
   const [reviews, setReviews] = useState<NeighborReview[]>(profile.neighborReviews);
   const [hoverStar, setHoverStar] = useState(0);
@@ -1952,7 +1974,7 @@ function UserProfileView({
       if (!active) return;
       if (row?.avatar_url) { setAvatarUrl(row.avatar_url); onAvatarChange?.(row.avatar_url); }
       if (row?.cover_url) setCoverUrl(row.cover_url);
-      if (row?.theme && Object.prototype.hasOwnProperty.call(PROFILE_THEMES, row.theme)) setTheme(row.theme as ThemeName);
+      if (row?.theme) setTheme(resolveProfileTheme(row.theme));
       if (photos) setGallery(photos.map((p: any) => ({ url: p.image_url, alt: p.caption || "Profile photo" })));
     })();
     return () => { active = false; };
@@ -2069,10 +2091,12 @@ function UserProfileView({
           ? <img src={coverUrl} alt="Cover" className="w-full h-full object-cover" />
           : <div className={`w-full h-full bg-gradient-to-br ${T.cover}`} />
         }
-        <label className="absolute bottom-3 right-3 flex items-center gap-1.5 bg-black/40 hover:bg-black/60 text-white text-xs font-medium px-3 py-1.5 rounded-lg cursor-pointer transition-colors backdrop-blur-sm">
-          <Camera size={13} /> Change Cover
-          <input type="file" accept="image/*" className="hidden" onChange={handleCoverUpload} />
-        </label>
+        {isOwnProfile && (
+          <label className="absolute bottom-3 right-3 flex items-center gap-1.5 bg-black/40 hover:bg-black/60 text-white text-xs font-medium px-3 py-1.5 rounded-lg cursor-pointer transition-colors backdrop-blur-sm">
+            <Camera size={13} /> Change Cover
+            <input type="file" accept="image/*" className="hidden" onChange={handleCoverUpload} />
+          </label>
+        )}
       </div>
 
       <div className={`${isOwnProfile ? T.tint : "bg-white"} border-b border-border`}>
@@ -2174,7 +2198,7 @@ function UserProfileView({
       </div>
 
       <div className="max-w-3xl mx-auto px-4 py-6 pb-24">
-        {tab === "posts" && <ProfilePostsFeed profileName={profile.name} profileType="personal" />}
+        {tab === "posts" && <ProfilePostsFeed profileName={profile.name} profileType="personal" profileOwnerId={profile.id} />}
 
         {tab === "about" && (
           <div className="grid grid-cols-1 md:grid-cols-[1fr_200px] gap-5">
@@ -2867,11 +2891,10 @@ export default function App() {
       return;
     }
 
-    const { data: row } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .maybeSingle();
+    const [{ data: row }, { count: postCount }] = await Promise.all([
+      supabase.from("profiles").select("*").eq("id", user.id).maybeSingle(),
+      supabase.from("posts").select("id", { count: "exact", head: true }).eq("author_id", user.id),
+    ]);
 
     const m = user.user_metadata || {};
     const accountType = (row?.account_type || m.account_type) === "business" ? "business" : "personal";
@@ -2879,14 +2902,18 @@ export default function App() {
 
     const created = row?.created_at ? new Date(row.created_at) : new Date(user.created_at);
     const profile: UserProfile = {
+      id: user.id,
       name: row?.full_name || m.full_name || user.email?.split("@")[0] || "Neighbor",
       neighborhood: row?.neighborhood || m.neighborhood || row?.city || m.city || "Your neighborhood",
       city: row?.city || m.city || "Michigan City",
       joinDate: created.toLocaleDateString(undefined, { month: "long", year: "numeric" }),
       bio: row?.bio || m.bio || "",
       badges: ["newcomer"],
-      posts: 0, neighbors: 0, helpfulVotes: 0, recsGiven: 0, rating: 0, ratingCount: 0,
+      posts: postCount || 0, neighbors: 0, helpfulVotes: 0, recsGiven: 0, rating: 0, ratingCount: 0,
       neighborReviews: [], galleryPhotos: [], recentActivity: [],
+      avatarUrl: row?.avatar_url || null,
+      coverUrl: row?.cover_url || null,
+      theme: row?.theme || null,
     };
 
     setCurrentProfile(profile);
@@ -3002,27 +3029,33 @@ export default function App() {
     setNotifOpen(false);
   }
   async function goToUser(name: string, authorId?: string) {
+    // Demo profiles have no database ID. Real profiles are never resolved from
+    // this name-keyed collection because multiple users can share a display name.
+    if (!authorId && USER_PROFILES[name]) {
+      setView({ page: "user", profile: USER_PROFILES[name] });
+      return;
+    }
+
     // If this author owns a saved business profile and the displayed post name matches
     // that business, route to the business view before attempting a personal profile.
     if (authorId) {
-      const { data: businessRow } = await supabase
-        .from("business_profiles")
-        .select("*")
-        .eq("user_id", authorId)
-        .maybeSingle();
+      const [{ data: { user: signedInUser } }, { data: businessRow }] = await Promise.all([
+        supabase.auth.getUser(),
+        supabase.from("business_profiles").select("*").eq("user_id", authorId).maybeSingle(),
+      ]);
+
+      // The signed-in user's own posts must always open the editable profile that
+      // belongs to the active session, never another account with the same name.
+      if (signedInUser?.id === authorId) {
+        setView({ page: currentAccountType === "business" ? "my-business" : "me" });
+        navigate("/profile");
+        return;
+      }
 
       if (businessRow?.business_name && businessRow.business_name.trim().toLowerCase() === name.trim().toLowerCase()) {
         const businessId = BUSINESSES.find((b) => b.name.trim().toLowerCase() === name.trim().toLowerCase())?.id;
         if (businessId) {
           setView({ page: "business", id: businessId });
-          return;
-        }
-
-        // For the signed-in owner, use the app's established my-business route.
-        // That route renders currentBusiness, which is already hydrated from business_profiles.
-        const { data: { user: signedInUser } } = await supabase.auth.getUser();
-        if (signedInUser?.id === authorId) {
-          setView({ page: "my-business" });
           return;
         }
 
@@ -3066,28 +3099,28 @@ export default function App() {
         return;
       }
     }
-    if (USER_PROFILES[name]) {
-      setView({ page: "user", name });
-      return;
-    }
 
     let row: any = null;
     if (authorId) {
       const { data } = await supabase.from("profiles").select("*").eq("id", authorId).maybeSingle();
       row = data;
-    }
-    if (!row) {
+    } else {
       const { data } = await supabase.from("profiles").select("*").ilike("full_name", name).eq("account_type", "personal").limit(1).maybeSingle();
       row = data;
-    }
-    if (!row) {
-      const { data } = await supabase.from("profiles").select("*").ilike("full_name", name).limit(1).maybeSingle();
-      row = data;
+      if (!row) {
+        const { data: fallback } = await supabase.from("profiles").select("*").ilike("full_name", name).limit(1).maybeSingle();
+        row = fallback;
+      }
     }
     if (!row) return;
 
     const resolvedName = row.full_name || name;
-    USER_PROFILES[resolvedName] = {
+    const [{ data: photoRows }, { count: postCount }] = await Promise.all([
+      supabase.from("profile_photos").select("image_url, caption").eq("user_id", row.id).order("created_at", { ascending: true }),
+      supabase.from("posts").select("id", { count: "exact", head: true }).eq("author_id", row.id),
+    ]);
+    const profile: UserProfile = {
+      id: row.id,
       name: resolvedName,
       neighborhood: row.neighborhood || row.city || "",
       city: row.city || "Michigan City",
@@ -3096,17 +3129,20 @@ export default function App() {
         : "",
       bio: row.bio || "",
       badges: [],
-      posts: 0,
+      posts: postCount || 0,
       neighbors: 0,
       helpfulVotes: 0,
       recsGiven: 0,
       rating: 0,
       ratingCount: 0,
       neighborReviews: [],
-      galleryPhotos: [],
+      galleryPhotos: (photoRows || []).map((photo: any) => ({ url: photo.image_url, alt: photo.caption || resolvedName + " photo" })),
       recentActivity: [],
+      avatarUrl: row.avatar_url || null,
+      coverUrl: row.cover_url || null,
+      theme: row.theme || null,
     };
-    setView({ page: "user", name: resolvedName });
+    setView({ page: "user", profile });
   }
   function goToFeed() {
     setView({ page: "feed" });
@@ -3155,24 +3191,20 @@ export default function App() {
       );
   }
   if (view.page === "user") {
-    const profile = USER_PROFILES[view.name];
-    if (profile)
-      return (
-        <UserProfileView
-          profile={profile}
-          onBack={goToFeed}
-          isOwnProfile={view.name === "Maria Santos"}
-          myAvatarUrl={view.name === "Maria Santos" ? myAvatarUrl : null}
-          onAvatarChange={view.name === "Maria Santos" ? setMyAvatarUrl : undefined}
-        />
-      );
+    return (
+      <UserProfileView
+        key={view.profile.id || view.profile.name}
+        profile={view.profile}
+        onBack={goToFeed}
+      />
+    );
   }
 
   if (view.page === "search") {
     return (
       <SearchView
         onBack={goToFeed}
-        onUserClick={(name) => { if (USER_PROFILES[name]) setView({ page: "user", name }); }}
+        onUserClick={goToUser}
         onBusinessClick={(id) => setView({ page: "business", id })}
         groups={groups}
         activeLocation={activeLocation}
@@ -3189,7 +3221,7 @@ export default function App() {
       <ClassifiedsView
         posts={classifiedPosts}
         onBack={goToFeed}
-        onUserClick={(name) => { if (USER_PROFILES[name]) setView({ page: "user", name }); }}
+        onUserClick={goToUser}
         activeLocation={activeLocation}
       />
     );
