@@ -2,6 +2,14 @@ import React, { useState, useEffect, useRef } from "react";
 import { Analytics } from "@vercel/analytics/react";
 import { useLocation, useNavigate } from "react-router";
 import { SettingsView } from "@/app/components/SettingsView";
+import {
+  ActiveNeighbor,
+  ActiveNeighborsCard,
+  CommunityGroup,
+  CommunityGroupsCard,
+  CreateGroupDialog,
+} from "@/app/components/CommunitySidebar";
+import { MessagingModal } from "@/app/components/MessagingModal";
 import { supabase } from "@/lib/supabase";
 import { ImageWithFallback } from "@/app/components/figma/ImageWithFallback";
 import neighborlyLogo from "@/imports/Copilot_20260807_041314.png";
@@ -153,6 +161,9 @@ interface MessageContact {
   name: string;
   avatarUrl?: string | null;
   accountType?: "personal" | "business";
+  latestMessage?: string;
+  latestMessageAt?: string;
+  unreadCount?: number;
 }
 
 interface DirectMessage {
@@ -2974,7 +2985,7 @@ function SearchView({
 }: {
   onBack: () => void;
   onUserClick: (name: string, authorId?: string) => void;
-  groups: { id: number; name: string; description: string; members: number; joined: boolean; city: string }[];
+  groups: { id: string; name: string; description: string; members: number; joined: boolean; city: string }[];
   activeLocation: LocationName;
 }) {
   const [query, setQuery] = useState("");
@@ -4518,7 +4529,7 @@ function formatMessageTime(value: string) {
   return date.toLocaleDateString([], { month: "short", day: "numeric" });
 }
 
-function MessagingModal({
+function LegacyMessagingModal({
   open,
   onClose,
   currentUserId,
@@ -4863,6 +4874,7 @@ function MessagingModal({
 // ─── Main App ─────────────────────────────────────────────────────────────────
 
 type ActiveTab = "all" | PostCategory;
+const POST_PAGE_SIZE = 25;
 
 export default function App() {
   const location = useLocation();
@@ -4899,6 +4911,10 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [myAvatarUrl, setMyAvatarUrl] = useState<string | null>(null);
   const postsLoadedRef = useRef(false);
+  const [postsCursor, setPostsCursor] = useState<string | null>(null);
+  const [hasMoreDatabasePosts, setHasMoreDatabasePosts] = useState(true);
+  const [loadingMorePosts, setLoadingMorePosts] = useState(false);
+  const [morePostsError, setMorePostsError] = useState<string | null>(null);
   const [currentProfile, setCurrentProfile] = useState<UserProfile | null>(null);
   const [currentBusiness, setCurrentBusiness] = useState<Business | null>(null);
   const [currentAccountType, setCurrentAccountType] = useState<"personal" | "business">("personal");
@@ -4907,6 +4923,12 @@ export default function App() {
   const [adminStatusReady, setAdminStatusReady] = useState(false);
   const [adminAttentionCount, setAdminAttentionCount] = useState(0);
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
+  const [groupsLoading, setGroupsLoading] = useState(true);
+  const [groupsError, setGroupsError] = useState<string | null>(null);
+  const [groupActionBusyId, setGroupActionBusyId] = useState<string | null>(null);
+  const [activeNeighbors, setActiveNeighbors] = useState<ActiveNeighbor[]>([]);
+  const [activeNeighborsLoading, setActiveNeighborsLoading] = useState(true);
+  const [activeNeighborBusyId, setActiveNeighborBusyId] = useState<string | null>(null);
   const [activeLocation, setActiveLocation] = useState<LocationName>("All Areas");
   const [locationOpen, setLocationOpen] = useState(false);
   const [locationSearch, setLocationSearch] = useState("");
@@ -4920,12 +4942,7 @@ export default function App() {
     })),
   ]);
   const [weather, setWeather] = useState<WeatherSnapshot>(INITIAL_WEATHER);
-  const [groups, setGroups] = useState([
-    { id: 1, name: "🪴 Plant & Garden Club", description: "Share tips, seeds, and local plant swaps", members: 142, joined: false, city: "Michigan City" },
-    { id: 2, name: "🐾 Local Pet Owners", description: "Pet-friendly spots and vet recommendations", members: 98, joined: true, city: "Long Beach" },
-    { id: 3, name: "🛠️ DIY & Handyman", description: "Home improvement tips from neighbors", members: 215, joined: false, city: "New Buffalo" },
-    { id: 4, name: "📰 Local News Watch", description: "Breaking news and local updates for La Porte", members: 76, joined: false, city: "La Porte" },
-  ]);
+  const [groups, setGroups] = useState<CommunityGroup[]>([]);
 
   const homeLocation = canonicalLocation(currentBusiness?.city || currentProfile?.city);
   const homeArea = neighborhoodLocationValue(homeLocation, currentProfile?.neighborhood);
@@ -4942,6 +4959,16 @@ export default function App() {
       return priority[right.tier] - priority[left.tier];
     });
   const activeAdvertisement = visibleAdvertisements[0] || null;
+  const visibleGroups = groups
+    .filter((group) => {
+      if (activeLocation === "All Areas") return true;
+      if (!sameLocation(group.city, selectedArea.city)) return false;
+      return !selectedArea.neighborhood || !group.neighborhood || sameLocation(group.neighborhood, selectedArea.neighborhood);
+    })
+    .slice(0, 6);
+  const visibleActiveNeighbors = activeNeighbors
+    .filter((neighbor) => matchesSelectedLocation(neighbor.city, neighbor.neighborhood, activeLocation))
+    .slice(0, 8);
 
   useEffect(() => {
     if (!authReady) return;
@@ -4979,12 +5006,18 @@ export default function App() {
     let cancelled = false;
 
     (async () => {
-      const [profilesResult, businessesResult, postsResult] = await Promise.all([
-        supabase.from("profiles").select("city, neighborhood").limit(500),
-        supabase.from("business_profiles").select("city, neighborhood").limit(500),
-        supabase.from("posts").select("city, neighborhood").limit(500),
-      ]);
+      const { data: areaRows, error: areasError } = await supabase
+        .from("community_areas")
+        .select("city, neighborhood")
+        .eq("is_active", true)
+        .order("city", { ascending: true })
+        .order("neighborhood", { ascending: true, nullsFirst: true });
       if (cancelled) return;
+
+      if (areasError) {
+        console.error("Could not load the community area directory", areasError);
+        return;
+      }
 
       const options = new Map<string, AreaOption>();
       const addArea = (cityValue?: string | null, neighborhoodValue?: string | null) => {
@@ -5006,11 +5039,9 @@ export default function App() {
       LOCATIONS.filter((locationName) => locationName !== "All Areas").forEach((city) => addArea(city));
       addArea(homeLocation);
       addArea(homeLocation, currentProfile?.neighborhood);
-      [profilesResult.data, businessesResult.data, postsResult.data].forEach((rows) => {
-        (rows || []).forEach((row: any) => {
-          addArea(row.city);
-          addArea(row.city, row.neighborhood);
-        });
+      (areaRows || []).forEach((row: any) => {
+        addArea(row.city);
+        addArea(row.city, row.neighborhood);
       });
 
       const sorted = [...options.values()].sort((left, right) => {
@@ -5205,8 +5236,6 @@ export default function App() {
   useEffect(() => {
     if (!authReady || !currentProfile?.id) return;
     void refreshUnreadMessages();
-    const timer = window.setInterval(() => { void refreshUnreadMessages(); }, 15000);
-    return () => window.clearInterval(timer);
   }, [authReady, currentProfile?.id]);
 
   async function refreshFriendRequests() {
@@ -5258,8 +5287,19 @@ export default function App() {
   useEffect(() => {
     if (!authReady || !currentProfile?.id) return;
     void refreshFriendRequests();
-    const timer = window.setInterval(() => { void refreshFriendRequests(); }, 15000);
-    return () => window.clearInterval(timer);
+  }, [authReady, currentProfile?.id]);
+
+  useEffect(() => {
+    const userId = currentProfile?.id;
+    if (!authReady || !userId) return;
+
+    const channel = supabase
+      .channel(`user:${userId}:inbox`, { config: { private: true } })
+      .on("broadcast", { event: "message_created" }, () => { void refreshUnreadMessages(); })
+      .on("broadcast", { event: "friendship_changed" }, () => { void refreshFriendRequests(); })
+      .subscribe();
+
+    return () => { void supabase.removeChannel(channel); };
   }, [authReady, currentProfile?.id]);
 
   async function respondToFriendRequest(requestId: string, accept: boolean) {
@@ -5272,6 +5312,174 @@ export default function App() {
     if (result.error) setFriendRequestError(accept ? "Could not accept this friend request." : "Could not decline this friend request.");
     else setPendingFriendRequests((current) => current.filter((request) => request.id !== requestId));
     setFriendRequestBusy(null);
+  }
+
+  async function loadCommunityGroups() {
+    const userId = currentProfile?.id;
+    if (!userId) {
+      setGroups([]);
+      setGroupsLoading(false);
+      return;
+    }
+
+    setGroupsLoading(true);
+    const [directoryResult, membershipResult] = await Promise.all([
+      supabase
+        .from("community_groups_directory")
+        .select("id, name, description, emoji, city, neighborhood, member_count, created_at")
+        .eq("is_active", true)
+        .order("member_count", { ascending: false })
+        .order("created_at", { ascending: false }),
+      supabase.from("community_group_members").select("group_id").eq("user_id", userId),
+    ]);
+
+    if (directoryResult.error || membershipResult.error) {
+      console.error("Could not load community groups", directoryResult.error || membershipResult.error);
+      setGroupsError("Community groups are temporarily unavailable.");
+      setGroupsLoading(false);
+      return;
+    }
+
+    const joinedIds = new Set((membershipResult.data || []).map((membership: any) => membership.group_id));
+    setGroups((directoryResult.data || []).map((group: any): CommunityGroup => ({
+      id: group.id,
+      name: group.name,
+      description: group.description,
+      emoji: group.emoji || "🏘️",
+      city: canonicalLocation(group.city),
+      neighborhood: group.neighborhood || null,
+      members: Number(group.member_count || 0),
+      joined: joinedIds.has(group.id),
+    })));
+    setGroupsError(null);
+    setGroupsLoading(false);
+  }
+
+  useEffect(() => {
+    if (!authReady || !currentProfile?.id) return;
+    void loadCommunityGroups();
+  }, [authReady, currentProfile?.id]);
+
+  async function toggleJoinGroup(group: CommunityGroup) {
+    const userId = currentProfile?.id;
+    if (!userId || groupActionBusyId) return;
+    setGroupActionBusyId(group.id);
+    setGroupsError(null);
+
+    const result = group.joined
+      ? await supabase.from("community_group_members").delete().eq("group_id", group.id).eq("user_id", userId)
+      : await supabase.from("community_group_members").insert({ group_id: group.id, user_id: userId });
+
+    if (result.error) {
+      console.error("Could not update group membership", result.error);
+      setGroupsError(group.joined ? "The group could not be left." : "The group could not be joined.");
+    } else {
+      setGroups((current) => current.map((item) => item.id === group.id
+        ? { ...item, joined: !group.joined, members: Math.max(0, item.members + (group.joined ? -1 : 1)) }
+        : item,
+      ));
+    }
+    setGroupActionBusyId(null);
+  }
+
+  async function createCommunityGroup(values: { name: string; description: string; emoji: string; areaValue: string }) {
+    const area = selectedLocationParts(values.areaValue);
+    if (!area.city) throw new Error("Choose a city or neighborhood for this group.");
+    const { error: createError } = await supabase.rpc("create_community_group", {
+      group_name: values.name,
+      group_description: values.description,
+      group_emoji: values.emoji,
+      group_city: area.city,
+      group_neighborhood: area.neighborhood,
+    });
+    if (createError) {
+      if (createError.code === "23505") throw new Error("A group with this name already exists in that area.");
+      throw new Error("The group could not be created. Please try again.");
+    }
+    await loadCommunityGroups();
+  }
+
+  async function loadActiveNeighborProfiles(userIds: string[]) {
+    const currentUserId = currentProfile?.id;
+    const uniqueIds = [...new Set(userIds)].filter((id) => id && id !== currentUserId).slice(0, 50);
+    if (!currentUserId || !uniqueIds.length) {
+      setActiveNeighbors([]);
+      setActiveNeighborsLoading(false);
+      return;
+    }
+
+    const [profilesResult, businessesResult, followsResult] = await Promise.all([
+      supabase.from("profiles").select("id, full_name, city, neighborhood, avatar_url, account_type").in("id", uniqueIds),
+      supabase.from("business_profiles").select("user_id, business_name, city, neighborhood, logo_url").in("user_id", uniqueIds),
+      supabase.from("profile_follows").select("followed_id").eq("follower_id", currentUserId).in("followed_id", uniqueIds),
+    ]);
+
+    if (profilesResult.error || businessesResult.error || followsResult.error) {
+      console.error("Could not load active neighbors", profilesResult.error || businessesResult.error || followsResult.error);
+      setActiveNeighborsLoading(false);
+      return;
+    }
+
+    const businessesById = new Map((businessesResult.data || []).map((business: any) => [business.user_id, business]));
+    const followedIds = new Set((followsResult.data || []).map((follow: any) => follow.followed_id));
+    setActiveNeighbors((profilesResult.data || []).map((profile: any): ActiveNeighbor => {
+      const business: any = businessesById.get(profile.id);
+      const isBusiness = profile.account_type === "business" || Boolean(business);
+      return {
+        id: profile.id,
+        name: isBusiness ? business?.business_name || profile.full_name || "Local Business" : profile.full_name || "Neighbor",
+        city: canonicalLocation(business?.city || profile.city),
+        neighborhood: business?.neighborhood || profile.neighborhood || null,
+        avatarUrl: isBusiness ? business?.logo_url || profile.avatar_url || null : profile.avatar_url || null,
+        accountType: isBusiness ? "business" : "personal",
+        following: followedIds.has(profile.id),
+      };
+    }).sort((left, right) => left.name.localeCompare(right.name)));
+    setActiveNeighborsLoading(false);
+  }
+
+  useEffect(() => {
+    const currentUserId = currentProfile?.id;
+    if (!authReady || !currentUserId) return;
+    setActiveNeighborsLoading(true);
+
+    const topicLocation = encodeURIComponent(locationKey(browsingLocation) || "all");
+    const channel = supabase
+      .channel(`neighborly:active:${topicLocation}`, {
+        config: { private: true, presence: { key: currentUserId } },
+      })
+      .on("presence", { event: "sync" }, () => {
+        const state = channel.presenceState() as Record<string, Array<{ user_id?: string }>>;
+        const userIds = Object.values(state).flatMap((entries) => entries.map((entry) => entry.user_id).filter((id): id is string => Boolean(id)));
+        void loadActiveNeighborProfiles(userIds);
+      })
+      .subscribe((status) => {
+        if (status !== "SUBSCRIBED") return;
+        void channel.track({
+          user_id: currentUserId,
+          city: currentProfile?.city || homeLocation,
+          neighborhood: currentProfile?.neighborhood || null,
+          online_at: new Date().toISOString(),
+        });
+      });
+
+    return () => {
+      setActiveNeighbors([]);
+      void supabase.removeChannel(channel);
+    };
+  }, [authReady, currentProfile?.id, currentProfile?.city, currentProfile?.neighborhood, browsingLocation, homeLocation]);
+
+  async function toggleActiveNeighborFollow(neighbor: ActiveNeighbor) {
+    const currentUserId = currentProfile?.id;
+    if (!currentUserId || activeNeighborBusyId) return;
+    setActiveNeighborBusyId(neighbor.id);
+    const result = neighbor.following
+      ? await supabase.from("profile_follows").delete().eq("follower_id", currentUserId).eq("followed_id", neighbor.id)
+      : await supabase.from("profile_follows").insert({ follower_id: currentUserId, followed_id: neighbor.id });
+    if (!result.error) {
+      setActiveNeighbors((current) => current.map((item) => item.id === neighbor.id ? { ...item, following: !neighbor.following } : item));
+    }
+    setActiveNeighborBusyId(null);
   }
 
   useEffect(() => {
@@ -5292,54 +5500,90 @@ export default function App() {
     }
   }, [adminStatusReady, authReady, currentAccountType, isSiteAdmin, location.pathname]);
 
+  async function loadDatabasePostsPage(cursor?: string, reset = false) {
+    if (loadingMorePosts) return;
+    setLoadingMorePosts(true);
+    setMorePostsError(null);
+
+    let request = supabase
+      .from("posts")
+      .select("id, author_id, category, content, image_url, city, neighborhood, is_admin_post, created_at")
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(POST_PAGE_SIZE + 1);
+    if (cursor) request = request.lt("created_at", cursor);
+
+    const { data: rows, error } = await request;
+    if (error) {
+      console.error("Could not load the feed", error);
+      setMorePostsError("More posts could not be loaded. Please try again.");
+      setLoadingMorePosts(false);
+      return;
+    }
+
+    const pageRows = (rows || []).slice(0, POST_PAGE_SIZE);
+    setHasMoreDatabasePosts((rows || []).length > POST_PAGE_SIZE);
+    if (!pageRows.length) {
+      setLoadingMorePosts(false);
+      return;
+    }
+
+    const authorIds = [...new Set(pageRows.map((row: any) => row.author_id).filter(Boolean))];
+    const [profilesResult, businessesResult] = await Promise.all([
+      supabase.from("profiles").select("id, full_name, city, neighborhood, avatar_url, account_type").in("id", authorIds),
+      supabase.from("business_profiles").select("user_id, business_name, city, neighborhood, logo_url").in("user_id", authorIds),
+    ]);
+    if (profilesResult.error || businessesResult.error) {
+      console.error("Could not load post authors", profilesResult.error || businessesResult.error);
+      setMorePostsError("Post authors could not be loaded.");
+      setLoadingMorePosts(false);
+      return;
+    }
+
+    const profiles = new Map((profilesResult.data || []).map((profile: any) => [profile.id, profile]));
+    const businesses = new Map((businessesResult.data || []).map((business: any) => [business.user_id, business]));
+    const loaded: Post[] = pageRows.map((row: any, index: number) => {
+      const profile: any = profiles.get(row.author_id);
+      const business: any = businesses.get(row.author_id);
+      const isBusiness = profile?.account_type === "business" || Boolean(business);
+      const created = new Date(row.created_at);
+      return {
+        id: created.getTime() + index,
+        databaseId: row.id,
+        author: row.is_admin_post ? "Neighborly Admin" : (isBusiness ? business?.business_name || profile?.full_name || "Local Business" : profile?.full_name || "Neighbor"),
+        authorId: row.author_id,
+        authorAvatar: row.is_admin_post ? neighborlyLogo : (isBusiness ? business?.logo_url || profile?.avatar_url || null : profile?.avatar_url || null),
+        isAdminPost: Boolean(row.is_admin_post),
+        authorBadges: [],
+        neighborhood: row.neighborhood || business?.neighborhood || profile?.neighborhood || row.city || business?.city || profile?.city || "Local Area",
+        city: canonicalLocation(row.city || business?.city || profile?.city),
+        time: created.toLocaleDateString() === new Date().toLocaleDateString() ? "Today" : created.toLocaleDateString(),
+        category: (row.category || "general") as PostCategory,
+        body: row.content,
+        image: row.image_url || undefined,
+        likes: 0,
+        comments: [],
+        bookmarked: false,
+        liked: false,
+      };
+    });
+
+    setPosts((current) => {
+      const existingIds = new Set(current.map((post) => post.databaseId).filter(Boolean));
+      const uniqueLoaded = loaded.filter((post) => !existingIds.has(post.databaseId));
+      const savedPosts = current.filter((post) => Boolean(post.databaseId));
+      const demoPosts = current.filter((post) => !post.databaseId && !uniqueLoaded.some((loadedPost) => loadedPost.body === post.body && loadedPost.author === post.author));
+      return reset ? [...uniqueLoaded, ...demoPosts] : [...savedPosts, ...uniqueLoaded, ...demoPosts];
+    });
+    setPostsCursor(pageRows[pageRows.length - 1].created_at);
+    setLoadingMorePosts(false);
+  }
+
   useEffect(() => {
     if (!authReady || postsLoadedRef.current) return;
     postsLoadedRef.current = true;
-    (async () => {
-      const { data: rows, error } = await supabase
-        .from("posts")
-        .select("id, author_id, category, content, image_url, city, neighborhood, is_admin_post, created_at")
-        .order("created_at", { ascending: false })
-        .limit(100);
-      if (error || !rows?.length) return;
-
-      const ids = [...new Set(rows.map((r: any) => r.author_id).filter(Boolean))];
-      const [{ data: profileRows }, { data: businessRows }] = await Promise.all([
-        supabase.from("profiles").select("id, full_name, city, neighborhood, avatar_url, account_type").in("id", ids),
-        supabase.from("business_profiles").select("user_id, business_name, city, neighborhood, logo_url").in("user_id", ids),
-      ]);
-      const profiles = new Map((profileRows || []).map((p: any) => [p.id, p]));
-      const businesses = new Map((businessRows || []).map((b: any) => [b.user_id, b]));
-
-      const loaded: Post[] = rows.map((r: any, index: number) => {
-        const p: any = profiles.get(r.author_id);
-        const b: any = businesses.get(r.author_id);
-        const isBiz = p?.account_type === "business" || !!b;
-        const created = new Date(r.created_at);
-        return {
-          id: created.getTime() + index,
-          databaseId: r.id,
-          author: r.is_admin_post ? "Neighborly Admin" : (isBiz ? (b?.business_name || p?.full_name || "Local Business") : (p?.full_name || "Neighbor")),
-          authorId: r.author_id,
-          authorAvatar: r.is_admin_post ? neighborlyLogo : (isBiz ? (b?.logo_url || p?.avatar_url || null) : (p?.avatar_url || null)),
-          isAdminPost: Boolean(r.is_admin_post),
-          authorBadges: [],
-          neighborhood: r.neighborhood || b?.neighborhood || p?.neighborhood || r.city || b?.city || p?.city || "Local Area",
-          city: canonicalLocation(r.city || b?.city || p?.city),
-          time: created.toLocaleDateString() === new Date().toLocaleDateString() ? "Today" : created.toLocaleDateString(),
-          category: (r.category || "general") as PostCategory,
-          body: r.content,
-          image: r.image_url || undefined,
-          likes: 0, comments: [], bookmarked: false, liked: false,
-        };
-      });
-      setPosts((prev) => [...loaded, ...prev.filter((p) => !loaded.some((d) => d.body === p.body && d.author === p.author))]);
-    })();
+    void loadDatabasePostsPage(undefined, true);
   }, [authReady]);
-
-  function toggleJoinGroup(id: number) {
-    setGroups((prev) => prev.map((g) => g.id === id ? { ...g, joined: !g.joined } : g));
-  }
 
   function goToBusiness(id: number) {
     setView({ page: "business", id });
@@ -6424,6 +6668,19 @@ export default function App() {
               </React.Fragment>
             );
           })}
+
+          {morePostsError && (
+            <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-center text-sm text-red-700">{morePostsError}</p>
+          )}
+          {hasMoreDatabasePosts && (
+            <button
+              onClick={() => { void loadDatabasePostsPage(postsCursor || undefined); }}
+              disabled={loadingMorePosts}
+              className="mx-auto rounded-full border border-purple-300 bg-white px-5 py-2 text-sm font-semibold text-purple-700 shadow-sm transition-colors hover:bg-purple-50 disabled:opacity-50"
+            >
+              {loadingMorePosts ? "Loading more posts…" : "Load more posts"}
+            </button>
+          )}
         </section>
 
         {/* Desktop sidebar — always visible on lg+ */}
@@ -6442,34 +6699,14 @@ export default function App() {
               <MessageSquare size={16} /> Send Feedback
             </button>
 
-            <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold text-sm">Community Groups</h3>
-                <button
-                  onClick={() => setIsCreateGroupOpen(true)}
-                  className="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 font-semibold px-2.5 py-1 rounded-lg transition-colors"
-                >
-                  + Create
-                </button>
-              </div>
-              <div className="flex flex-col gap-2">
-                {(activeLocation === "All Areas" ? groups : groups.filter((group) => sameLocation(group.city, selectedArea.city))).map((group) => (
-                  <div key={group.id} className="p-2.5 rounded-lg border border-border/60 hover:bg-secondary/30 transition-colors">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-semibold truncate flex-1 mr-2">{group.name}</span>
-                      <button
-                        onClick={() => toggleJoinGroup(group.id)}
-                        className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors flex-shrink-0 ${group.joined ? "bg-secondary text-muted-foreground hover:bg-secondary/80" : "bg-primary text-primary-foreground hover:bg-primary/90"}`}
-                      >
-                        {group.joined ? "Joined" : "Join"}
-                      </button>
-                    </div>
-                    <p className="text-xs text-muted-foreground line-clamp-1">{group.description}</p>
-                    <span className="text-[10px] text-muted-foreground">{group.members} members</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <CommunityGroupsCard
+              groups={visibleGroups}
+              loading={groupsLoading}
+              error={groupsError}
+              busyGroupId={groupActionBusyId}
+              onToggleMembership={(group) => { void toggleJoinGroup(group); }}
+              onCreate={() => setIsCreateGroupOpen(true)}
+            />
 
             <div className="bg-card rounded-xl border border-border p-4">
               <div className="flex items-center justify-between mb-3">
@@ -6515,25 +6752,13 @@ export default function App() {
               </div>
             </div>
 
-            <div className="bg-card rounded-xl border border-border p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold text-sm">Active Neighbors</h3>
-                <button className="text-xs text-blue-600 font-medium hover:underline">View all</button>
-              </div>
-              <div className="flex flex-col gap-2.5">
-                {(["Nadia Petrov", "James Whitfield", "Grace Okonkwo"] as const).map((name) => {
-                  return (
-                    <div key={name} className="flex items-center gap-2.5">
-                      <button onClick={() => goToUser(name)}><Avatar name={name} size="sm" /></button>
-                      <div className="flex-1 min-w-0">
-                        <button onClick={() => goToUser(name)} className="text-sm font-medium leading-tight hover:text-blue-600 transition-colors block">{name}</button>
-                      </div>
-                      <button className="text-xs text-blue-600 border border-blue-600/30 rounded-full px-2 py-0.5 hover:bg-secondary transition-colors flex-shrink-0">Follow</button>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            <ActiveNeighborsCard
+              neighbors={visibleActiveNeighbors}
+              loading={activeNeighborsLoading}
+              busyNeighborId={activeNeighborBusyId}
+              onOpenProfile={(neighbor) => { void goToUser(neighbor.name, neighbor.id); }}
+              onToggleFollow={(neighbor) => { void toggleActiveNeighborFollow(neighbor); }}
+            />
 
             <p className="text-xs text-muted-foreground text-center px-2">© 2026 Neighborly · Privacy · Terms · Help</p>
         </aside>
@@ -6567,25 +6792,14 @@ export default function App() {
             <MessageSquare size={16} /> Send Feedback
           </button>
 
-          {/* Community Groups */}
-          <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-sm">Community Groups</h3>
-              <button onClick={() => setIsCreateGroupOpen(true)} className="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 font-semibold px-2.5 py-1 rounded-lg transition-colors">+ Create</button>
-            </div>
-            <div className="flex flex-col gap-2">
-              {(activeLocation === "All Areas" ? groups : groups.filter((group) => sameLocation(group.city, selectedArea.city))).map((group) => (
-                <div key={group.id} className="p-2.5 rounded-lg border border-border/60 hover:bg-secondary/30 transition-colors">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-semibold truncate flex-1 mr-2">{group.name}</span>
-                    <button onClick={() => toggleJoinGroup(group.id)} className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors flex-shrink-0 ${group.joined ? "bg-secondary text-muted-foreground" : "bg-primary text-primary-foreground hover:bg-primary/90"}`}>{group.joined ? "Joined" : "Join"}</button>
-                  </div>
-                  <p className="text-xs text-muted-foreground line-clamp-1">{group.description}</p>
-                  <span className="text-[10px] text-muted-foreground">{group.members} members</span>
-                </div>
-              ))}
-            </div>
-          </div>
+          <CommunityGroupsCard
+            groups={visibleGroups}
+            loading={groupsLoading}
+            error={groupsError}
+            busyGroupId={groupActionBusyId}
+            onToggleMembership={(group) => { void toggleJoinGroup(group); }}
+            onCreate={() => setIsCreateGroupOpen(true)}
+          />
 
           {/* Upcoming Events */}
           <div className="bg-card rounded-xl border border-border p-4">
@@ -6627,25 +6841,16 @@ export default function App() {
             </div>
           </div>
 
-          {/* Active Neighbors */}
-          <div className="bg-card rounded-xl border border-border p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-sm">Active Neighbors</h3>
-            </div>
-            <div className="flex flex-col gap-2.5">
-              {(["Nadia Petrov", "James Whitfield", "Grace Okonkwo"] as const).map((name) => {
-                return (
-                  <div key={name} className="flex items-center gap-2.5">
-                    <button onClick={() => { goToUser(name); setSidebarOpen(false); }}><Avatar name={name} size="sm" /></button>
-                    <div className="flex-1 min-w-0">
-                      <button onClick={() => { goToUser(name); setSidebarOpen(false); }} className="text-sm font-medium leading-tight hover:text-blue-600 transition-colors block">{name}</button>
-                    </div>
-                    <button className="text-xs text-blue-600 border border-blue-600/30 rounded-full px-2 py-0.5 hover:bg-secondary transition-colors flex-shrink-0">Follow</button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          <ActiveNeighborsCard
+            neighbors={visibleActiveNeighbors}
+            loading={activeNeighborsLoading}
+            busyNeighborId={activeNeighborBusyId}
+            onOpenProfile={(neighbor) => {
+              setSidebarOpen(false);
+              void goToUser(neighbor.name, neighbor.id);
+            }}
+            onToggleFollow={(neighbor) => { void toggleActiveNeighborFollow(neighbor); }}
+          />
 
           <p className="text-xs text-muted-foreground text-center px-2 pb-2">© 2026 Neighborly · Privacy · Terms · Help</p>
       </aside>
@@ -6667,6 +6872,14 @@ export default function App() {
           senderName={currentAccountType === "business" ? currentBusiness?.name || currentProfile?.name || "Neighbor" : currentProfile?.name || "Neighbor"}
         />
       )}
+
+      <CreateGroupDialog
+        open={isCreateGroupOpen}
+        areas={areaOptions}
+        defaultAreaValue={activeLocation === "All Areas" ? homeArea : activeLocation}
+        onOpenChange={setIsCreateGroupOpen}
+        onCreate={createCommunityGroup}
+      />
 
       {/* Fixed bottom nav — mobile */}
       <div className="fixed bottom-0 left-0 right-0 z-50 lg:hidden bg-purple-800 border-t border-purple-700 flex items-stretch h-16">
