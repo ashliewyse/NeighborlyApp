@@ -276,6 +276,7 @@ interface Post {
   body: string;
   image?: string;
   authorAvatar?: string | null;
+  isAdminPost?: boolean;
   likes: number;
   comments: Comment[];
   bookmarked: boolean;
@@ -1288,7 +1289,7 @@ function ProfilePostsFeed({ profileName, profileType, profileOwnerId }: { profil
         ownerId = profileRow?.id || null;
       }
       if (!ownerId) { if (active) { setItems([]); setLoading(false); } return; }
-      const { data, error } = await supabase.from("posts").select("id, author_id, category, content, image_url, created_at").eq("author_id", ownerId).order("created_at", { ascending: false }).limit(50);
+      const { data, error } = await supabase.from("posts").select("id, author_id, category, content, image_url, created_at").eq("author_id", ownerId).eq("is_admin_post", false).order("created_at", { ascending: false }).limit(50);
       if (!active) return;
       setItems(error ? [] : (data || [])); setLoading(false);
     })();
@@ -3473,11 +3474,14 @@ function HelpWantedView({
           <article key={post.id} className="overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-primary/30">
             <div className="p-4">
               <div className="flex items-start gap-3">
-                <button onClick={() => onUserClick(post.author, post.authorId)}>
+                <button onClick={() => !post.isAdminPost && onUserClick(post.author, post.authorId)} disabled={post.isAdminPost} aria-label={post.isAdminPost ? "Official Neighborly administrator" : `View ${post.author}'s profile`}>
                   <Avatar name={post.author} size="sm" src={post.authorAvatar || null} />
                 </button>
                 <div className="min-w-0 flex-1">
-                  <button onClick={() => onUserClick(post.author, post.authorId)} className="text-sm font-semibold hover:text-primary">{post.author}</button>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <button onClick={() => !post.isAdminPost && onUserClick(post.author, post.authorId)} disabled={post.isAdminPost} className="text-sm font-semibold enabled:hover:text-primary">{post.author}</button>
+                    {post.isAdminPost && <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700"><BadgeCheck size={11} /> Official</span>}
+                  </div>
                   <p className="text-xs text-muted-foreground">{post.neighborhood} · {post.time}</p>
                 </div>
                 <PostOwnerMenu post={post} currentUserId={currentUserId} busy={busyPostId === post.databaseId} onEdit={onEdit} onDelete={onDelete} />
@@ -3488,7 +3492,7 @@ function HelpWantedView({
                 <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700"><HandHeart size={12} /> Help Wanted</span>
                 <button
                   onClick={() => post.authorId && onMessage({ id: post.authorId, name: post.author, avatarUrl: post.authorAvatar || null })}
-                  disabled={!post.authorId || post.authorId === currentUserId}
+                  disabled={!post.authorId || post.authorId === currentUserId || post.isAdminPost}
                   className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {post.authorId === currentUserId ? "Your Request" : "Offer Help"}
@@ -3572,11 +3576,14 @@ function ClassifiedsView({
               )}
               <div className="p-4">
                 <div className="flex items-start gap-3">
-                  <button onClick={() => onUserClick(post.author, post.authorId)}>
+                  <button onClick={() => !post.isAdminPost && onUserClick(post.author, post.authorId)} disabled={post.isAdminPost} aria-label={post.isAdminPost ? "Official Neighborly administrator" : `View ${post.author}'s profile`}>
                     <Avatar name={post.author} size="sm" src={post.authorAvatar || null} />
                   </button>
                   <div className="flex-1 min-w-0">
-                    <button onClick={() => onUserClick(post.author, post.authorId)} className="font-semibold text-sm text-foreground hover:text-primary transition-colors">{post.author}</button>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <button onClick={() => !post.isAdminPost && onUserClick(post.author, post.authorId)} disabled={post.isAdminPost} className="font-semibold text-sm text-foreground enabled:hover:text-primary transition-colors">{post.author}</button>
+                      {post.isAdminPost && <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700"><BadgeCheck size={11} /> Official</span>}
+                    </div>
                     <p className="text-xs text-muted-foreground">{post.neighborhood} · {post.time}</p>
                   </div>
                   <PostOwnerMenu post={post} currentUserId={currentUserId} busy={busyPostId === post.databaseId} onEdit={onEdit} onDelete={onDelete} />
@@ -3586,7 +3593,7 @@ function ClassifiedsView({
                 <div className="flex gap-2 mt-3">
                   <button
                     onClick={() => post.authorId && onMessage({ id: post.authorId, name: post.author, avatarUrl: post.authorAvatar || null })}
-                    disabled={!post.authorId || post.authorId === currentUserId}
+                    disabled={!post.authorId || post.authorId === currentUserId || post.isAdminPost}
                     className="flex-1 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     Message Seller
@@ -3766,21 +3773,13 @@ function FeedbackModal({
 
 function AdminDashboard({
   onBack,
-  profile,
-  business,
-  accountType,
   defaultCity,
   defaultNeighborhood,
-  avatarUrl,
   onPostCreated,
 }: {
   onBack: () => void;
-  profile: UserProfile;
-  business: Business | null;
-  accountType: "personal" | "business";
   defaultCity: string;
   defaultNeighborhood: string;
-  avatarUrl?: string | null;
   onPostCreated: (post: Post) => void;
 }) {
   const [tab, setTab] = useState<"posts" | "feedback" | "advertising">("posts");
@@ -3876,6 +3875,7 @@ function AdminDashboard({
       }
       const { data: saved, error: insertError } = await supabase.from("posts").insert({
         author_id: user.id,
+        is_admin_post: true,
         post_type: postTypeForCategory(postCategory),
         category: postCategory,
         content: postBody.trim(),
@@ -3887,14 +3887,14 @@ function AdminDashboard({
         if (uploadedPath) await supabase.storage.from("neighborly-media").remove([uploadedPath]);
         throw insertError;
       }
-      const authorName = accountType === "business" ? business?.name || profile.name : profile.name;
       onPostCreated({
         id: new Date(saved.created_at).getTime(),
         databaseId: saved.id,
-        author: authorName,
+        author: "Neighborly Admin",
         authorId: user.id,
         authorBadges: [],
-        authorAvatar: avatarUrl || null,
+        authorAvatar: neighborlyLogo,
+        isAdminPost: true,
         neighborhood: postNeighborhood.trim(),
         city: postCity.trim(),
         time: "Just now",
@@ -4016,8 +4016,8 @@ function AdminDashboard({
         {tab === "posts" && (
           <section className="rounded-2xl bg-white p-5 shadow-sm sm:p-6">
             <div className="mb-5 flex items-center gap-3">
-              <Avatar name={accountType === "business" ? business?.name || profile.name : profile.name} size="md" src={avatarUrl} />
-              <div><h2 className="font-semibold">Create a feed post</h2><p className="text-xs text-muted-foreground">Posts publish as the account you are currently signed into.</p></div>
+              <Avatar name="Neighborly Admin" size="md" src={neighborlyLogo} />
+              <div><h2 className="font-semibold">Create an official feed post</h2><p className="text-xs text-muted-foreground">Posts publish as Neighborly Admin and do not link to your personal or business profile.</p></div>
             </div>
             <form onSubmit={(event) => { void publishAdminPost(event); }} className="space-y-4" aria-busy={postBusy}>
               <textarea required={!postImage} maxLength={5000} rows={6} value={postBody} onChange={(event) => setPostBody(event.target.value)} placeholder="Write a community announcement, update, or other post…" className="w-full resize-none rounded-xl border border-border bg-muted px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-purple-600/30" />
@@ -4971,7 +4971,7 @@ export default function App() {
 
     const [{ data: row }, { count: postCount }] = await Promise.all([
       supabase.from("profiles").select("*").eq("id", user.id).maybeSingle(),
-      supabase.from("posts").select("id", { count: "exact", head: true }).eq("author_id", user.id),
+      supabase.from("posts").select("id", { count: "exact", head: true }).eq("author_id", user.id).eq("is_admin_post", false),
     ]);
 
     const m = user.user_metadata || {};
@@ -5206,7 +5206,7 @@ export default function App() {
     (async () => {
       const { data: rows, error } = await supabase
         .from("posts")
-        .select("id, author_id, category, content, image_url, city, neighborhood, created_at")
+        .select("id, author_id, category, content, image_url, city, neighborhood, is_admin_post, created_at")
         .order("created_at", { ascending: false })
         .limit(100);
       if (error || !rows?.length) return;
@@ -5227,9 +5227,10 @@ export default function App() {
         return {
           id: created.getTime() + index,
           databaseId: r.id,
-          author: isBiz ? (b?.business_name || p?.full_name || "Local Business") : (p?.full_name || "Neighbor"),
+          author: r.is_admin_post ? "Neighborly Admin" : (isBiz ? (b?.business_name || p?.full_name || "Local Business") : (p?.full_name || "Neighbor")),
           authorId: r.author_id,
-          authorAvatar: isBiz ? (b?.logo_url || p?.avatar_url || null) : (p?.avatar_url || null),
+          authorAvatar: r.is_admin_post ? neighborlyLogo : (isBiz ? (b?.logo_url || p?.avatar_url || null) : (p?.avatar_url || null)),
+          isAdminPost: Boolean(r.is_admin_post),
           authorBadges: [],
           neighborhood: r.neighborhood || b?.neighborhood || p?.neighborhood || r.city || b?.city || p?.city || "Local Area",
           city: canonicalLocation(r.city || b?.city || p?.city),
@@ -5341,7 +5342,7 @@ export default function App() {
     const resolvedName = row.full_name || name;
     const [{ data: photoRows }, { count: postCount }] = await Promise.all([
       supabase.from("profile_photos").select("image_url, caption").eq("user_id", row.id).order("created_at", { ascending: true }),
-      supabase.from("posts").select("id", { count: "exact", head: true }).eq("author_id", row.id),
+      supabase.from("posts").select("id", { count: "exact", head: true }).eq("author_id", row.id).eq("is_admin_post", false),
     ]);
     const profile: UserProfile = {
       id: row.id,
@@ -5513,12 +5514,8 @@ export default function App() {
   if (view.page === "admin" && currentProfile && isSiteAdmin) return (
     <AdminDashboard
       onBack={goToFeed}
-      profile={currentProfile}
-      business={currentBusiness}
-      accountType={currentAccountType}
       defaultCity={browsingLocation}
       defaultNeighborhood={currentBusiness?.address.split(",")[0] || currentProfile.neighborhood || browsingLocation}
-      avatarUrl={myAvatarUrl}
       onPostCreated={(post) => {
         setPosts((current) => [post, ...current]);
         if (post.category === "forsale") setClassifiedPosts((current) => [post, ...current]);
@@ -6122,7 +6119,9 @@ export default function App() {
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-start gap-3">
                       <button
-                        onClick={() => goToUser(post.author, post.authorId)}
+                        onClick={() => !post.isAdminPost && goToUser(post.author, post.authorId)}
+                        disabled={post.isAdminPost}
+                        aria-label={post.isAdminPost ? "Official Neighborly administrator" : `View ${post.author}'s profile`}
                       >
                         <Avatar name={post.author} size="md" src={post.authorAvatar || (post.author === (currentAccountType === "business" ? currentBusiness?.name : currentProfile?.name) ? myAvatarUrl : null)} />
                       </button>
@@ -6130,12 +6129,18 @@ export default function App() {
                         <div className="flex items-center gap-2 flex-wrap">
                           <button
                             onClick={() =>
-                              goToUser(post.author, post.authorId)
+                              !post.isAdminPost && goToUser(post.author, post.authorId)
                             }
-                            className="font-semibold text-sm hover:text-blue-600 transition-colors"
+                            disabled={post.isAdminPost}
+                            className="font-semibold text-sm enabled:hover:text-blue-600 transition-colors"
                           >
                             {post.author}
                           </button>
+                          {post.isAdminPost && (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
+                              <BadgeCheck size={11} /> Official
+                            </span>
+                          )}
                           {post.authorBadges
                             .slice(0, 2)
                             .map((b) => (
