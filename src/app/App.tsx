@@ -3947,6 +3947,8 @@ export default function App() {
   const [postActionBusyId, setPostActionBusyId] = useState<string | null>(null);
   const [postActionError, setPostActionError] = useState<string | null>(null);
   const [composing, setComposing] = useState(false);
+  const [postCreateBusy, setPostCreateBusy] = useState(false);
+  const [postCreateError, setPostCreateError] = useState<string | null>(null);
   const [newPostText, setNewPostText] = useState("");
   const [newPostImage, setNewPostImage] = useState<File | null>(null);
   const [newPostImagePreview, setNewPostImagePreview] = useState<string | null>(null);
@@ -4461,6 +4463,7 @@ export default function App() {
 
   function startHelpWantedPost() {
     setSelectedCategory("helpwanted");
+    setPostCreateError(null);
     setComposing(true);
     goToFeed();
   }
@@ -4709,36 +4712,60 @@ export default function App() {
     );
   }
   async function handleCreatePost() {
+    if (postCreateBusy) return;
     const text = newPostText.trim();
     if (!text && !newPostImage) return;
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    setPostCreateBusy(true);
+    setPostCreateError(null);
+    let uploadedPath: string | null = null;
 
-    let imageUrl: string | null = null;
-    if (newPostImage) {
-      const ext=(newPostImage.name.split(".").pop() || "jpg").toLowerCase();
-      const path=user.id+"/posts/"+Date.now()+"-"+Math.random().toString(36).slice(2)+"."+ext;
-      const { error: uploadError } = await supabase.storage.from("neighborly-media").upload(path,newPostImage,{ upsert:false, contentType:newPostImage.type || undefined });
-      if (uploadError) { console.error("Could not upload post photo",uploadError); return; }
-      const { data: publicData } = supabase.storage.from("neighborly-media").getPublicUrl(path);
-      imageUrl=publicData.publicUrl;
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        setPostCreateError("Your session expired. Please sign in again before posting.");
+        return;
+      }
+
+      let imageUrl: string | null = null;
+      if (newPostImage) {
+        const ext=(newPostImage.name.split(".").pop() || "jpg").toLowerCase();
+        uploadedPath=user.id+"/posts/"+Date.now()+"-"+Math.random().toString(36).slice(2)+"."+ext;
+        const { error: uploadError } = await supabase.storage.from("neighborly-media").upload(uploadedPath,newPostImage,{ upsert:false, contentType:newPostImage.type || undefined });
+        if (uploadError) {
+          console.error("Could not upload post photo",uploadError);
+          setPostCreateError("We couldn't upload that photo. Please try again.");
+          return;
+        }
+        const { data: publicData } = supabase.storage.from("neighborly-media").getPublicUrl(uploadedPath);
+        imageUrl=publicData.publicUrl;
+      }
+
+      const postCity = browsingLocation;
+      const homeNeighborhood = currentBusiness?.address.split(",")[0] || currentProfile?.neighborhood || postCity;
+      const postNeighborhood = selectedArea.neighborhood
+        || (sameLocation(postCity, homeLocation) ? homeNeighborhood : postCity);
+      const postType = postTypeForCategory(selectedCategory);
+      const { data: saved, error } = await supabase.from("posts").insert({ author_id:user.id, post_type:postType, category:selectedCategory, content:text, image_url:imageUrl, city:postCity, neighborhood:postNeighborhood }).select("id, created_at").single();
+      if (error) {
+        if (uploadedPath) await supabase.storage.from("neighborly-media").remove([uploadedPath]);
+        console.error("Could not save post",error);
+        setPostCreateError("We couldn't publish your post. Please try again.");
+        return;
+      }
+
+      const authorName=currentAccountType === "business" ? (currentBusiness?.name || "Business") : (currentProfile?.name || "You");
+      const newPost: Post={ id:new Date(saved.created_at).getTime(), databaseId:saved.id, author:authorName, authorId:user.id, authorAvatar:myAvatarUrl, authorBadges:[], neighborhood:postNeighborhood, city:postCity, time:"Just now", category:selectedCategory, body:text, image:imageUrl || undefined, likes:0, comments:[], bookmarked:false, liked:false };
+      setPosts(prev=>[newPost,...prev]);
+      if(selectedCategory === "forsale") setClassifiedPosts(prev=>[newPost,...prev]);
+      setNewPostText(""); setSelectedCategory("general"); setComposing(false);
+      if(newPostImagePreview) URL.revokeObjectURL(newPostImagePreview);
+      setNewPostImage(null); setNewPostImagePreview(null); if(postImageInputRef.current) postImageInputRef.current.value="";
+    } catch (unexpectedError) {
+      console.error("Unexpected error while creating post", unexpectedError);
+      setPostCreateError("Something went wrong while publishing. Please try again.");
+    } finally {
+      setPostCreateBusy(false);
     }
-
-    const postCity = browsingLocation;
-    const homeNeighborhood = currentBusiness?.address.split(",")[0] || currentProfile?.neighborhood || postCity;
-    const postNeighborhood = selectedArea.neighborhood
-      || (sameLocation(postCity, homeLocation) ? homeNeighborhood : postCity);
-    const postType = postTypeForCategory(selectedCategory);
-    const { data: saved, error } = await supabase.from("posts").insert({ author_id:user.id, post_type:postType, category:selectedCategory, content:text, image_url:imageUrl, city:postCity, neighborhood:postNeighborhood }).select("id, created_at").single();
-    if (error) { console.error("Could not save post",error); return; }
-
-    const authorName=currentAccountType === "business" ? (currentBusiness?.name || "Business") : (currentProfile?.name || "You");
-    const newPost: Post={ id:new Date(saved.created_at).getTime(), databaseId:saved.id, author:authorName, authorId:user.id, authorAvatar:myAvatarUrl, authorBadges:[], neighborhood:postNeighborhood, city:postCity, time:"Just now", category:selectedCategory, body:text, image:imageUrl || undefined, likes:0, comments:[], bookmarked:false, liked:false };
-    setPosts(prev=>[newPost,...prev]);
-    if(selectedCategory === "forsale") setClassifiedPosts(prev=>[newPost,...prev]);
-    setNewPostText(""); setSelectedCategory("general"); setComposing(false);
-    if(newPostImagePreview) URL.revokeObjectURL(newPostImagePreview);
-    setNewPostImage(null); setNewPostImagePreview(null); if(postImageInputRef.current) postImageInputRef.current.value="";
   }
   function submitComment(postId: number) {
     const text = (commentDraft[postId] || "").trim();
@@ -5000,7 +5027,7 @@ export default function App() {
           {!composing ? (
             <div
               className="bg-card rounded-xl border border-border p-4 flex items-center gap-3 cursor-pointer hover:border-primary/30 transition-colors"
-              onClick={() => setComposing(true)}
+              onClick={() => { setPostCreateError(null); setComposing(true); }}
             >
               <Avatar name={currentAccountType === "business" ? (currentBusiness?.name || "Business") : (currentProfile?.name || "Neighbor")} size="md" src={myAvatarUrl} />
               <div className="flex-1 bg-muted rounded-lg px-4 py-2.5 text-sm text-muted-foreground font-['DM_Sans',sans-serif]">
@@ -5060,10 +5087,16 @@ export default function App() {
                         <HandHeart size={11} /> This post will also appear on the Help Wanted page
                       </p>
                     )}
+                    {postCreateError && (
+                      <p role="alert" className="mb-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+                        {postCreateError}
+                      </p>
+                    )}
                     <div className="flex justify-end gap-2">
                       <button
                         onClick={() => {
                           setComposing(false);
+                          setPostCreateError(null);
                           setNewPostText("");
                           setSelectedCategory("general");
                           if (newPostImagePreview) URL.revokeObjectURL(newPostImagePreview);
@@ -5071,16 +5104,17 @@ export default function App() {
                           setNewPostImagePreview(null);
                           if (postImageInputRef.current) postImageInputRef.current.value = "";
                         }}
-                        className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors font-['DM_Sans',sans-serif]"
+                        disabled={postCreateBusy}
+                        className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 font-['DM_Sans',sans-serif]"
                       >
                         Cancel
                       </button>
                       <button
-                        onClick={handleCreatePost}
-                        disabled={!newPostText.trim() && !newPostImage}
+                        onClick={() => { void handleCreatePost(); }}
+                        disabled={postCreateBusy || (!newPostText.trim() && !newPostImage)}
                         className="px-4 py-1.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-40 font-['DM_Sans',sans-serif]"
                       >
-                        Post
+                        {postCreateBusy ? "Posting…" : "Post"}
                       </button>
                     </div>
                   </div>
@@ -5571,7 +5605,7 @@ export default function App() {
         {[
           { label: "Help Wanted", icon: <HandHeart size={20} />, action: () => setView({ page: "helpwanted" }), page: "helpwanted" },
           { label: "Search", icon: <Search size={20} />, action: () => setView({ page: "search" }), page: "search" },
-          { label: "Post", icon: <Plus size={20} />, action: () => { goToFeed(); setComposing(true); }, page: null },
+          { label: "Post", icon: <Plus size={20} />, action: () => { goToFeed(); setPostCreateError(null); setComposing(true); }, page: null },
           { label: "Events", icon: <CalendarDays size={20} />, action: () => setView({ page: "events" }), page: "events" },
           { label: "Sell", icon: <ShoppingBag size={20} />, action: () => setView({ page: "classifieds" }), page: "classifieds" },
         ].map(({ label, icon, action, page }) => (
