@@ -86,6 +86,7 @@ interface BusinessReview {
 
 interface Business {
   id: number;
+  ownerId?: string;
   name: string;
   category: string;
   city: string;
@@ -103,6 +104,8 @@ interface Business {
   founded: string;
   owner: string;
   reviews: BusinessReview[];
+  logoUrl?: string | null;
+  coverUrl?: string | null;
 }
 
 interface NeighborReview {
@@ -144,6 +147,7 @@ type PostCategory =
 type ActiveView =
   | { page: "feed" }
   | { page: "business"; id: number }
+  | { page: "saved-business"; business: Business }
   | { page: "user"; name: string }
   | { page: "me" }
   | { page: "my-business" }
@@ -948,14 +952,14 @@ function AuthView({
 
 // ─── Business Profile ─────────────────────────────────────────────────────────
 
-function ProfilePostsFeed({ profileName, profileType }: { profileName: string; profileType: "business" | "personal" }) {
+function ProfilePostsFeed({ profileName, profileType, profileOwnerId }: { profileName: string; profileType: "business" | "personal"; profileOwnerId?: string }) {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
     let active = true;
     (async () => {
-      let ownerId: string | null = null;
-      if (profileType === "business") {
+      let ownerId: string | null = profileOwnerId || null;
+      if (!ownerId && profileType === "business") {
         const { data: businessRow } = await supabase.from("business_profiles").select("user_id").eq("business_name", profileName).maybeSingle();
         ownerId = businessRow?.user_id || null;
         // Own business fallback: the displayed business can be assembled in memory, but posts are always saved with auth user.id.
@@ -966,7 +970,7 @@ function ProfilePostsFeed({ profileName, profileType }: { profileName: string; p
             if (ownBusiness?.business_name === profileName) ownerId = user.id;
           }
         }
-      } else {
+      } else if (!ownerId) {
         const { data: profileRow } = await supabase.from("profiles").select("id").eq("full_name", profileName).maybeSingle();
         ownerId = profileRow?.id || null;
       }
@@ -976,7 +980,7 @@ function ProfilePostsFeed({ profileName, profileType }: { profileName: string; p
       setItems(error ? [] : (data || [])); setLoading(false);
     })();
     return () => { active = false; };
-  }, [profileName, profileType]);
+  }, [profileName, profileType, profileOwnerId]);
   if (loading) return <div className="bg-white rounded-xl border border-border p-6 text-sm text-muted-foreground">Loading posts…</div>;
   if (!items.length) return <div className="bg-white rounded-xl border border-border p-6"><h3 className="font-semibold text-lg mb-2">Posts</h3><p className="text-sm text-muted-foreground">No posts from {profileName} yet.</p></div>;
   return <div className="space-y-4">{items.map((post:any) => <div key={post.id} className="bg-white rounded-xl border border-border p-4 sm:p-5"><div className="font-semibold mb-1">{profileName}</div><div className="text-xs text-muted-foreground mb-3">{new Date(post.created_at).toLocaleDateString()}</div><p className="text-sm sm:text-base whitespace-pre-wrap">{post.content}</p>{post.image_url && <img src={post.image_url} alt="Post" className="mt-3 w-full max-h-[480px] object-cover rounded-lg" />}</div>)}</div>;
@@ -1001,10 +1005,17 @@ function BusinessProfileView({
   const [photosExpanded, setPhotosExpanded] = useState(false);
   const [reviewHelpful, setReviewHelpful] = useState<Record<number, boolean>>({});
   const [businessPhotos, setBusinessPhotos] = useState(biz.photos);
-  const [coverUrl, setCoverUrl] = useState<string | null>(null);
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [coverUrl, setCoverUrl] = useState<string | null>(biz.coverUrl || null);
+  const [logoUrl, setLogoUrl] = useState<string | null>(biz.logoUrl || null);
   const [mediaBusy, setMediaBusy] = useState(false);
   const [mediaError, setMediaError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOwnProfile) return;
+    setBusinessPhotos(biz.photos);
+    setCoverUrl(biz.coverUrl || null);
+    setLogoUrl(biz.logoUrl || null);
+  }, [biz, isOwnProfile]);
 
   useEffect(() => {
     if (!isOwnProfile) return;
@@ -1291,7 +1302,7 @@ function BusinessProfileView({
           </div>
         )}
 
-        {tab === "posts" && <ProfilePostsFeed profileName={biz.name} profileType="business" />}
+        {tab === "posts" && <ProfilePostsFeed profileName={biz.name} profileType="business" profileOwnerId={biz.ownerId} />}
 
         {tab === "services" && (
           <div className="bg-white rounded-xl border border-border p-6">
@@ -3014,6 +3025,45 @@ export default function App() {
           setView({ page: "my-business" });
           return;
         }
+
+        const [{ data: ownerRow }, { data: photoRows }] = await Promise.all([
+          supabase.from("profiles").select("full_name, avatar_url, created_at").eq("id", authorId).maybeSingle(),
+          supabase.from("profile_photos").select("image_url, caption").eq("user_id", authorId).order("created_at", { ascending: true }),
+        ]);
+        const services = Array.isArray(businessRow.services)
+          ? businessRow.services
+          : typeof businessRow.services === "string" && businessRow.services.trim()
+            ? businessRow.services.split(",").map((value: string) => value.trim()).filter(Boolean)
+            : [];
+        const created = businessRow.created_at ? new Date(businessRow.created_at) : null;
+
+        setView({
+          page: "saved-business",
+          business: {
+            id: -2,
+            ownerId: authorId,
+            name: businessRow.business_name,
+            category: businessRow.category || "Local Business",
+            city: businessRow.city || "Michigan City",
+            rating: 0,
+            reviewCount: 0,
+            badges: [],
+            description: businessRow.description || "",
+            services,
+            photos: (photoRows || []).map((photo: any) => ({ url: photo.image_url, alt: photo.caption || businessRow.business_name + " photo" })),
+            phone: businessRow.phone || "",
+            email: "",
+            website: businessRow.website || "",
+            address: [businessRow.neighborhood, businessRow.city, businessRow.zip_code].filter(Boolean).join(", "),
+            hours: [],
+            founded: created ? String(created.getFullYear()) : String(new Date().getFullYear()),
+            owner: businessRow.owner_name || ownerRow?.full_name || "Local owner",
+            reviews: [],
+            logoUrl: businessRow.logo_url || ownerRow?.avatar_url || null,
+            coverUrl: businessRow.cover_url || null,
+          },
+        });
+        return;
       }
     }
     if (USER_PROFILES[name]) {
@@ -3024,6 +3074,10 @@ export default function App() {
     let row: any = null;
     if (authorId) {
       const { data } = await supabase.from("profiles").select("*").eq("id", authorId).maybeSingle();
+      row = data;
+    }
+    if (!row) {
+      const { data } = await supabase.from("profiles").select("*").ilike("full_name", name).eq("account_type", "personal").limit(1).maybeSingle();
       row = data;
     }
     if (!row) {
@@ -3081,6 +3135,13 @@ export default function App() {
       <div className="bg-white border-b border-border"><div className="max-w-5xl mx-auto px-4 py-2.5 flex justify-end"><button onClick={goToSettings} className="inline-flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-medium text-foreground hover:bg-muted">⚙️ Settings</button></div></div>
       <BusinessProfileView biz={currentBusiness} onBack={goToFeed} onUserClick={goToUser} isOwnProfile onLogoChange={setMyAvatarUrl} />
     </div>
+  );
+  if (view.page === "saved-business") return (
+    <BusinessProfileView
+      biz={view.business}
+      onBack={goToFeed}
+      onUserClick={goToUser}
+    />
   );
   if (view.page === "business") {
     const biz = BUSINESSES.find((b) => b.id === view.id);
@@ -3186,7 +3247,7 @@ export default function App() {
     if (error) { console.error("Could not save post",error); return; }
 
     const authorName=currentAccountType === "business" ? (currentBusiness?.name || "Business") : (currentProfile?.name || "You");
-    const newPost: Post={ id:new Date(saved.created_at).getTime(), author:authorName, authorAvatar:myAvatarUrl, authorBadges:[], neighborhood:postCity, city:postCity, time:"Just now", category:selectedCategory, body:text, image:imageUrl || undefined, likes:0, comments:[], bookmarked:false, liked:false };
+    const newPost: Post={ id:new Date(saved.created_at).getTime(), author:authorName, authorId:user.id, authorAvatar:myAvatarUrl, authorBadges:[], neighborhood:postCity, city:postCity, time:"Just now", category:selectedCategory, body:text, image:imageUrl || undefined, likes:0, comments:[], bookmarked:false, liked:false };
     setPosts(prev=>[newPost,...prev]);
     if(selectedCategory === "forsale") setClassifiedPosts(prev=>[newPost,...prev]);
     setNewPostText(""); setSelectedCategory("general"); setComposing(false);
