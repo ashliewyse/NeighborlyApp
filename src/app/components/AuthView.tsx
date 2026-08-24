@@ -185,7 +185,7 @@ export function AuthView({ mode, initialScreen = "form", onSwitchMode, onSuccess
       return;
     }
 
-    setNotice("Account created. Check your email to verify your address, then come back and sign in.");
+    setNotice("Access request submitted. Check your email to verify your address, then sign in to see your approval status.");
     setStep(1);
   }
 
@@ -239,10 +239,10 @@ export function AuthView({ mode, initialScreen = "form", onSwitchMode, onSuccess
             <ImageWithFallback src={neighborlyLogo} alt="Neighborly App" className="w-full h-auto object-contain" />
           </div>
           <h1 className="font-['Playfair_Display',serif] font-bold text-2xl text-foreground">
-            {screen === "forgot" ? "Reset your password" : screen === "recovery" ? "Choose a new password" : mode === "signin" ? "Welcome back" : "Join your neighborhood"}
+            {screen === "forgot" ? "Reset your password" : screen === "recovery" ? "Choose a new password" : mode === "signin" ? "Welcome back" : "Request Neighborly access"}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {screen === "forgot" ? "We'll email a secure reset link to your registered address." : screen === "recovery" ? "Create a new password for your Neighborly account." : mode === "signin" ? "Sign in to your Neighborly account" : "Create your account and basic profile together"}
+            {screen === "forgot" ? "We'll email a secure reset link to your registered address." : screen === "recovery" ? "Create a new password for your Neighborly account." : mode === "signin" ? "Sign in to your Neighborly account" : "Neighborly is invite-only during testing. Create your profile to request approval."}
           </p>
         </div>
 
@@ -394,7 +394,7 @@ export function AuthView({ mode, initialScreen = "form", onSwitchMode, onSuccess
               </div>
               <div className="flex gap-2">
                 <button onClick={() => { setStep(1); resetMessages(); }} className="px-4 py-2.5 rounded-lg border border-border text-sm font-medium">Back</button>
-                <button disabled={busy || (accountType === "business" && (!businessName.trim() || !businessCategory.trim()))} onClick={handleSignUp} className="flex-1 bg-blue-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">{busy ? "Creating account…" : "Create Account"}</button>
+                <button disabled={busy || (accountType === "business" && (!businessName.trim() || !businessCategory.trim()))} onClick={handleSignUp} className="flex-1 bg-blue-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">{busy ? "Submitting request…" : "Request Access"}</button>
               </div>
             </>
           )}

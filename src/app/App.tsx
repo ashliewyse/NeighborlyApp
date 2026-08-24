@@ -211,6 +211,16 @@ interface SiteFeedback {
   created_at: string;
 }
 
+interface MemberAccessRequest {
+  user_id: string;
+  email: string;
+  requested_name: string;
+  account_type: "personal" | "business";
+  status: "pending" | "approved" | "declined";
+  requested_at: string;
+  reviewed_at: string | null;
+}
+
 interface AdminAdvertisement {
   id: string;
   user_id: string;
@@ -3782,7 +3792,8 @@ function AdminDashboard({
   defaultNeighborhood: string;
   onPostCreated: (post: Post) => void;
 }) {
-  const [tab, setTab] = useState<"posts" | "feedback" | "advertising">("posts");
+  const [tab, setTab] = useState<"access" | "posts" | "feedback" | "advertising">("access");
+  const [accessRequests, setAccessRequests] = useState<MemberAccessRequest[]>([]);
   const [feedbackItems, setFeedbackItems] = useState<SiteFeedback[]>([]);
   const [advertisements, setAdvertisements] = useState<AdminAdvertisement[]>([]);
   const [loading, setLoading] = useState(true);
@@ -3819,12 +3830,18 @@ function AdminDashboard({
       .select("id, user_id, tier, business_name, headline, description, image_url, destination_url, phone, contact_email, target_city, status, billing_status, payment_method, payment_reference, starts_at, ends_at, created_at")
       .order("created_at", { ascending: false })
       .limit(100);
-    void Promise.all([feedbackRequest, advertisingRequest]).then(([feedbackResult, advertisingResult]) => {
+    const accessRequest = supabase
+      .from("member_access")
+      .select("user_id, email, requested_name, account_type, status, requested_at, reviewed_at")
+      .order("requested_at", { ascending: false })
+      .limit(100);
+    void Promise.all([accessRequest, feedbackRequest, advertisingRequest]).then(([accessResult, feedbackResult, advertisingResult]) => {
       if (cancelled) return;
-      if (feedbackResult.error || advertisingResult.error) {
-        console.error("Could not load admin dashboard", feedbackResult.error || advertisingResult.error);
+      if (accessResult.error || feedbackResult.error || advertisingResult.error) {
+        console.error("Could not load admin dashboard", accessResult.error || feedbackResult.error || advertisingResult.error);
         setLoadError("Some admin information could not be loaded. Please refresh.");
       }
+      setAccessRequests((accessResult.data || []) as MemberAccessRequest[]);
       setFeedbackItems((feedbackResult.data || []) as SiteFeedback[]);
       setAdvertisements((advertisingResult.data || []) as AdminAdvertisement[]);
       setLoading(false);
@@ -3928,6 +3945,32 @@ function AdminDashboard({
     setActionBusyId(null);
   }
 
+  async function reviewMemberAccess(item: MemberAccessRequest, status: "approved" | "declined") {
+    if (actionBusyId) return;
+    setActionBusyId(item.user_id);
+    setActionError(null);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setActionError("Please sign in again before reviewing access requests.");
+      setActionBusyId(null);
+      return;
+    }
+    const reviewedAt = new Date().toISOString();
+    const { error } = await supabase
+      .from("member_access")
+      .update({ status, reviewed_by: user.id, reviewed_at: reviewedAt, updated_at: reviewedAt })
+      .eq("user_id", item.user_id)
+      .select("user_id")
+      .single();
+    if (error) {
+      console.error("Could not review member access", error);
+      setActionError("That access request could not be updated.");
+    } else {
+      setAccessRequests((current) => current.map((request) => request.user_id === item.user_id ? { ...request, status, reviewed_at: reviewedAt } : request));
+    }
+    setActionBusyId(null);
+  }
+
   async function saveFeedbackResponse(item: SiteFeedback) {
     const response = (responseDrafts[item.id] ?? item.admin_response ?? "").trim();
     if (!response || actionBusyId) return;
@@ -3977,6 +4020,8 @@ function AdminDashboard({
   }
 
   const unreadFeedback = feedbackItems.filter((item) => item.status === "unread").length;
+  const pendingAccessRequests = accessRequests.filter((item) => item.status === "pending");
+  const reviewedAccessRequests = accessRequests.filter((item) => item.status !== "pending").slice(0, 20);
   const pendingAds = advertisements.filter((item) => item.status === "pending").length;
   const activeAds = advertisements.filter((item) => item.status === "active" && item.billing_status === "paid").length;
 
@@ -3994,14 +4039,16 @@ function AdminDashboard({
       </header>
 
       <main className="mx-auto max-w-6xl space-y-5 px-4 py-5 sm:px-6">
-        <section className="grid grid-cols-3 gap-3">
+        <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="rounded-xl bg-white p-4 shadow-sm"><p className="text-xs font-semibold uppercase text-muted-foreground">Access requests</p><p className="mt-1 text-2xl font-bold text-blue-700">{pendingAccessRequests.length}</p></div>
           <div className="rounded-xl bg-white p-4 shadow-sm"><p className="text-xs font-semibold uppercase text-muted-foreground">Unread feedback</p><p className="mt-1 text-2xl font-bold text-purple-700">{unreadFeedback}</p></div>
           <div className="rounded-xl bg-white p-4 shadow-sm"><p className="text-xs font-semibold uppercase text-muted-foreground">Pending ads</p><p className="mt-1 text-2xl font-bold text-amber-600">{pendingAds}</p></div>
           <div className="rounded-xl bg-white p-4 shadow-sm"><p className="text-xs font-semibold uppercase text-muted-foreground">Active ads</p><p className="mt-1 text-2xl font-bold text-emerald-600">{activeAds}</p></div>
         </section>
 
-        <nav className="grid grid-cols-3 overflow-hidden rounded-xl bg-white p-1 shadow-sm" aria-label="Admin sections">
+        <nav className="grid grid-cols-2 overflow-hidden rounded-xl bg-white p-1 shadow-sm sm:grid-cols-4" aria-label="Admin sections">
           {([
+            { id: "access" as const, label: `Access${pendingAccessRequests.length ? ` (${pendingAccessRequests.length})` : ""}`, icon: <UserCheck size={16} /> },
             { id: "posts" as const, label: "Create Posts", icon: <Megaphone size={16} /> },
             { id: "feedback" as const, label: `Feedback${unreadFeedback ? ` (${unreadFeedback})` : ""}`, icon: <MessageSquare size={16} /> },
             { id: "advertising" as const, label: `Advertising${pendingAds ? ` (${pendingAds})` : ""}`, icon: <CircleDollarSign size={16} /> },
@@ -4012,6 +4059,50 @@ function AdminDashboard({
 
         {loadError && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{loadError}</p>}
         {actionError && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{actionError}</p>}
+
+        {tab === "access" && (
+          <section className="space-y-4">
+            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+              <p className="font-semibold">Invite-only testing is active</p>
+              <p className="mt-1 text-xs leading-relaxed">New accounts cannot enter Neighborly until you approve them here. Existing members kept their access.</p>
+            </div>
+            <div>
+              <h2 className="mb-3 font-semibold text-white">Pending requests</h2>
+              {loading ? <div className="rounded-xl bg-white p-8 text-center text-sm text-muted-foreground">Loading access requests…</div> : pendingAccessRequests.length === 0 ? <div className="rounded-xl bg-white p-8 text-center text-sm text-muted-foreground">No one is waiting for approval.</div> : (
+                <div className="space-y-3">
+                  {pendingAccessRequests.map((item) => (
+                    <article key={item.user_id} className="rounded-2xl border-2 border-blue-300 bg-white p-5 shadow-sm">
+                      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold">{item.requested_name || "New Neighbor"}</h3><span className="rounded-full bg-blue-100 px-2 py-1 text-[10px] font-semibold uppercase text-blue-700">{item.account_type}</span></div>
+                          <a href={`mailto:${item.email}`} className="mt-1 block break-all text-sm text-blue-600 hover:underline">{item.email}</a>
+                          <p className="mt-1 text-xs text-muted-foreground">Requested {new Date(item.requested_at).toLocaleString()}</p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <button onClick={() => { void reviewMemberAccess(item, "approved"); }} disabled={actionBusyId === item.user_id} className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">Approve access</button>
+                          <button onClick={() => { void reviewMemberAccess(item, "declined"); }} disabled={actionBusyId === item.user_id} className="rounded-lg border border-red-200 px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50">Decline</button>
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </div>
+            {reviewedAccessRequests.length > 0 ? (
+              <div>
+                <h2 className="mb-3 font-semibold text-white">Recently reviewed</h2>
+                <div className="space-y-2">
+                  {reviewedAccessRequests.map((item) => (
+                    <article key={item.user_id} className="flex flex-col justify-between gap-3 rounded-xl bg-white p-4 shadow-sm sm:flex-row sm:items-center">
+                      <div className="min-w-0"><p className="font-semibold">{item.requested_name || "Neighbor"}</p><p className="truncate text-xs text-muted-foreground">{item.email}</p></div>
+                      <div className="flex items-center gap-2"><span className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase ${item.status === "approved" ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>{item.status}</span>{item.status === "declined" ? <button onClick={() => { void reviewMemberAccess(item, "approved"); }} disabled={actionBusyId === item.user_id} className="rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50">Approve now</button> : null}</div>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </section>
+        )}
 
         {tab === "posts" && (
           <section className="rounded-2xl bg-white p-5 shadow-sm sm:p-6">
@@ -5082,13 +5173,14 @@ export default function App() {
     }
     let cancelled = false;
     async function refreshAdminAttention() {
-      const [feedbackResult, advertisingResult] = await Promise.all([
+      const [accessResult, feedbackResult, advertisingResult] = await Promise.all([
+        supabase.from("member_access").select("user_id", { count: "exact", head: true }).eq("status", "pending"),
         supabase.from("site_feedback").select("id", { count: "exact", head: true }).eq("status", "unread"),
         supabase.from("advertising_campaigns").select("id", { count: "exact", head: true }).eq("status", "pending"),
       ]);
       if (cancelled) return;
-      if (!feedbackResult.error && !advertisingResult.error) {
-        setAdminAttentionCount((feedbackResult.count || 0) + (advertisingResult.count || 0));
+      if (!accessResult.error && !feedbackResult.error && !advertisingResult.error) {
+        setAdminAttentionCount((accessResult.count || 0) + (feedbackResult.count || 0) + (advertisingResult.count || 0));
       }
     }
     void refreshAdminAttention();
