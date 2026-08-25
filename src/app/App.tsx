@@ -277,6 +277,7 @@ type ActiveView =
 
 interface Comment {
   id: number;
+  databaseId?: string;
   author: string;
   authorId?: string;
   authorAvatar?: string | null;
@@ -4899,6 +4900,8 @@ export default function App() {
     INITIAL_POSTS.filter((p) => p.category === "forsale"),
   );
   const [commentDraft, setCommentDraft] = useState<Record<number, string>>({});
+  const [commentBusy, setCommentBusy] = useState<Record<number, boolean>>({});
+  const [commentError, setCommentError] = useState<Record<number, string>>({});
   const [notifOpen, setNotifOpen] = useState(false);
   const [messagesOpen, setMessagesOpen] = useState(false);
   const [messageRecipient, setMessageRecipient] = useState<MessageContact | null>(null);
@@ -5533,7 +5536,26 @@ export default function App() {
       return;
     }
 
-    const authorIds = [...new Set(pageRows.map((row: any) => row.author_id).filter(Boolean))];
+    const postIds = pageRows.map((row: any) => row.id);
+    const commentsResult = await supabase
+      .from("post_comments")
+      .select("id, post_id, author_id, body, created_at")
+      .in("post_id", postIds)
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true });
+    if (commentsResult.error) {
+      console.error("Could not load post comments", commentsResult.error);
+      setMorePostsError("Comments could not be loaded. Please try again.");
+      setLoadingMorePosts(false);
+      return;
+    }
+
+    const authorIds = [
+      ...new Set([
+        ...pageRows.map((row: any) => row.author_id),
+        ...(commentsResult.data || []).map((comment: any) => comment.author_id),
+      ].filter(Boolean)),
+    ];
     const [profilesResult, businessesResult] = await Promise.all([
       supabase.from("profiles").select("id, full_name, city, neighborhood, avatar_url, account_type").in("id", authorIds),
       supabase.from("business_profiles").select("user_id, business_name, city, neighborhood, logo_url").in("user_id", authorIds),
@@ -5547,6 +5569,32 @@ export default function App() {
 
     const profiles = new Map((profilesResult.data || []).map((profile: any) => [profile.id, profile]));
     const businesses = new Map((businessesResult.data || []).map((business: any) => [business.user_id, business]));
+    const commentsByPost = new Map<string, Comment[]>();
+    (commentsResult.data || []).forEach((comment: any, index: number) => {
+      const profile: any = profiles.get(comment.author_id);
+      const business: any = businesses.get(comment.author_id);
+      const isBusiness = profile?.account_type === "business" || Boolean(business);
+      const created = new Date(comment.created_at);
+      const mappedComment: Comment = {
+        id: created.getTime() + index,
+        databaseId: comment.id,
+        author: isBusiness
+          ? business?.business_name || profile?.full_name || "Local Business"
+          : profile?.full_name || "Neighbor",
+        authorId: comment.author_id,
+        authorAvatar: isBusiness
+          ? business?.logo_url || profile?.avatar_url || null
+          : profile?.avatar_url || null,
+        authorBadges: [],
+        body: comment.body,
+        time: formatMessageTime(comment.created_at),
+        likes: 0,
+      };
+      commentsByPost.set(comment.post_id, [
+        ...(commentsByPost.get(comment.post_id) || []),
+        mappedComment,
+      ]);
+    });
     const loaded: Post[] = pageRows.map((row: any, index: number) => {
       const profile: any = profiles.get(row.author_id);
       const business: any = businesses.get(row.author_id);
@@ -5567,7 +5615,7 @@ export default function App() {
         body: row.content,
         image: row.image_url || undefined,
         likes: 0,
-        comments: [],
+        comments: commentsByPost.get(row.id) || [],
         bookmarked: false,
         liked: false,
       };
@@ -6057,32 +6105,59 @@ export default function App() {
       setPostCreateBusy(false);
     }
   }
-  function submitComment(postId: number) {
+  async function submitComment(postId: number) {
+    if (commentBusy[postId]) return;
     const text = (commentDraft[postId] || "").trim();
     if (!text) return;
-    setPosts((prev) =>
-      prev.map((p) =>
-        p.id === postId
-          ? {
-              ...p,
-              comments: [
-                ...p.comments,
-                {
-                  id: Date.now(),
-                  author: commentAuthorName,
-                  authorId: currentProfile?.id,
-                  authorAvatar: myAvatarUrl,
-                  authorBadges: [],
-                  body: text,
-                  time: "Just now",
-                  likes: 0,
-                },
-              ],
-            }
-          : p,
-      ),
-    );
-    setCommentDraft((prev) => ({ ...prev, [postId]: "" }));
+    const post = posts.find((candidate) => candidate.id === postId);
+    if (!post?.databaseId) {
+      setCommentError((prev) => ({ ...prev, [postId]: "This sample post cannot accept comments." }));
+      return;
+    }
+
+    setCommentBusy((prev) => ({ ...prev, [postId]: true }));
+    setCommentError((prev) => ({ ...prev, [postId]: "" }));
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        setCommentError((prev) => ({ ...prev, [postId]: "Your session expired. Please sign in again." }));
+        return;
+      }
+
+      const { data: saved, error } = await supabase
+        .from("post_comments")
+        .insert({ post_id: post.databaseId, author_id: user.id, body: text })
+        .select("id, created_at")
+        .single();
+      if (error) {
+        console.error("Could not save comment", error);
+        setCommentError((prev) => ({ ...prev, [postId]: "Your comment could not be saved. Please try again." }));
+        return;
+      }
+
+      const newComment: Comment = {
+        id: new Date(saved.created_at).getTime(),
+        databaseId: saved.id,
+        author: commentAuthorName,
+        authorId: user.id,
+        authorAvatar: myAvatarUrl,
+        authorBadges: [],
+        body: text,
+        time: "Just now",
+        likes: 0,
+      };
+      setPosts((prev) => prev.map((candidate) =>
+        candidate.id === postId
+          ? { ...candidate, comments: [...candidate.comments, newComment] }
+          : candidate,
+      ));
+      setCommentDraft((prev) => ({ ...prev, [postId]: "" }));
+    } catch (unexpectedError) {
+      console.error("Unexpected error while saving comment", unexpectedError);
+      setCommentError((prev) => ({ ...prev, [postId]: "Something went wrong. Please try again." }));
+    } finally {
+      setCommentBusy((prev) => ({ ...prev, [postId]: false }));
+    }
   }
 
   return (
@@ -6662,18 +6737,24 @@ export default function App() {
                           }
                           onKeyDown={(e) =>
                             e.key === "Enter" &&
-                            submitComment(post.id)
+                            void submitComment(post.id)
                           }
+                          disabled={commentBusy[post.id]}
                           className="flex-1 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none"
                         />
                         <button
-                          onClick={() => submitComment(post.id)}
-                          className="text-blue-600 hover:text-blue-600/70 transition-colors"
+                          onClick={() => { void submitComment(post.id); }}
+                          disabled={commentBusy[post.id] || !(commentDraft[post.id] || "").trim()}
+                          aria-label={commentBusy[post.id] ? "Saving comment" : "Post comment"}
+                          className="text-blue-600 hover:text-blue-600/70 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           <Send size={14} />
                         </button>
                       </div>
                     </div>
+                    {commentError[post.id] && (
+                      <p className="ml-10 mt-2 text-xs text-red-600" role="alert">{commentError[post.id]}</p>
+                    )}
                   </div>
                 )}
               </article>
