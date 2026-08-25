@@ -283,8 +283,14 @@ interface Comment {
   authorAvatar?: string | null;
   authorBadges: UserBadgeType[];
   body: string;
+  image?: string;
   time: string;
   likes: number;
+}
+
+interface CommentImageDraft {
+  file: File;
+  previewUrl: string;
 }
 interface Post {
   id: number;
@@ -4915,6 +4921,14 @@ function LegacyMessagingModal({
 
 type ActiveTab = "all" | PostCategory;
 const POST_PAGE_SIZE = 25;
+const COMMENT_IMAGE_MAX_BYTES = 6 * 1024 * 1024;
+const COMMENT_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+const COMMENT_IMAGE_EXTENSIONS: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/gif": "gif",
+};
 
 export default function App() {
   const location = useLocation();
@@ -4937,6 +4951,10 @@ export default function App() {
     INITIAL_POSTS.filter((p) => p.category === "forsale"),
   );
   const [commentDraft, setCommentDraft] = useState<Record<number, string>>({});
+  const [commentImageDraft, setCommentImageDraft] = useState<Record<number, CommentImageDraft>>({});
+  const commentImageDraftRef = useRef<Record<number, CommentImageDraft>>({});
+  const commentImageInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
+  const commentPreviewUrlsRef = useRef<Set<string>>(new Set());
   const [commentBusy, setCommentBusy] = useState<Record<number, boolean>>({});
   const [commentError, setCommentError] = useState<Record<number, string>>({});
   const [notifOpen, setNotifOpen] = useState(false);
@@ -4989,6 +5007,15 @@ export default function App() {
   const commentAuthorName = currentAccountType === "business"
     ? currentBusiness?.name || currentProfile?.name || "Neighbor"
     : currentProfile?.name || "Neighbor";
+
+  useEffect(() => {
+    return () => {
+      commentPreviewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      commentPreviewUrlsRef.current.clear();
+      commentImageDraftRef.current = {};
+    };
+  }, []);
+
   const homeLocation = canonicalLocation(currentBusiness?.city || currentProfile?.city);
   const homeArea = neighborhoodLocationValue(homeLocation, currentProfile?.neighborhood);
   const selectedArea = selectedLocationParts(activeLocation);
@@ -5576,7 +5603,7 @@ export default function App() {
     const postIds = pageRows.map((row: any) => row.id);
     const commentsResult = await supabase
       .from("post_comments")
-      .select("id, post_id, author_id, body, created_at")
+      .select("id, post_id, author_id, body, image_path, created_at")
       .in("post_id", postIds)
       .order("created_at", { ascending: true })
       .order("id", { ascending: true });
@@ -5624,6 +5651,9 @@ export default function App() {
           : profile?.avatar_url || null,
         authorBadges: [],
         body: comment.body,
+        image: comment.image_path
+          ? supabase.storage.from("neighborly-media").getPublicUrl(comment.image_path).data.publicUrl
+          : undefined,
         time: formatMessageTime(comment.created_at),
         likes: 0,
       };
@@ -6142,10 +6172,53 @@ export default function App() {
       setPostCreateBusy(false);
     }
   }
+  function clearCommentImage(postId: number) {
+    const current = commentImageDraftRef.current[postId];
+    if (current) {
+      URL.revokeObjectURL(current.previewUrl);
+      commentPreviewUrlsRef.current.delete(current.previewUrl);
+      delete commentImageDraftRef.current[postId];
+    }
+    setCommentImageDraft((previous) => {
+      const next = { ...previous };
+      delete next[postId];
+      return next;
+    });
+    const input = commentImageInputRefs.current[postId];
+    if (input) input.value = "";
+  }
+
+  function chooseCommentImage(postId: number, file: File | null) {
+    clearCommentImage(postId);
+    if (!file) return;
+    if (!COMMENT_IMAGE_TYPES.has(file.type)) {
+      setCommentError((previous) => ({
+        ...previous,
+        [postId]: "Please choose a JPG, PNG, WebP, or GIF image.",
+      }));
+      return;
+    }
+    if (file.size > COMMENT_IMAGE_MAX_BYTES) {
+      setCommentError((previous) => ({
+        ...previous,
+        [postId]: "That photo is larger than 6 MB. Please choose a smaller image.",
+      }));
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+    const draft = { file, previewUrl };
+    commentPreviewUrlsRef.current.add(previewUrl);
+    commentImageDraftRef.current[postId] = draft;
+    setCommentImageDraft((previous) => ({ ...previous, [postId]: draft }));
+    setCommentError((previous) => ({ ...previous, [postId]: "" }));
+  }
+
   async function submitComment(postId: number) {
     if (commentBusy[postId]) return;
     const text = (commentDraft[postId] || "").trim();
-    if (!text) return;
+    const imageDraft = commentImageDraftRef.current[postId];
+    if (!text && !imageDraft) return;
     const post = posts.find((candidate) => candidate.id === postId);
     if (!post?.databaseId) {
       setCommentError((prev) => ({ ...prev, [postId]: "This sample post cannot accept comments." }));
@@ -6154,6 +6227,8 @@ export default function App() {
 
     setCommentBusy((prev) => ({ ...prev, [postId]: true }));
     setCommentError((prev) => ({ ...prev, [postId]: "" }));
+    let uploadedPath: string | null = null;
+    let commentSaved = false;
     try {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError || !user) {
@@ -6161,16 +6236,44 @@ export default function App() {
         return;
       }
 
+      if (imageDraft) {
+        const extension = COMMENT_IMAGE_EXTENSIONS[imageDraft.file.type];
+        const uniqueName = Math.random().toString(36).slice(2) || "photo";
+        uploadedPath = `${user.id}/comments/${post.databaseId}/${Date.now()}-${uniqueName}.${extension}`;
+        const { error: uploadError } = await supabase.storage
+          .from("neighborly-media")
+          .upload(uploadedPath, imageDraft.file, {
+            cacheControl: "3600",
+            contentType: imageDraft.file.type,
+            upsert: false,
+          });
+        if (uploadError) {
+          console.error("Could not upload comment photo", uploadError);
+          setCommentError((prev) => ({ ...prev, [postId]: "Your photo could not be uploaded. Please try again." }));
+          return;
+        }
+      }
+
       const { data: saved, error } = await supabase
         .from("post_comments")
-        .insert({ post_id: post.databaseId, author_id: user.id, body: text })
-        .select("id, created_at")
+        .insert({
+          post_id: post.databaseId,
+          author_id: user.id,
+          body: text,
+          image_path: uploadedPath,
+        })
+        .select("id, created_at, image_path")
         .single();
       if (error) {
+        if (uploadedPath) {
+          await supabase.storage.from("neighborly-media").remove([uploadedPath]);
+          uploadedPath = null;
+        }
         console.error("Could not save comment", error);
         setCommentError((prev) => ({ ...prev, [postId]: "Your comment could not be saved. Please try again." }));
         return;
       }
+      commentSaved = true;
 
       const newComment: Comment = {
         id: new Date(saved.created_at).getTime(),
@@ -6180,6 +6283,9 @@ export default function App() {
         authorAvatar: myAvatarUrl,
         authorBadges: [],
         body: text,
+        image: saved.image_path
+          ? supabase.storage.from("neighborly-media").getPublicUrl(saved.image_path).data.publicUrl
+          : undefined,
         time: "Just now",
         likes: 0,
       };
@@ -6189,7 +6295,11 @@ export default function App() {
           : candidate,
       ));
       setCommentDraft((prev) => ({ ...prev, [postId]: "" }));
+      clearCommentImage(postId);
     } catch (unexpectedError) {
+      if (uploadedPath && !commentSaved) {
+        await supabase.storage.from("neighborly-media").remove([uploadedPath]);
+      }
       console.error("Unexpected error while saving comment", unexpectedError);
       setCommentError((prev) => ({ ...prev, [postId]: "Something went wrong. Please try again." }));
     } finally {
@@ -6753,41 +6863,102 @@ export default function App() {
                                 {c.time}
                               </span>
                             </div>
-                            <p className="text-sm text-foreground/85 mt-0.5">
-                              {c.body}
-                            </p>
+                            {c.body && (
+                              <p className="text-sm text-foreground/85 mt-0.5">
+                                {c.body}
+                              </p>
+                            )}
+                            {c.image && (
+                              <ExpandablePhoto
+                                src={c.image}
+                                alt={`Photo shared by ${c.author}`}
+                                buttonClassName="mt-2 block w-full max-w-lg cursor-zoom-in overflow-hidden rounded-lg border border-border bg-muted"
+                                imageClassName="max-h-80 w-full object-cover"
+                              />
+                            )}
                           </div>
                         </div>
                       ))}
                     </div>
-                    <div className="flex gap-2.5 items-center">
-                      <Avatar name={commentAuthorName} size="sm" src={myAvatarUrl} />
-                      <div className="flex-1 flex items-center gap-2 bg-card rounded-lg border border-border px-3 py-2 focus-within:border-blue-600/40 transition-colors">
-                        <input
-                          type="text"
-                          placeholder="Write a comment..."
-                          value={commentDraft[post.id] || ""}
-                          onChange={(e) =>
-                            setCommentDraft((prev) => ({
-                              ...prev,
-                              [post.id]: e.target.value,
-                            }))
-                          }
-                          onKeyDown={(e) =>
-                            e.key === "Enter" &&
-                            void submitComment(post.id)
-                          }
-                          disabled={commentBusy[post.id]}
-                          className="flex-1 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none"
-                        />
-                        <button
-                          onClick={() => { void submitComment(post.id); }}
-                          disabled={commentBusy[post.id] || !(commentDraft[post.id] || "").trim()}
-                          aria-label={commentBusy[post.id] ? "Saving comment" : "Post comment"}
-                          className="text-blue-600 hover:text-blue-600/70 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          <Send size={14} />
-                        </button>
+                    <div className="flex gap-2.5 items-start">
+                      <div className="mt-1">
+                        <Avatar name={commentAuthorName} size="sm" src={myAvatarUrl} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 transition-colors focus-within:border-blue-600/40">
+                          <input
+                            type="text"
+                            maxLength={2000}
+                            placeholder="Write a comment or add a photo..."
+                            value={commentDraft[post.id] || ""}
+                            onChange={(e) =>
+                              setCommentDraft((prev) => ({
+                                ...prev,
+                                [post.id]: e.target.value,
+                              }))
+                            }
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                void submitComment(post.id);
+                              }
+                            }}
+                            disabled={commentBusy[post.id]}
+                            className="min-w-0 flex-1 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none"
+                          />
+                          <input
+                            ref={(element) => {
+                              commentImageInputRefs.current[post.id] = element;
+                            }}
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp,image/gif"
+                            className="hidden"
+                            disabled={commentBusy[post.id]}
+                            onChange={(event) => {
+                              chooseCommentImage(post.id, event.target.files?.[0] || null);
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => commentImageInputRefs.current[post.id]?.click()}
+                            disabled={commentBusy[post.id]}
+                            aria-label="Add a photo to this comment"
+                            title="Add photo"
+                            className="text-muted-foreground transition-colors hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            <Camera size={16} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { void submitComment(post.id); }}
+                            disabled={
+                              commentBusy[post.id]
+                              || (!(commentDraft[post.id] || "").trim() && !commentImageDraft[post.id])
+                            }
+                            aria-label={commentBusy[post.id] ? "Saving comment" : "Post comment"}
+                            className="text-blue-600 transition-colors hover:text-blue-600/70 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            <Send size={14} />
+                          </button>
+                        </div>
+                        {commentImageDraft[post.id] && (
+                          <div className="relative mt-2 w-fit max-w-full">
+                            <img
+                              src={commentImageDraft[post.id].previewUrl}
+                              alt="Selected comment photo preview"
+                              className="max-h-40 max-w-full rounded-lg border border-border object-cover"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => clearCommentImage(post.id)}
+                              disabled={commentBusy[post.id]}
+                              aria-label="Remove comment photo"
+                              className="absolute right-1 top-1 rounded-full bg-black/70 p-1 text-white disabled:opacity-50"
+                            >
+                              <X size={13} />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                     {commentError[post.id] && (
