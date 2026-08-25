@@ -278,6 +278,8 @@ type ActiveView =
 interface Comment {
   id: number;
   author: string;
+  authorId?: string;
+  authorAvatar?: string | null;
   authorBadges: UserBadgeType[];
   body: string;
   time: string;
@@ -4944,6 +4946,9 @@ export default function App() {
   const [weather, setWeather] = useState<WeatherSnapshot>(INITIAL_WEATHER);
   const [groups, setGroups] = useState<CommunityGroup[]>([]);
 
+  const commentAuthorName = currentAccountType === "business"
+    ? currentBusiness?.name || currentProfile?.name || "Neighbor"
+    : currentProfile?.name || "Neighbor";
   const homeLocation = canonicalLocation(currentBusiness?.city || currentProfile?.city);
   const homeArea = neighborhoodLocationValue(homeLocation, currentProfile?.neighborhood);
   const selectedArea = selectedLocationParts(activeLocation);
@@ -6064,7 +6069,9 @@ export default function App() {
                 ...p.comments,
                 {
                   id: Date.now(),
-                  author: "You",
+                  author: commentAuthorName,
+                  authorId: currentProfile?.id,
+                  authorAvatar: myAvatarUrl,
                   authorBadges: [],
                   body: text,
                   time: "Just now",
@@ -6601,15 +6608,20 @@ export default function App() {
                           className="flex gap-2.5"
                         >
                           <button
-                            onClick={() => goToUser(c.author)}
+                            onClick={() => goToUser(c.author, c.authorId)}
+                            aria-label={`View ${c.author}'s profile`}
                           >
-                            <Avatar name={c.author} size="sm" />
+                            <Avatar
+                              name={c.author}
+                              size="sm"
+                              src={c.authorId === currentProfile?.id ? myAvatarUrl : c.authorAvatar}
+                            />
                           </button>
                           <div className="flex-1 bg-card rounded-lg px-3 py-2 border border-border">
                             <div className="flex items-center gap-2 flex-wrap">
                               <button
                                 onClick={() =>
-                                  goToUser(c.author)
+                                  goToUser(c.author, c.authorId)
                                 }
                                 className="text-sm font-semibold hover:text-blue-600 transition-colors"
                               >
@@ -6636,7 +6648,7 @@ export default function App() {
                       ))}
                     </div>
                     <div className="flex gap-2.5 items-center">
-                      <Avatar name="Maria Santos" size="sm" src={myAvatarUrl} />
+                      <Avatar name={commentAuthorName} size="sm" src={myAvatarUrl} />
                       <div className="flex-1 flex items-center gap-2 bg-card rounded-lg border border-border px-3 py-2 focus-within:border-blue-600/40 transition-colors">
                         <input
                           type="text"
