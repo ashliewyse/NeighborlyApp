@@ -1110,6 +1110,42 @@ function Avatar({
   );
 }
 
+function ExpandablePhoto({
+  src,
+  alt,
+  imageClassName,
+  buttonClassName = "block cursor-zoom-in",
+}: {
+  src: string;
+  alt: string;
+  imageClassName: string;
+  buttonClassName?: string;
+}) {
+  return (
+    <Dialog.Root>
+      <Dialog.Trigger asChild>
+        <button type="button" className={buttonClassName} aria-label={`View ${alt} full size`}>
+          <img src={src} alt={alt} className={imageClassName} />
+        </button>
+      </Dialog.Trigger>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm" />
+        <Dialog.Content
+          className="fixed inset-0 z-[101] flex items-center justify-center p-3 outline-none sm:p-8"
+          aria-describedby={undefined}
+        >
+          <Dialog.Title className="sr-only">{alt}</Dialog.Title>
+          <Dialog.Close tabIndex={-1} className="absolute inset-0 cursor-zoom-out" aria-label="Close full-size photo" />
+          <img src={src} alt={alt} className="relative z-10 max-h-[calc(100dvh-1.5rem)] max-w-[calc(100vw-1.5rem)] object-contain sm:max-h-[calc(100dvh-4rem)] sm:max-w-[calc(100vw-4rem)]" />
+          <Dialog.Close className="absolute right-3 top-[max(0.75rem,env(safe-area-inset-top))] z-20 inline-flex items-center gap-1.5 rounded-full bg-black/70 px-3 py-2 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-black sm:right-6 sm:top-6" aria-label="Close full-size photo">
+            <X size={18} /> Close
+          </Dialog.Close>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
+
 function BizBadgePill({ type }: { type: BusinessBadgeType }) {
   const m = BIZ_BADGE_META[type];
   return (
@@ -1321,7 +1357,7 @@ function ProfilePostsFeed({ profileName, profileType, profileOwnerId }: { profil
   }, [profileName, profileType, profileOwnerId]);
   if (loading) return <div className="bg-white rounded-xl border border-border p-6 text-sm text-muted-foreground">Loading posts…</div>;
   if (!items.length) return <div className="bg-white rounded-xl border border-border p-6"><h3 className="font-semibold text-lg mb-2">Posts</h3><p className="text-sm text-muted-foreground">No posts from {profileName} yet.</p></div>;
-  return <div className="space-y-4">{items.map((post:any) => <div key={post.id} className="bg-white rounded-xl border border-border p-4 sm:p-5"><div className="font-semibold mb-1">{profileName}</div><div className="text-xs text-muted-foreground mb-3">{new Date(post.created_at).toLocaleDateString()}</div><p className="text-sm sm:text-base whitespace-pre-wrap">{post.content}</p>{post.image_url && <img src={post.image_url} alt="Post" className="mt-3 w-full max-h-[480px] object-cover rounded-lg" />}</div>)}</div>;
+  return <div className="space-y-4">{items.map((post:any) => <div key={post.id} className="bg-white rounded-xl border border-border p-4 sm:p-5"><div className="font-semibold mb-1">{profileName}</div><div className="text-xs text-muted-foreground mb-3">{new Date(post.created_at).toLocaleDateString()}</div><p className="text-sm sm:text-base whitespace-pre-wrap">{post.content}</p>{post.image_url && <div className="mt-3 flex max-h-[72vh] justify-center overflow-hidden rounded-lg bg-muted"><ExpandablePhoto src={post.image_url} alt={`${profileName}'s post photo`} buttonClassName="flex max-h-[72vh] max-w-full cursor-zoom-in justify-center" imageClassName="max-h-[72vh] max-w-full object-contain" /></div>}</div>)}</div>;
 }
 
 function BusinessProfileView({
@@ -1730,12 +1766,13 @@ function BusinessProfileView({
                   key={i}
                   className="relative group overflow-hidden rounded-xl bg-muted aspect-[4/3]"
                 >
-                  <img
+                  <ExpandablePhoto
                     src={photo.url}
                     alt={photo.alt}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    buttonClassName="h-full w-full cursor-zoom-in"
+                    imageClassName="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                   />
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                  <div className="pointer-events-none absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
                     <Eye
                       size={20}
                       className="text-white opacity-0 group-hover:opacity-100 transition-opacity"
@@ -2870,7 +2907,7 @@ function UserProfileView({
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {gallery.map((p, i) => (
                 <div key={i} className="relative group aspect-[4/3] rounded-xl overflow-hidden bg-muted">
-                  <img src={p.url} alt={p.alt} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                  <ExpandablePhoto src={p.url} alt={p.alt} buttonClassName="h-full w-full cursor-zoom-in" imageClassName="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
                 </div>
               ))}
               <label className="aspect-[4/3] rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:border-primary/40 transition-colors text-muted-foreground">
@@ -3511,7 +3548,7 @@ function HelpWantedView({
                 <PostOwnerMenu post={post} currentUserId={currentUserId} busy={busyPostId === post.databaseId} onEdit={onEdit} onDelete={onDelete} />
               </div>
               <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground/85">{post.body}</p>
-              {post.image && <img src={post.image} alt="Help wanted post" className="mt-3 max-h-72 w-full rounded-xl object-cover" />}
+              {post.image && <ExpandablePhoto src={post.image} alt="Help wanted post photo" buttonClassName="mt-3 flex max-h-72 w-full cursor-zoom-in justify-center overflow-hidden rounded-xl bg-muted" imageClassName="max-h-72 max-w-full object-contain" />}
               <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-3">
                 <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700"><HandHeart size={12} /> Help Wanted</span>
                 <button
@@ -3596,7 +3633,7 @@ function ClassifiedsView({
           filtered.map((post) => (
             <div key={post.id} className="bg-card rounded-xl border border-border overflow-hidden hover:border-primary/30 transition-colors">
               {post.image && (
-                <img src={post.image} alt={post.title} className="w-full h-40 object-cover" />
+                <ExpandablePhoto src={post.image} alt={post.title || "Classified listing photo"} buttonClassName="block h-40 w-full cursor-zoom-in overflow-hidden bg-muted" imageClassName="h-full w-full object-cover" />
               )}
               <div className="p-4">
                 <div className="flex items-start gap-3">
@@ -6599,11 +6636,12 @@ export default function App() {
                   </div>
                 </div>
                 {post.image && (
-                  <div className="bg-muted">
-                    <img
+                  <div className="bg-muted lg:flex lg:max-h-[72vh] lg:justify-center lg:overflow-hidden">
+                    <ExpandablePhoto
                       src={post.image}
                       alt={post.title || "Post image"}
-                      className="w-full object-cover max-h-64"
+                      buttonClassName="flex max-h-64 w-full cursor-zoom-in justify-center overflow-hidden lg:max-h-[72vh] lg:w-auto lg:max-w-full"
+                      imageClassName="max-h-64 w-full object-cover lg:h-auto lg:max-h-[72vh] lg:w-auto lg:max-w-full lg:object-contain"
                     />
                   </div>
                 )}
