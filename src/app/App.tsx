@@ -6801,18 +6801,14 @@ export default function App() {
                   </button>
                 </div>
 
-                <div className="px-4 pb-3 flex items-center gap-1 border-t border-border pt-2">
+                <div className="grid grid-cols-4 items-center gap-0.5 border-t border-border px-2 pb-3 pt-2 sm:gap-1 sm:px-4">
                   <button
                     onClick={() => toggleLike(post.id)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex-1 justify-center ${post.liked ? "bg-blue-600/10 text-blue-600" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}
+                    className={`flex min-w-0 items-center justify-center gap-1 rounded-lg px-1 py-1.5 text-xs font-medium transition-colors sm:gap-1.5 sm:px-3 sm:text-sm ${post.liked ? "bg-blue-600/10 text-blue-600" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}
                   >
                     <Heart
                       size={14}
-                      className={
-                        post.liked
-                          ? "fill-blue-600 text-blue-600"
-                          : ""
-                      }
+                      className={`shrink-0 ${post.liked ? "fill-blue-600 text-blue-600" : ""}`}
                     />
                     {post.liked ? "Liked" : "Like"}
                   </button>
@@ -6820,27 +6816,23 @@ export default function App() {
                     onClick={() =>
                       setExpandedPost(expanded ? null : post.id)
                     }
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors flex-1 justify-center"
+                    className="flex min-w-0 items-center justify-center gap-1 rounded-lg px-1 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground sm:gap-1.5 sm:px-3 sm:text-sm"
                   >
-                    <MessageCircle size={14} />
+                    <MessageCircle size={14} className="shrink-0" />
                     Comment
                   </button>
                   <button
                     onClick={() => toggleBookmark(post.id)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex-1 justify-center ${post.bookmarked ? "bg-amber-50 text-amber-700" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}
+                    className={`flex min-w-0 items-center justify-center gap-1 rounded-lg px-1 py-1.5 text-xs font-medium transition-colors sm:gap-1.5 sm:px-3 sm:text-sm ${post.bookmarked ? "bg-amber-50 text-amber-700" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}
                   >
                     <Bookmark
                       size={14}
-                      className={
-                        post.bookmarked
-                          ? "fill-amber-600 text-amber-600"
-                          : ""
-                      }
+                      className={`shrink-0 ${post.bookmarked ? "fill-amber-600 text-amber-600" : ""}`}
                     />
                     Save
                   </button>
-                  <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors flex-1 justify-center">
-                    <Share2 size={14} />
+                  <button className="flex min-w-0 items-center justify-center gap-1 rounded-lg px-1 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground sm:gap-1.5 sm:px-3 sm:text-sm">
+                    <Share2 size={14} className="shrink-0" />
                     Share
                   </button>
                 </div>
