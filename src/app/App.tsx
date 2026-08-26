@@ -4356,7 +4356,7 @@ function AdvertiseModal({
       }
 
       const ext = (adImage.name.split(".").pop() || "jpg").toLowerCase();
-      uploadedPath = `${user.id}/advertising/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      uploadedPath = `${user.id}/business-features/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
       const { error: uploadError } = await supabase.storage
         .from("neighborly-media")
         .upload(uploadedPath, adImage, { upsert: false, contentType: adImage.type });
@@ -4531,14 +4531,14 @@ function AdvertiseModal({
 function AdvertisingSidebarCard({ ad, onAdvertise }: { ad: LiveAdvertisement | null; onAdvertise: () => void }) {
   if (!ad) {
     return (
-      <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl p-4 text-white shadow-sm">
+      <section aria-label="Local business feature" className="min-h-32 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl p-4 text-white shadow-sm">
         <div className="flex items-center gap-2 mb-2">
           <Megaphone size={16} className="text-blue-200" />
-          <h3 className="font-semibold text-sm">Grow Your Business</h3>
+          <h3 className="font-semibold text-sm">Local Business Spotlight</h3>
         </div>
-        <p className="text-xs text-blue-100 mb-3 leading-relaxed">Create a photo ad for local neighbors. Plans start at $15/month.</p>
-        <button onClick={onAdvertise} className="w-full bg-white text-blue-700 font-semibold text-xs py-2 rounded-lg hover:bg-blue-50 transition-colors">Advertise Here</button>
-      </div>
+        <p className="text-xs text-blue-100 mb-3 leading-relaxed">Share your business with local neighbors. Plans start at $15/month.</p>
+        <button onClick={onAdvertise} className="w-full bg-white text-blue-700 font-semibold text-xs py-2 rounded-lg hover:bg-blue-50 transition-colors">Promote Your Business</button>
+      </section>
     );
   }
 
@@ -4546,10 +4546,15 @@ function AdvertisingSidebarCard({ ad, onAdvertise }: { ad: LiveAdvertisement | n
   const contactHref = safeWebsite || (ad.phone ? `tel:${ad.phone.replace(/[^+\d]/g, "")}` : null);
 
   return (
-    <div className="overflow-hidden rounded-xl border border-blue-200 bg-white shadow-sm">
-      <div className="relative">
-        <img src={ad.imageUrl} alt={`${ad.businessName} advertisement`} className="aspect-video w-full object-cover" />
-        <span className="absolute left-2 top-2 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">Sponsored</span>
+    <section aria-label="Local business feature" className="min-h-32 overflow-hidden rounded-xl border border-blue-200 bg-white shadow-sm">
+      <div className="relative min-h-16 bg-gradient-to-br from-blue-50 to-indigo-100">
+        <img
+          src={ad.imageUrl}
+          alt={`${ad.businessName} local business feature`}
+          className="aspect-video w-full object-cover"
+          onError={(event) => { event.currentTarget.style.display = "none"; }}
+        />
+        <span className="absolute left-2 top-2 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">Paid Local Feature</span>
       </div>
       <div className="p-4">
         <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">{ad.businessName}</p>
@@ -4557,12 +4562,12 @@ function AdvertisingSidebarCard({ ad, onAdvertise }: { ad: LiveAdvertisement | n
         <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-muted-foreground">{ad.description}</p>
         {contactHref && (
           <a href={contactHref} target={safeWebsite ? "_blank" : undefined} rel={safeWebsite ? "noreferrer" : undefined} className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg bg-blue-600 py-2 text-xs font-semibold text-white hover:bg-blue-700">
-            Learn More {safeWebsite && <ExternalLink size={12} />}
+            Contact Business {safeWebsite && <ExternalLink size={12} />}
           </a>
         )}
-        <button onClick={onAdvertise} className="mt-2 w-full text-center text-[11px] font-semibold text-blue-600 hover:underline">Advertise Here</button>
+        <button onClick={onAdvertise} className="mt-2 w-full text-center text-[11px] font-semibold text-blue-600 hover:underline">Promote Your Business</button>
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -7099,7 +7104,7 @@ export default function App() {
           {/* Weather */}
           <WeatherCard locationName={browsingLocation} weather={weather} />
 
-          {/* Grow Your Business */}
+          {/* Local business feature */}
           <AdvertisingSidebarCard ad={activeAdvertisement} onAdvertise={() => setAdvertiseOpen(true)} />
 
           {isSiteAdmin && (
