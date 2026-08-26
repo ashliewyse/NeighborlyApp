@@ -10,7 +10,7 @@ import {
   CreateGroupDialog,
 } from "@/app/components/CommunitySidebar";
 import { MessagingModal } from "@/app/components/MessagingModal";
-import { supabase } from "@/lib/supabase";
+import { publicSupabase, supabase } from "@/lib/supabase";
 import { ImageWithFallback } from "@/app/components/figma/ImageWithFallback";
 import neighborlyLogo from "@/imports/Copilot_20260807_041314.png";
 import neighborlyAppLogo from "@/imports/watermarked_img_9245041771390677153.jpg";
@@ -5047,7 +5047,7 @@ export default function App() {
     let cancelled = false;
 
     const loadAdvertisements = async () => {
-      const { data, error } = await supabase
+      const { data, error } = await publicSupabase
         .from("advertising_campaigns")
         .select("id, tier, business_name, headline, description, image_url, destination_url, phone, target_city")
         .eq("status", "active")

@@ -24,3 +24,15 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
     detectSessionInUrl: true,
   },
 });
+
+// Active advertisements are intentionally public under RLS. Keeping their
+// reads on an auth-free client prevents a cached mobile session from changing
+// which paid campaigns are visible.
+export const publicSupabase = createClient(supabaseUrl, supabasePublishableKey, {
+  auth: {
+    storageKey: "neighborly-public-advertisements",
+    persistSession: false,
+    autoRefreshToken: false,
+    detectSessionInUrl: false,
+  },
+});
