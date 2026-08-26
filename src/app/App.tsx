@@ -5045,33 +5045,51 @@ export default function App() {
   useEffect(() => {
     if (!authReady) return;
     let cancelled = false;
-    void supabase
-      .from("advertising_campaigns")
-      .select("id, tier, business_name, headline, description, image_url, destination_url, phone, target_city")
-      .eq("status", "active")
-      .eq("billing_status", "paid")
-      .order("created_at", { ascending: false })
-      .limit(25)
-      .then(({ data, error }) => {
-        if (cancelled) return;
-        if (error) {
-          console.error("Could not load advertisements", error);
-          return;
-        }
-        setLiveAdvertisements((data || []).map((row: any) => ({
-          id: row.id,
-          tier: row.tier as AdvertisingTier,
-          businessName: row.business_name,
-          headline: row.headline,
-          description: row.description,
-          imageUrl: row.image_url,
-          destinationUrl: row.destination_url,
-          phone: row.phone,
-          targetCity: row.target_city,
-        })));
-      });
-    return () => { cancelled = true; };
-  }, [authReady]);
+
+    const loadAdvertisements = async () => {
+      const { data, error } = await supabase
+        .from("advertising_campaigns")
+        .select("id, tier, business_name, headline, description, image_url, destination_url, phone, target_city")
+        .eq("status", "active")
+        .eq("billing_status", "paid")
+        .order("created_at", { ascending: false })
+        .limit(25);
+
+      if (cancelled) return;
+      if (error) {
+        console.error("Could not load advertisements", error);
+        return;
+      }
+
+      setLiveAdvertisements((data || []).map((row: any) => ({
+        id: row.id,
+        tier: row.tier as AdvertisingTier,
+        businessName: row.business_name,
+        headline: row.headline,
+        description: row.description,
+        imageUrl: row.image_url,
+        destinationUrl: row.destination_url,
+        phone: row.phone,
+        targetCity: row.target_city,
+      })));
+    };
+
+    const refreshVisibleAdvertisements = () => {
+      if (document.visibilityState === "visible") void loadAdvertisements();
+    };
+
+    void loadAdvertisements();
+    window.addEventListener("focus", refreshVisibleAdvertisements);
+    document.addEventListener("visibilitychange", refreshVisibleAdvertisements);
+    const refreshTimer = window.setInterval(() => { void loadAdvertisements(); }, 60_000);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus", refreshVisibleAdvertisements);
+      document.removeEventListener("visibilitychange", refreshVisibleAdvertisements);
+      window.clearInterval(refreshTimer);
+    };
+  }, [authReady, view.page]);
 
   useEffect(() => {
     if (!authReady) return;
