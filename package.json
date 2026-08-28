@@ -4,9 +4,9 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "prebuild": "node scripts/patch-feed-notifications.mjs",
+    "prebuild": "node scripts/patch-feed-notifications.mjs && node scripts/patch-ad-card-fit.mjs",
     "build": "vite build",
-    "predev": "node scripts/patch-feed-notifications.mjs",
+    "predev": "node scripts/patch-feed-notifications.mjs && node scripts/patch-ad-card-fit.mjs",
     "dev": "vite"
   },
   "dependencies": {
