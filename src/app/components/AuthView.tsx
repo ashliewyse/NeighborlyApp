@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { ChevronLeft, CheckCircle2, Eye, EyeOff, KeyRound, MapPin, ShieldCheck } from "lucide-react";
+import { ChevronLeft, CheckCircle2, Eye, EyeOff, KeyRound, MapPin, Palette, ShieldCheck } from "lucide-react";
+import { Link } from "react-router";
 import { ImageWithFallback } from "@/app/components/figma/ImageWithFallback";
 import { CommunityGuidelines } from "@/app/components/CommunityGuidelines";
 import neighborlyLogo from "@/imports/Copilot_20260807_041314.png";
@@ -7,6 +8,12 @@ import { supabase } from "@/lib/supabase";
 
 type AuthMode = "signin" | "signup";
 type AuthScreen = "form" | "forgot" | "recovery";
+
+const PROFILE_THEME_OPTIONS = [
+  { id: "classic-blue", label: "Classic Blue", swatch: "bg-blue-600", cover: "from-blue-700 to-sky-400", button: "bg-blue-600", soft: "bg-blue-50", border: "border-blue-200", text: "text-blue-700" },
+  { id: "purple", label: "Purple", swatch: "bg-purple-600", cover: "from-purple-800 to-fuchsia-500", button: "bg-purple-600", soft: "bg-purple-50", border: "border-purple-200", text: "text-purple-700" },
+  { id: "teal", label: "Teal", swatch: "bg-teal-600", cover: "from-teal-700 to-cyan-400", button: "bg-teal-600", soft: "bg-teal-50", border: "border-teal-200", text: "text-teal-700" },
+] as const;
 
 interface AuthViewProps {
   mode: AuthMode;
@@ -73,7 +80,7 @@ export function AuthView({ mode, initialScreen = "form", onSwitchMode, onSuccess
   const [zipCode, setZipCode] = useState("");
   const [neighborhood, setNeighborhood] = useState("");
   const [bio, setBio] = useState("");
-  const [theme, setTheme] = useState("classic-blue");
+  const [theme, setTheme] = useState<(typeof PROFILE_THEME_OPTIONS)[number]["id"]>("classic-blue");
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
 
@@ -239,28 +246,38 @@ export function AuthView({ mode, initialScreen = "form", onSwitchMode, onSuccess
 
   const inputClass = "w-full bg-muted rounded-lg px-3 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-blue-600/30 border border-transparent focus:border-blue-600/20";
   const labelClass = "text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1";
+  const selectedTheme = PROFILE_THEME_OPTIONS.find((option) => option.id === theme) || PROFILE_THEME_OPTIONS[0];
+  const previewName = accountType === "business" ? businessName.trim() || "Your Business" : fullName.trim() || "Your Name";
+  const previewLocation = [neighborhood.trim(), city.trim()].filter(Boolean).join(", ") || "Your neighborhood";
+  const previewBio = accountType === "business"
+    ? businessDescription.trim() || "A short description of your business will appear here."
+    : bio.trim() || "A short introduction will help neighbors get to know you.";
+  const previewInitials = previewName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "N";
 
   return (
-    <div className="min-h-screen bg-purple-950 flex items-center justify-center p-4 font-['DM_Sans',sans-serif]">
-      <div className="max-w-lg w-full bg-white rounded-2xl border border-border p-6 sm:p-8 shadow-xl">
+    <div className="min-h-screen bg-gradient-to-b from-purple-950 via-purple-900 to-slate-950 flex items-center justify-center p-4 font-['DM_Sans',sans-serif]">
+      <div className={`${mode === "signup" && screen === "form" && step === 2 ? "max-w-2xl" : "max-w-lg"} w-full bg-white rounded-2xl border border-border p-6 sm:p-8 shadow-xl transition-[max-width]`}>
+        <Link to="/" className="mb-5 inline-flex items-center gap-1 text-xs font-semibold text-purple-700 hover:text-purple-900 hover:underline">
+          <ChevronLeft size={14} /> Back to the Neighborly welcome page
+        </Link>
         <div className="text-center mb-6">
           <div className="w-36 mx-auto mb-4">
             <ImageWithFallback src={neighborlyLogo} alt="Neighborly App" className="w-full h-auto object-contain" />
           </div>
           <h1 className="font-['Playfair_Display',serif] font-bold text-2xl text-foreground">
-            {screen === "forgot" ? "Reset your password" : screen === "recovery" ? "Choose a new password" : mode === "signin" ? "Welcome back" : "Request Neighborly access"}
+            {screen === "forgot" ? "Reset your password" : screen === "recovery" ? "Choose a new password" : mode === "signin" ? "Welcome back to Neighborly" : "Join the Neighborly beta"}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {screen === "forgot" ? "We'll email a secure reset link to your registered address." : screen === "recovery" ? "Create a new password for your Neighborly account." : mode === "signin" ? "Sign in to your Neighborly account" : "Neighborly is invite-only during testing. Create your profile to request approval."}
+            {screen === "forgot" ? "We'll email a secure reset link to your registered address." : screen === "recovery" ? "Create a new password for your Neighborly account." : mode === "signin" ? "Sign in to connect with your local community or check your approval status." : "Create your profile and request access. You can change your profile details later."}
           </p>
         </div>
 
         {mode === "signup" && screen === "form" && (
           <div className="mb-5">
             <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground mb-2">
-              <span className={step >= 1 ? "text-blue-600" : ""}>1 Account</span>
+              <span className={step >= 1 ? "text-blue-600" : ""}>1 Create Login</span>
               <div className="h-px flex-1 bg-border" />
-              <span className={step >= 2 ? "text-blue-600" : ""}>2 Profile & Rules</span>
+              <span className={step >= 2 ? "text-blue-600" : ""}>2 Build Profile</span>
             </div>
             <div className="h-1.5 rounded-full bg-muted overflow-hidden">
               <div className="h-full bg-blue-600 transition-all" style={{ width: step === 1 ? "50%" : "100%" }} />
@@ -298,6 +315,9 @@ export function AuthView({ mode, initialScreen = "form", onSwitchMode, onSuccess
             </>
           ) : mode === "signin" ? (
             <>
+              <div className="rounded-xl border border-purple-100 bg-purple-50 px-4 py-3 text-sm leading-5 text-purple-950">
+                Approved members can enter Neighborly here. If you recently requested access, sign in to check your approval status.
+              </div>
               <div>
                 <label className={labelClass}>Email</label>
                 <input className={inputClass} type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" />
@@ -320,6 +340,9 @@ export function AuthView({ mode, initialScreen = "form", onSwitchMode, onSuccess
             </>
           ) : step === 1 ? (
             <>
+              <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm leading-5 text-blue-950">
+                Requesting access takes about two minutes. After submitting, verify your email and sign in to see when your account is approved.
+              </div>
               <div>
                 <label className={labelClass}>Account Type</label>
                 <p className="text-xs text-muted-foreground mb-2">Choose how you want to use Neighborly.</p>
@@ -358,7 +381,7 @@ export function AuthView({ mode, initialScreen = "form", onSwitchMode, onSuccess
                 }
                 setStep(2);
               }} className="w-full bg-blue-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700">
-                Continue to Profile
+                Continue: Build My Profile
               </button>
             </>
           ) : (
@@ -393,12 +416,45 @@ export function AuthView({ mode, initialScreen = "form", onSwitchMode, onSuccess
                 <textarea className={`${inputClass} min-h-24 resize-none`} value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Tell your neighbors a little about yourself…" maxLength={300} />
                 <p className="text-[11px] text-muted-foreground text-right mt-1">{bio.length}/300</p>
               </div>
-              <div>
-                <label className={labelClass}>Profile Color</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {[{ id: "classic-blue", label: "Classic Blue" }, { id: "purple", label: "Purple" }, { id: "teal", label: "Teal" }].map((t) => (
-                    <button key={t.id} type="button" onClick={() => setTheme(t.id)} className={`rounded-lg border px-2 py-2 text-xs font-medium ${theme === t.id ? "border-blue-600 bg-blue-50 text-blue-700 ring-1 ring-blue-600" : "border-border text-muted-foreground"}`}>{t.label}</button>
-                  ))}
+              <div className="rounded-2xl border border-border bg-slate-50 p-4 sm:p-5">
+                <div className="mb-4 flex items-start gap-2">
+                  <Palette size={18} className="mt-0.5 flex-shrink-0 text-purple-700" />
+                  <div>
+                    <label className={labelClass}>Choose Your Profile Color</label>
+                    <p className="text-xs leading-5 text-muted-foreground">Select a color to see exactly how it will look. You can change it later in Settings.</p>
+                  </div>
+                </div>
+                <div className="grid gap-4 md:grid-cols-[0.9fr_1.1fr] md:items-start">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 md:grid-cols-1">
+                    {PROFILE_THEME_OPTIONS.map((option) => (
+                      <button
+                        key={option.id}
+                        type="button"
+                        aria-pressed={theme === option.id}
+                        onClick={() => setTheme(option.id)}
+                        className={`flex items-center gap-2 rounded-lg border bg-white px-3 py-2.5 text-left text-xs font-semibold transition-all ${theme === option.id ? "border-slate-800 ring-2 ring-slate-800/15" : "border-border text-muted-foreground hover:border-slate-400"}`}
+                      >
+                        <span className={`h-4 w-4 rounded-full ${option.swatch}`} aria-hidden="true" />
+                        <span className="flex-1">{option.label}</span>
+                        {theme === option.id ? <CheckCircle2 size={14} className={option.text} aria-hidden="true" /> : null}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" aria-live="polite" aria-label={`${selectedTheme.label} profile preview`}>
+                    <div className={`h-16 bg-gradient-to-r ${selectedTheme.cover} p-2.5 text-right`}>
+                      <span className="rounded-full bg-black/30 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">Live Preview</span>
+                    </div>
+                    <div className="px-4 pb-4">
+                      <div className="-mt-7 flex items-end justify-between gap-3">
+                        <div className={`flex h-14 w-14 items-center justify-center rounded-full border-4 border-white ${selectedTheme.button} text-sm font-bold text-white shadow-sm`}>{previewInitials}</div>
+                        <span className={`mb-1 rounded-lg px-3 py-1.5 text-[11px] font-semibold text-white ${selectedTheme.button}`}>Message</span>
+                      </div>
+                      <p className="mt-2 truncate text-sm font-bold text-slate-900">{previewName}</p>
+                      <p className={`mt-0.5 flex items-center gap-1 text-[11px] font-medium ${selectedTheme.text}`}><MapPin size={11} /> {previewLocation}</p>
+                      <p className={`mt-3 rounded-lg border p-2.5 text-[11px] leading-4 text-slate-700 ${selectedTheme.soft} ${selectedTheme.border}`}>{previewBio}</p>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -423,7 +479,7 @@ export function AuthView({ mode, initialScreen = "form", onSwitchMode, onSuccess
 
               <div className="flex gap-2">
                 <button onClick={() => { setStep(1); resetMessages(); }} className="px-4 py-2.5 rounded-lg border border-border text-sm font-medium">Back</button>
-                <button disabled={busy || !agreedToGuidelines || (accountType === "business" && (!businessName.trim() || !businessCategory.trim()))} onClick={handleSignUp} className="flex-1 bg-blue-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">{busy ? "Submitting request…" : "Request Access"}</button>
+                <button disabled={busy || !agreedToGuidelines || (accountType === "business" && (!businessName.trim() || !businessCategory.trim()))} onClick={handleSignUp} className="flex-1 bg-blue-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">{busy ? "Submitting request…" : "Send Access Request"}</button>
               </div>
             </>
           )}
@@ -434,9 +490,9 @@ export function AuthView({ mode, initialScreen = "form", onSwitchMode, onSuccess
           {screen === "form" && (
             <div className="text-center mt-2">
               {mode === "signin" ? (
-                <p className="text-sm text-muted-foreground">Don't have an account? <button onClick={() => { onSwitchMode("signup"); setStep(1); resetMessages(); }} className="text-blue-600 font-medium hover:underline">Sign up</button></p>
+                <p className="text-sm text-muted-foreground">New to Neighborly? <button onClick={() => { onSwitchMode("signup"); setStep(1); resetMessages(); }} className="text-blue-600 font-medium hover:underline">Request beta access</button></p>
               ) : (
-                <p className="text-sm text-muted-foreground">Already registered? <button onClick={() => { onSwitchMode("signin"); setStep(1); resetMessages(); }} className="text-blue-600 font-medium hover:underline">Sign in</button></p>
+                <p className="text-sm text-muted-foreground">Already registered or waiting for approval? <button onClick={() => { onSwitchMode("signin"); setStep(1); resetMessages(); }} className="text-blue-600 font-medium hover:underline">Sign in</button></p>
               )}
             </div>
           )}

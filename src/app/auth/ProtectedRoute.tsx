@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { Clock3, LogOut, RefreshCw, ShieldCheck, XCircle } from "lucide-react";
 import { Navigate, Outlet, useLocation } from "react-router";
 import { useAuth } from "@/app/auth/AuthProvider";
@@ -68,7 +68,7 @@ function AccessRequestScreen({
   );
 }
 
-export function ProtectedRoute() {
+export function ProtectedRoute({ children }: { children?: ReactNode }) {
   const {
     user,
     loading,
@@ -105,5 +105,5 @@ export function ProtectedRoute() {
     );
   }
 
-  return <Outlet />;
+  return children ?? <Outlet />;
 }

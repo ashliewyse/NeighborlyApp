@@ -1,12 +1,31 @@
 import { lazy, Suspense, useCallback } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate, useSearchParams } from "react-router";
 import { AuthView } from "@/app/components/AuthView";
+import { WelcomePage } from "@/app/components/WelcomePage";
 import { useAuth } from "@/app/auth/AuthProvider";
 import { ProtectedRoute } from "@/app/auth/ProtectedRoute";
 
 type AuthMode = "signin" | "signup";
 type AuthScreen = "form" | "forgot" | "recovery";
 const App = lazy(() => import("@/app/App"));
+
+function AppContent() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-purple-950 flex items-center justify-center text-white">Loading Neighborly…</div>}>
+      <App />
+    </Suspense>
+  );
+}
+
+function HomePage() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <div className="min-h-screen bg-purple-950 flex items-center justify-center text-white">Loading Neighborly…</div>;
+  }
+
+  return user ? <ProtectedRoute><AppContent /></ProtectedRoute> : <WelcomePage />;
+}
 
 function AuthPage({ mode, initialScreen = "form" }: { mode: AuthMode; initialScreen?: AuthScreen }) {
   const { user, loading } = useAuth();
@@ -93,6 +112,7 @@ export function AppRouter() {
 
   return (
     <Routes>
+      <Route path="/" element={<HomePage />} />
       <Route path="/sign-in" element={<AuthPage mode="signin" />} />
       <Route path="/sign-up" element={<AuthPage mode="signup" />} />
       <Route path="/forgot-password" element={<AuthPage mode="signin" initialScreen="forgot" />} />
@@ -102,11 +122,7 @@ export function AppRouter() {
       <Route element={<ProtectedRoute />}>
         <Route
           path="/*"
-          element={
-            <Suspense fallback={<div className="min-h-screen bg-purple-950 flex items-center justify-center text-white">Loading Neighborly…</div>}>
-              <App />
-            </Suspense>
-          }
+          element={<AppContent />}
         />
       </Route>
 
