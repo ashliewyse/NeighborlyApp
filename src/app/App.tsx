@@ -3927,11 +3927,13 @@ function FeedbackModal({
 
 function AdminDashboard({
   onBack,
+  onPreviewSignup,
   defaultCity,
   defaultNeighborhood,
   onPostCreated,
 }: {
   onBack: () => void;
+  onPreviewSignup: () => void;
   defaultCity: string;
   defaultNeighborhood: string;
   onPostCreated: (post: Post) => void;
@@ -4206,9 +4208,14 @@ function AdminDashboard({
 
         {tab === "access" && (
           <section className="space-y-4">
-            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
-              <p className="font-semibold">Invite-only testing is active</p>
-              <p className="mt-1 text-xs leading-relaxed">New accounts cannot enter Neighborly until you approve them here. Existing members kept their access.</p>
+            <div className="flex flex-col gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="font-semibold">Invite-only testing is active</p>
+                <p className="mt-1 text-xs leading-relaxed">New accounts cannot enter Neighborly until you approve them here. Existing members kept their access.</p>
+              </div>
+              <button type="button" onClick={onPreviewSignup} className="inline-flex flex-shrink-0 items-center justify-center gap-2 rounded-lg bg-blue-700 px-4 py-2.5 text-xs font-semibold text-white hover:bg-blue-800">
+                <UserPlus size={15} /> Preview Sign-Up
+              </button>
             </div>
             <div>
               <h2 className="mb-3 font-semibold text-white">Pending requests</h2>
@@ -6095,6 +6102,7 @@ export default function App() {
   if (view.page === "admin" && currentProfile && isSiteAdmin) return (
     <AdminDashboard
       onBack={goToFeed}
+      onPreviewSignup={() => navigate("/sign-up-preview")}
       defaultCity={browsingLocation}
       defaultNeighborhood={currentBusiness?.address.split(",")[0] || currentProfile.neighborhood || browsingLocation}
       onPostCreated={(post) => {
