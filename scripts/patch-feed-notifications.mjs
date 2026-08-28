@@ -182,7 +182,7 @@ if (!source.includes("neighborlyNotifications.map((notification)")) {
                 key={notification.id}
                 type="button"
                 onClick={() => { void openNeighborlyNotification(notification); }}
-                className={\`w-full border-b border-border px-4 py-3 text-left transition-colors hover:bg-secondary/60 ${notification.readAt ? "bg-white" : "bg-blue-50/60"}\`}
+                className={"w-full border-b border-border px-4 py-3 text-left transition-colors hover:bg-secondary/60 " + (notification.readAt ? "bg-white" : "bg-blue-50/60")}
               >
                 <div className="flex items-start gap-3">
                   <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-teal-50 text-teal-700">
