@@ -20,7 +20,11 @@ interface AuthViewProps {
   initialScreen?: AuthScreen;
   onSwitchMode: (mode: AuthMode) => void;
   onSuccess: () => void;
+  previewMode?: boolean;
 }
+
+const PREVIEW_EMAIL = "preview@neighborly.test";
+const PREVIEW_PASSWORD = "NeighborlyDemo123!";
 
 async function syncProfileFromMetadata(user: any) {
   if (!user?.id) return;
@@ -57,9 +61,10 @@ async function syncProfileFromMetadata(user: any) {
   }
 }
 
-export function AuthView({ mode, initialScreen = "form", onSwitchMode, onSuccess }: AuthViewProps) {
+export function AuthView({ mode, initialScreen = "form", onSwitchMode, onSuccess, previewMode = false }: AuthViewProps) {
   const [screen, setScreen] = useState<AuthScreen>(initialScreen);
   const [step, setStep] = useState(1);
+  const [previewComplete, setPreviewComplete] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -73,9 +78,9 @@ export function AuthView({ mode, initialScreen = "form", onSwitchMode, onSuccess
   const [businessPhone, setBusinessPhone] = useState("");
   const [businessWebsite, setBusinessWebsite] = useState("");
   const [businessDescription, setBusinessDescription] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [email, setEmail] = useState(previewMode ? PREVIEW_EMAIL : "");
+  const [password, setPassword] = useState(previewMode ? PREVIEW_PASSWORD : "");
+  const [confirmPassword, setConfirmPassword] = useState(previewMode ? PREVIEW_PASSWORD : "");
   const [city, setCity] = useState("");
   const [zipCode, setZipCode] = useState("");
   const [neighborhood, setNeighborhood] = useState("");
@@ -85,6 +90,8 @@ export function AuthView({ mode, initialScreen = "form", onSwitchMode, onSuccess
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
 
   useEffect(() => {
+    if (previewMode) return;
+
     let active = true;
 
     supabase.auth.getSession().then(async ({ data }) => {
@@ -109,7 +116,7 @@ export function AuthView({ mode, initialScreen = "form", onSwitchMode, onSuccess
       active = false;
       listener.subscription.unsubscribe();
     };
-  }, [initialScreen, onSuccess]);
+  }, [initialScreen, onSuccess, previewMode]);
 
   function resetMessages() {
     setError("");
@@ -156,6 +163,12 @@ export function AuthView({ mode, initialScreen = "form", onSwitchMode, onSuccess
     }
     if (!agreedToGuidelines) {
       setError("Please read and agree to the Neighborly Community Guidelines before requesting access.");
+      return;
+    }
+
+    if (previewMode) {
+      setPreviewComplete(true);
+      window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
 
@@ -254,25 +267,40 @@ export function AuthView({ mode, initialScreen = "form", onSwitchMode, onSuccess
     : bio.trim() || "A short introduction will help neighbors get to know you.";
   const previewInitials = previewName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "N";
 
+  function previewOtherAccountType() {
+    setAccountType(accountType === "business" ? "personal" : "business");
+    setStep(1);
+    setPreviewComplete(false);
+    setAgreedToGuidelines(false);
+    resetMessages();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-purple-950 via-purple-900 to-slate-950 flex items-center justify-center p-4 font-['DM_Sans',sans-serif]">
-      <div className={`${mode === "signup" && screen === "form" && step === 2 ? "max-w-2xl" : "max-w-lg"} w-full bg-white rounded-2xl border border-border p-6 sm:p-8 shadow-xl transition-[max-width]`}>
+      <div className={`${mode === "signup" && screen === "form" && step === 2 && !previewComplete ? "max-w-2xl" : "max-w-lg"} w-full bg-white rounded-2xl border border-border p-6 sm:p-8 shadow-xl transition-[max-width]`}>
         <Link to="/" className="mb-5 inline-flex items-center gap-1 text-xs font-semibold text-purple-700 hover:text-purple-900 hover:underline">
-          <ChevronLeft size={14} /> Back to the Neighborly welcome page
+          <ChevronLeft size={14} /> {previewMode ? "Exit sign-up preview" : "Back to the Neighborly welcome page"}
         </Link>
         <div className="text-center mb-6">
           <div className="w-36 mx-auto mb-4">
             <ImageWithFallback src={neighborlyLogo} alt="Neighborly App" className="w-full h-auto object-contain" />
           </div>
           <h1 className="font-['Playfair_Display',serif] font-bold text-2xl text-foreground">
-            {screen === "forgot" ? "Reset your password" : screen === "recovery" ? "Choose a new password" : mode === "signin" ? "Welcome back to Neighborly" : "Join the Neighborly beta"}
+            {previewComplete ? `${accountType === "business" ? "Business" : "Personal"} preview complete` : previewMode ? "Preview the Neighborly sign-up" : screen === "forgot" ? "Reset your password" : screen === "recovery" ? "Choose a new password" : mode === "signin" ? "Welcome back to Neighborly" : "Join the Neighborly beta"}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {screen === "forgot" ? "We'll email a secure reset link to your registered address." : screen === "recovery" ? "Create a new password for your Neighborly account." : mode === "signin" ? "Sign in to connect with your local community or check your approval status." : "Create your profile and request access. You can change your profile details later."}
+            {previewComplete ? "You reached the end of this walkthrough without creating an account." : previewMode ? "Try every step exactly as a new neighbor would see it." : screen === "forgot" ? "We'll email a secure reset link to your registered address." : screen === "recovery" ? "Create a new password for your Neighborly account." : mode === "signin" ? "Sign in to connect with your local community or check your approval status." : "Create your profile and request access. You can change your profile details later."}
           </p>
         </div>
 
-        {mode === "signup" && screen === "form" && (
+        {previewMode && !previewComplete && (
+          <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-5 text-amber-950">
+            <strong>Safe preview:</strong> nothing you enter here will be saved. The demo email cannot create an account, send email, or make a profile.
+          </div>
+        )}
+
+        {mode === "signup" && screen === "form" && !previewComplete && (
           <div className="mb-5">
             <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground mb-2">
               <span className={step >= 1 ? "text-blue-600" : ""}>1 Create Login</span>
@@ -286,7 +314,26 @@ export function AuthView({ mode, initialScreen = "form", onSwitchMode, onSuccess
         )}
 
         <div className="flex flex-col gap-4">
-          {screen === "recovery" ? (
+          {previewComplete ? (
+            <>
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-center">
+                <CheckCircle2 size={42} className="mx-auto text-emerald-600" />
+                <h2 className="mt-3 text-lg font-bold text-emerald-950">Nothing was saved</h2>
+                <p className="mt-1 text-sm leading-6 text-emerald-900">No Neighborly login, Supabase user, access request, or profile was created.</p>
+              </div>
+              <div className="rounded-xl border border-border bg-slate-50 p-4 text-sm">
+                <p><span className="font-semibold">Path previewed:</span> {accountType === "business" ? "Local Business" : "Personal Account"}</p>
+                <p className="mt-2"><span className="font-semibold">Profile color:</span> {selectedTheme.label}</p>
+                <p className="mt-2"><span className="font-semibold">Demo email:</span> {PREVIEW_EMAIL}</p>
+              </div>
+              <button onClick={previewOtherAccountType} className="w-full rounded-lg bg-purple-700 py-3 text-sm font-semibold text-white hover:bg-purple-800">
+                Preview the {accountType === "business" ? "Personal" : "Business"} Sign-Up
+              </button>
+              <Link to="/" className="w-full rounded-lg border border-border py-3 text-center text-sm font-semibold text-slate-700 hover:bg-muted">
+                Return to Neighborly
+              </Link>
+            </>
+          ) : screen === "recovery" ? (
             <>
               <div>
                 <label className={labelClass}>New Password</label>
@@ -341,7 +388,7 @@ export function AuthView({ mode, initialScreen = "form", onSwitchMode, onSuccess
           ) : step === 1 ? (
             <>
               <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm leading-5 text-blue-950">
-                Requesting access takes about two minutes. After submitting, verify your email and sign in to see when your account is approved.
+                {previewMode ? "Walk through the same choices a new neighbor sees. The fixed demo login below is only for this preview." : "Requesting access takes about two minutes. After submitting, verify your email and sign in to see when your account is approved."}
               </div>
               <div>
                 <label className={labelClass}>Account Type</label>
@@ -360,8 +407,8 @@ export function AuthView({ mode, initialScreen = "form", onSwitchMode, onSuccess
                 <input className={inputClass} value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Maria Santos" autoComplete="name" />
               </div>
               <div>
-                <label className={labelClass}>Email</label>
-                <input className={inputClass} type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" />
+                <label className={labelClass}>{previewMode ? "Demo Email" : "Email"}</label>
+                <input className={`${inputClass} ${previewMode ? "cursor-not-allowed bg-slate-100 text-slate-600" : ""}`} type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" readOnly={previewMode} aria-readonly={previewMode} />
               </div>
               <div className="grid sm:grid-cols-2 gap-3">
                 <div>
@@ -479,7 +526,7 @@ export function AuthView({ mode, initialScreen = "form", onSwitchMode, onSuccess
 
               <div className="flex gap-2">
                 <button onClick={() => { setStep(1); resetMessages(); }} className="px-4 py-2.5 rounded-lg border border-border text-sm font-medium">Back</button>
-                <button disabled={busy || !agreedToGuidelines || (accountType === "business" && (!businessName.trim() || !businessCategory.trim()))} onClick={handleSignUp} className="flex-1 bg-blue-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">{busy ? "Submitting request…" : "Send Access Request"}</button>
+                <button disabled={busy || !agreedToGuidelines || (accountType === "business" && (!businessName.trim() || !businessCategory.trim()))} onClick={handleSignUp} className="flex-1 bg-blue-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">{busy ? "Submitting request…" : previewMode ? "Complete Safe Preview" : "Send Access Request"}</button>
               </div>
             </>
           )}
@@ -487,7 +534,7 @@ export function AuthView({ mode, initialScreen = "form", onSwitchMode, onSuccess
           {error && <div className="rounded-lg border border-red-200 bg-red-50 text-red-700 px-3 py-2.5 text-sm">{error}</div>}
           {notice && <div className="rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 px-3 py-2.5 text-sm flex gap-2"><CheckCircle2 size={16} className="mt-0.5 flex-shrink-0" />{notice}</div>}
 
-          {screen === "form" && (
+          {screen === "form" && !previewMode && (
             <div className="text-center mt-2">
               {mode === "signin" ? (
                 <p className="text-sm text-muted-foreground">New to Neighborly? <button onClick={() => { onSwitchMode("signup"); setStep(1); resetMessages(); }} className="text-blue-600 font-medium hover:underline">Request beta access</button></p>
@@ -499,7 +546,7 @@ export function AuthView({ mode, initialScreen = "form", onSwitchMode, onSuccess
 
           <div className="mt-2 pt-4 border-t border-border flex items-start gap-2 text-xs text-muted-foreground">
             <ShieldCheck size={15} className="text-emerald-600 flex-shrink-0 mt-0.5" />
-            <span>Your password is handled by secure authentication. Neighborly never stores a plain-text copy of it.</span>
+            <span>{previewMode ? "Preview entries stay in this browser tab only and are discarded when you leave." : "Your password is handled by secure authentication. Neighborly never stores a plain-text copy of it."}</span>
           </div>
         </div>
       </div>

@@ -68,6 +68,19 @@ function AuthPage({ mode, initialScreen = "form" }: { mode: AuthMode; initialScr
   );
 }
 
+function SignupPreviewPage() {
+  const navigate = useNavigate();
+
+  return (
+    <AuthView
+      mode="signup"
+      previewMode
+      onSwitchMode={() => undefined}
+      onSuccess={() => navigate("/", { replace: true })}
+    />
+  );
+}
+
 function AuthCallbackPage() {
   const { user, loading, error } = useAuth();
   const [searchParams] = useSearchParams();
@@ -120,6 +133,7 @@ export function AppRouter() {
       <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
       <Route element={<ProtectedRoute />}>
+        <Route path="/sign-up-preview" element={<SignupPreviewPage />} />
         <Route
           path="/*"
           element={<AppContent />}
