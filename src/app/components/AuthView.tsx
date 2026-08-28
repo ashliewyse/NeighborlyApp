@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { ChevronLeft, CheckCircle2, Eye, EyeOff, KeyRound, MapPin, ShieldCheck } from "lucide-react";
 import { ImageWithFallback } from "@/app/components/figma/ImageWithFallback";
+import { CommunityGuidelines } from "@/app/components/CommunityGuidelines";
 import neighborlyLogo from "@/imports/Copilot_20260807_041314.png";
 import { supabase } from "@/lib/supabase";
 
@@ -56,6 +57,7 @@ export function AuthView({ mode, initialScreen = "form", onSwitchMode, onSuccess
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [agreedToGuidelines, setAgreedToGuidelines] = useState(false);
 
   const [accountType, setAccountType] = useState<"personal" | "business" | "">("");
   const [fullName, setFullName] = useState("");
@@ -145,6 +147,10 @@ export function AuthView({ mode, initialScreen = "form", onSwitchMode, onSuccess
       setError("Your passwords don't match.");
       return;
     }
+    if (!agreedToGuidelines) {
+      setError("Please read and agree to the Neighborly Community Guidelines before requesting access.");
+      return;
+    }
 
     setBusy(true);
     const { data, error: signUpError } = await supabase.auth.signUp({
@@ -165,6 +171,8 @@ export function AuthView({ mode, initialScreen = "form", onSwitchMode, onSuccess
           neighborhood: neighborhood.trim(),
           bio: bio.trim(),
           theme,
+          community_guidelines_version: "2026-08-28",
+          community_guidelines_agreed_at: new Date().toISOString(),
         },
       },
     });
@@ -187,6 +195,7 @@ export function AuthView({ mode, initialScreen = "form", onSwitchMode, onSuccess
 
     setNotice("Access request submitted. Check your email to verify your address, then sign in to see your approval status.");
     setStep(1);
+    setAgreedToGuidelines(false);
   }
 
   async function handleForgotPassword() {
@@ -251,7 +260,7 @@ export function AuthView({ mode, initialScreen = "form", onSwitchMode, onSuccess
             <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground mb-2">
               <span className={step >= 1 ? "text-blue-600" : ""}>1 Account</span>
               <div className="h-px flex-1 bg-border" />
-              <span className={step >= 2 ? "text-blue-600" : ""}>2 Profile</span>
+              <span className={step >= 2 ? "text-blue-600" : ""}>2 Profile & Rules</span>
             </div>
             <div className="h-1.5 rounded-full bg-muted overflow-hidden">
               <div className="h-full bg-blue-600 transition-all" style={{ width: step === 1 ? "50%" : "100%" }} />
@@ -392,9 +401,29 @@ export function AuthView({ mode, initialScreen = "form", onSwitchMode, onSuccess
                   ))}
                 </div>
               </div>
+
+              <details className="rounded-xl border border-border bg-muted/20 p-4">
+                <summary className="cursor-pointer font-semibold text-sm text-blue-700">Read Community Guidelines & how badges work</summary>
+                <div className="mt-4 max-h-96 overflow-y-auto pr-1">
+                  <CommunityGuidelines compact />
+                </div>
+              </details>
+
+              <label className="flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={agreedToGuidelines}
+                  onChange={(e) => setAgreedToGuidelines(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-blue-300"
+                />
+                <span className="text-sm text-blue-950">
+                  I have read and agree to Neighborly's Community Guidelines, including the rules for respectful behavior, reporting, and how badges work.
+                </span>
+              </label>
+
               <div className="flex gap-2">
                 <button onClick={() => { setStep(1); resetMessages(); }} className="px-4 py-2.5 rounded-lg border border-border text-sm font-medium">Back</button>
-                <button disabled={busy || (accountType === "business" && (!businessName.trim() || !businessCategory.trim()))} onClick={handleSignUp} className="flex-1 bg-blue-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">{busy ? "Submitting request…" : "Request Access"}</button>
+                <button disabled={busy || !agreedToGuidelines || (accountType === "business" && (!businessName.trim() || !businessCategory.trim()))} onClick={handleSignUp} className="flex-1 bg-blue-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">{busy ? "Submitting request…" : "Request Access"}</button>
               </div>
             </>
           )}
