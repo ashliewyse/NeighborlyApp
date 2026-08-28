@@ -66,7 +66,7 @@ const neighborlyBrandCard = `<div className="bg-card rounded-xl border border-bo
   <div className="relative w-full">
     <img src={neighborlyAppLogo} alt="Neighborly" className="w-full h-auto object-contain" />
     <div aria-hidden="true" className="pointer-events-none absolute left-[18%] right-[18%] top-[55%] h-[15%] bg-white flex items-center justify-center">
-      <span className="font-['Playfair_Display',serif] text-[clamp(1rem,2vw,1.5rem)] font-normal text-slate-800">Neighborly</span>
+      <span className="bg-gradient-to-r from-violet-600 to-blue-500 bg-clip-text font-['Playfair_Display',serif] text-[clamp(1rem,2vw,1.5rem)] font-bold text-transparent">Neighborly</span>
     </div>
   </div>
 </div>`;
@@ -80,7 +80,7 @@ if (legacyBrandCardCount > 0) {
 
 if (changed) {
   fs.writeFileSync(appPath, source);
-  console.log("Applied original Neighborly artwork with only the App label removed, plus full-height ad layout without overlap.");
+  console.log("Applied original Neighborly artwork with header-matched wordmark, plus full-height ad layout without overlap.");
 } else {
   console.log("Neighborly branding and ad layout are already up to date.");
 }
