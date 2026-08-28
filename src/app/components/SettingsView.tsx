@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { ChevronLeft, KeyRound, Mail, LogOut, ShieldCheck, UserRound, Building2, Save } from "lucide-react";
+import { ChevronLeft, KeyRound, Mail, LogOut, ShieldCheck, UserRound, Building2, Save, BookOpen } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { CommunityGuidelines } from "@/app/components/CommunityGuidelines";
 
 type AccountType = "personal" | "business";
 
@@ -33,6 +34,7 @@ export function SettingsView({ onBack, onProfileSaved }: { onBack: () => void; o
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
+  const [showGuidelines, setShowGuidelines] = useState(false);
   const [accountType, setAccountType] = useState<AccountType>("personal");
   const [profile, setProfile] = useState<ProfileForm>(emptyProfile);
 
@@ -202,6 +204,14 @@ export function SettingsView({ onBack, onProfileSaved }: { onBack: () => void; o
           <div className="flex items-center gap-2 mb-2"><UserRound size={17} className="text-primary" /><h2 className="font-semibold">Profile</h2></div>
           <p className="text-sm text-muted-foreground">Update your about information, contact details, and profile color. Badges and reviews are protected.</p>
           <button onClick={() => setEditingProfile(true)} className="mt-4 w-full sm:w-auto bg-primary text-primary-foreground px-4 py-2.5 rounded-lg text-sm font-medium">Update Profile</button>
+        </section>
+        <section className="bg-white rounded-xl border border-border p-4 sm:p-5">
+          <div className="flex items-center gap-2 mb-2"><BookOpen size={17} className="text-primary" /><h2 className="font-semibold">Community Guidelines & Badges</h2></div>
+          <p className="text-sm text-muted-foreground">Review Neighborly's community rules, reporting expectations, and how activity and role badges work.</p>
+          <button onClick={() => setShowGuidelines((value) => !value)} className="mt-4 w-full sm:w-auto border border-border bg-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-muted/40">
+            {showGuidelines ? "Hide Guidelines" : "View Guidelines & Badge Rules"}
+          </button>
+          {showGuidelines && <div className="mt-5 border-t border-border pt-5"><CommunityGuidelines /></div>}
         </section>
         <section className="bg-white rounded-xl border border-border p-4 sm:p-5"><div className="flex items-center gap-2 mb-4"><Mail size={16} className="text-primary" /><h2 className="font-semibold">Email address</h2></div><label className={label}>Email</label><input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} className={input} /><p className="text-xs text-muted-foreground mt-2">Changing your email may require confirmation from the new address.</p><button onClick={updateEmail} disabled={busy || !newEmail.trim() || newEmail.trim() === email} className="mt-3 w-full sm:w-auto bg-primary text-primary-foreground px-4 py-2.5 rounded-lg text-sm font-medium disabled:opacity-40">Update Email</button></section>
         <section className="bg-white rounded-xl border border-border p-4 sm:p-5"><div className="flex items-center gap-2 mb-4"><KeyRound size={16} className="text-primary" /><h2 className="font-semibold">Password</h2></div><div className="space-y-3"><div><label className={label}>New password</label><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 8 characters" className={input} /></div><div><label className={label}>Confirm password</label><input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className={input} /></div></div><button onClick={updatePassword} disabled={busy || !password || !confirmPassword} className="mt-3 w-full sm:w-auto bg-primary text-primary-foreground px-4 py-2.5 rounded-lg text-sm font-medium disabled:opacity-40">Update Password</button></section>
