@@ -196,6 +196,7 @@ type AdvertisingTier = "starter" | "spotlight" | "featured";
 
 interface LiveAdvertisement {
   id: string;
+  ownerId: string;
   tier: AdvertisingTier;
   businessName: string;
   headline: string;
@@ -4528,7 +4529,15 @@ function AdvertiseModal({
   );
 }
 
-function AdvertisingSidebarCard({ ad, onAdvertise }: { ad: LiveAdvertisement | null; onAdvertise: () => void }) {
+function AdvertisingSidebarCard({
+  ad,
+  onAdvertise,
+  onOpenProfile,
+}: {
+  ad: LiveAdvertisement | null;
+  onAdvertise: () => void;
+  onOpenProfile: () => void;
+}) {
   if (!ad) {
     return (
       <section aria-label="Local business feature" className="min-h-32 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl p-4 text-white shadow-sm">
@@ -4542,29 +4551,33 @@ function AdvertisingSidebarCard({ ad, onAdvertise }: { ad: LiveAdvertisement | n
     );
   }
 
-  const safeWebsite = ad.destinationUrl && /^https?:\/\//i.test(ad.destinationUrl) ? ad.destinationUrl : null;
-  const contactHref = safeWebsite || (ad.phone ? `tel:${ad.phone.replace(/[^+\d]/g, "")}` : null);
-
   return (
     <section aria-label="Local business feature" className="min-h-32 overflow-hidden rounded-xl border border-blue-200 bg-white shadow-sm">
-      <div className="relative min-h-16 bg-gradient-to-br from-blue-50 to-indigo-100">
-        <img
-          src={ad.imageUrl}
-          alt={`${ad.businessName} local business feature`}
-          className="aspect-video w-full object-cover"
-          onError={(event) => { event.currentTarget.style.display = "none"; }}
-        />
-        <span className="absolute left-2 top-2 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">Paid Local Feature</span>
-      </div>
-      <div className="p-4">
-        <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">{ad.businessName}</p>
-        <h3 className="mt-1 text-sm font-bold text-foreground">{ad.headline}</h3>
-        <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-muted-foreground">{ad.description}</p>
-        {contactHref && (
-          <a href={contactHref} target={safeWebsite ? "_blank" : undefined} rel={safeWebsite ? "noreferrer" : undefined} className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg bg-blue-600 py-2 text-xs font-semibold text-white hover:bg-blue-700">
-            Contact Business {safeWebsite && <ExternalLink size={12} />}
-          </a>
-        )}
+      <button
+        type="button"
+        onClick={onOpenProfile}
+        aria-label={`View ${ad.businessName} business profile`}
+        className="group block w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-600"
+      >
+        <div className="relative flex min-h-16 w-full items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+          <img
+            src={ad.imageUrl}
+            alt={`${ad.businessName} local business feature`}
+            className="block h-auto max-h-96 w-full object-contain"
+            onError={(event) => { event.currentTarget.style.display = "none"; }}
+          />
+          <span className="absolute left-2 top-2 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">Paid Local Feature</span>
+        </div>
+        <div className="p-4 pb-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">{ad.businessName}</p>
+          <h3 className="mt-1 text-sm font-bold text-foreground">{ad.headline}</h3>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{ad.description}</p>
+          <span className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg bg-blue-600 py-2 text-xs font-semibold text-white transition-colors group-hover:bg-blue-700">
+            View Business Profile <ChevronRight size={13} />
+          </span>
+        </div>
+      </button>
+      <div className="px-4 pb-4">
         <button onClick={onAdvertise} className="mt-2 w-full text-center text-[11px] font-semibold text-blue-600 hover:underline">Promote Your Business</button>
       </div>
     </section>
@@ -5054,7 +5067,7 @@ export default function App() {
     const loadAdvertisements = async () => {
       const { data, error } = await publicSupabase
         .from("advertising_campaigns")
-        .select("id, tier, business_name, headline, description, image_url, destination_url, phone, target_city")
+        .select("id, user_id, tier, business_name, headline, description, image_url, destination_url, phone, target_city")
         .eq("status", "active")
         .eq("billing_status", "paid")
         .order("created_at", { ascending: false })
@@ -5068,6 +5081,7 @@ export default function App() {
 
       setLiveAdvertisements((data || []).map((row: any) => ({
         id: row.id,
+        ownerId: row.user_id,
         tier: row.tier as AdvertisingTier,
         businessName: row.business_name,
         headline: row.headline,
@@ -5732,7 +5746,7 @@ export default function App() {
     setView({ page: "business", id });
     setNotifOpen(false);
   }
-  async function goToUser(name: string, authorId?: string) {
+  async function goToUser(name: string, authorId?: string, options?: { preferBusiness?: boolean }) {
     // Demo profiles have no database ID. Real profiles are never resolved from
     // this name-keyed collection because multiple users can share a display name.
     if (!authorId && USER_PROFILES[name]) {
@@ -5751,12 +5765,12 @@ export default function App() {
       // The signed-in user's own posts must always open the editable profile that
       // belongs to the active session, never another account with the same name.
       if (signedInUser?.id === authorId) {
-        setView({ page: currentAccountType === "business" ? "my-business" : "me" });
+        setView({ page: options?.preferBusiness || currentAccountType === "business" ? "my-business" : "me" });
         navigate("/profile");
         return;
       }
 
-      if (businessRow?.business_name && businessRow.business_name.trim().toLowerCase() === name.trim().toLowerCase()) {
+      if (businessRow?.business_name && (options?.preferBusiness || businessRow.business_name.trim().toLowerCase() === name.trim().toLowerCase())) {
         const businessId = BUSINESSES.find((b) => b.name.trim().toLowerCase() === name.trim().toLowerCase())?.id;
         if (businessId) {
           setView({ page: "business", id: businessId });
@@ -7010,7 +7024,13 @@ export default function App() {
 
             <WeatherCard locationName={browsingLocation} weather={weather} />
 
-            <AdvertisingSidebarCard ad={activeAdvertisement} onAdvertise={() => setAdvertiseOpen(true)} />
+            <AdvertisingSidebarCard
+              ad={activeAdvertisement}
+              onAdvertise={() => setAdvertiseOpen(true)}
+              onOpenProfile={() => {
+                if (activeAdvertisement) void goToUser(activeAdvertisement.businessName, activeAdvertisement.ownerId, { preferBusiness: true });
+              }}
+            />
 
             <button onClick={() => setFeedbackOpen(true)} className="flex w-full items-center justify-center gap-2 rounded-xl border border-purple-200 bg-white px-4 py-3 text-sm font-semibold text-purple-700 shadow-sm hover:bg-purple-50">
               <MessageSquare size={16} /> Send Feedback
@@ -7097,7 +7117,14 @@ export default function App() {
           <WeatherCard locationName={browsingLocation} weather={weather} />
 
           {/* Local business feature */}
-          <AdvertisingSidebarCard ad={activeAdvertisement} onAdvertise={() => setAdvertiseOpen(true)} />
+          <AdvertisingSidebarCard
+            ad={activeAdvertisement}
+            onAdvertise={() => setAdvertiseOpen(true)}
+            onOpenProfile={() => {
+              setSidebarOpen(false);
+              if (activeAdvertisement) void goToUser(activeAdvertisement.businessName, activeAdvertisement.ownerId, { preferBusiness: true });
+            }}
+          />
 
           {isSiteAdmin && (
             <button onClick={() => { goToAdmin(); setSidebarOpen(false); }} className="flex w-full items-center justify-center gap-2 rounded-xl bg-purple-700 px-4 py-3 text-sm font-semibold text-white hover:bg-purple-800">
