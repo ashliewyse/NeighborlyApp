@@ -18,13 +18,13 @@ function replaceOnce(needle, replacement, label) {
 
 replaceOnce(
   'className="min-h-32 overflow-hidden rounded-xl border border-blue-200 bg-white shadow-sm"',
-  'className="min-h-32 rounded-xl border border-blue-200 bg-white shadow-sm"',
+  'className="min-h-32 shrink-0 overflow-hidden rounded-xl border border-blue-200 bg-white shadow-sm"',
   "ad card container",
 );
 
 replaceOnce(
   'className="group block w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-600"',
-  'className="group block h-auto max-h-none w-full overflow-visible text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-600"',
+  'className="group block h-auto max-h-none w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-600"',
   "ad card button",
 );
 
@@ -60,7 +60,7 @@ replaceOnce(
 
 if (changed) {
   fs.writeFileSync(appPath, source);
-  console.log("Applied full-height Neighborly sidebar ad layout with separate paid label and advertise action.");
+  console.log("Applied full-height Neighborly sidebar ad layout without overlap.");
 } else {
   console.log("Neighborly sidebar ad layout already allows full content and advertising access.");
 }
