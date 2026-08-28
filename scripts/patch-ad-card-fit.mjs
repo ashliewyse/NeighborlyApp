@@ -58,27 +58,29 @@ replaceOnce(
   "active ad advertise button",
 );
 
+// Keep the original Neighborly artwork exactly as designed. Only cover the original
+// "Neighborly App" title line and redraw "Neighborly" centered in the same area.
 const legacyBrandCardPattern = /<div className="bg-card rounded-xl border border-border p-4 shadow-sm flex items-center justify-center">\s*<img src=\{neighborlyAppLogo\} alt="Neighborly App" className="w-full h-auto object-contain" \/>\s*<\/div>/g;
 const legacyBrandCardCount = (source.match(legacyBrandCardPattern) || []).length;
-const neighborlyBrandCard = `<div aria-label="Neighborly brand" className="bg-card rounded-xl border border-border p-6 shadow-sm flex flex-col items-center justify-center text-center">
-  <div className="relative mb-3 h-20 w-24" aria-hidden="true">
-    <Home size={72} strokeWidth={1.8} className="absolute left-1/2 top-0 -translate-x-1/2 text-blue-500" />
-    <MessageCircle size={32} strokeWidth={1.8} className="absolute left-1/2 top-8 -translate-x-1/2 text-indigo-500" />
+const neighborlyBrandCard = `<div className="bg-card rounded-xl border border-border p-4 shadow-sm flex items-center justify-center">
+  <div className="relative w-full">
+    <img src={neighborlyAppLogo} alt="Neighborly" className="w-full h-auto object-contain" />
+    <div aria-hidden="true" className="pointer-events-none absolute left-[18%] right-[18%] top-[55%] h-[15%] bg-white flex items-center justify-center">
+      <span className="font-['Playfair_Display',serif] text-[clamp(1rem,2vw,1.5rem)] font-normal text-slate-800">Neighborly</span>
+    </div>
   </div>
-  <div className="font-['DM_Sans',sans-serif] text-2xl font-medium tracking-tight text-slate-800">Neighborly</div>
-  <div className="mt-1 text-xs text-muted-foreground">Neighbors Helping Neighbors</div>
 </div>`;
 
 if (legacyBrandCardCount > 0) {
   source = source.replace(legacyBrandCardPattern, neighborlyBrandCard);
   changed = true;
-} else if (!source.includes('aria-label="Neighborly brand"')) {
-  throw new Error("Neighborly branding patch failed: could not find the sidebar logo card.");
+} else if (!source.includes('alt="Neighborly" className="w-full h-auto object-contain"')) {
+  throw new Error("Neighborly branding patch failed: could not find the original sidebar logo card.");
 }
 
 if (changed) {
   fs.writeFileSync(appPath, source);
-  console.log("Applied Neighborly sidebar branding and full-height ad layout without overlap.");
+  console.log("Applied original Neighborly artwork with only the App label removed, plus full-height ad layout without overlap.");
 } else {
-  console.log("Neighborly sidebar branding and ad layout are already up to date.");
+  console.log("Neighborly branding and ad layout are already up to date.");
 }
