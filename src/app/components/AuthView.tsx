@@ -8,6 +8,12 @@ import { supabase } from "@/lib/supabase";
 
 type AuthMode = "signin" | "signup";
 type AuthScreen = "form" | "forgot" | "recovery";
+type AuthOperation = "sign-in" | "sign-up" | "password-reset" | "password-update";
+
+type AuthErrorLike = {
+  code?: string;
+  message?: string;
+};
 
 const PROFILE_THEME_OPTIONS = [
   { id: "classic-blue", label: "Classic Blue", swatch: "bg-blue-600", cover: "from-blue-700 to-sky-400", button: "bg-blue-600", soft: "bg-blue-50", border: "border-blue-200", text: "text-blue-700" },
@@ -25,6 +31,42 @@ interface AuthViewProps {
 
 const PREVIEW_EMAIL = "preview@neighborly.test";
 const PREVIEW_PASSWORD = "NeighborlyDemo123!";
+
+function getFriendlyAuthError(error: AuthErrorLike | null, operation: AuthOperation) {
+  const code = error?.code?.toLowerCase() || "";
+  const message = error?.message?.toLowerCase() || "";
+
+  if (code === "over_email_send_rate_limit" || message.includes("email rate limit")) {
+    return operation === "password-reset"
+      ? "Neighborly's password-reset email service is temporarily busy. Please wait a little while before requesting another link."
+      : "Neighborly couldn't send your confirmation email because our email service is temporarily busy. Your request was not submitted. Please wait a little while and try again.";
+  }
+
+  if (code === "email_address_not_authorized" || message.includes("email address not authorized")) {
+    return "Neighborly couldn't deliver a confirmation email to that address. Please try again shortly or contact Neighborly for help.";
+  }
+
+  if (code === "invalid_credentials" || message.includes("invalid login credentials")) {
+    return "That email and password combination wasn't recognized. Check your information or reset your password.";
+  }
+
+  if (code === "email_not_confirmed" || message.includes("email not confirmed")) {
+    return "Please confirm your email address before signing in. Check your inbox and spam folder for the Neighborly email.";
+  }
+
+  if (code === "user_already_exists" || message.includes("already registered")) {
+    return "An account already exists for that email. Try signing in or use Forgot password.";
+  }
+
+  const fallbackByOperation: Record<AuthOperation, string> = {
+    "sign-in": "We couldn't sign you in. Please check your information and try again.",
+    "sign-up": "We couldn't submit your access request. Please try again.",
+    "password-reset": "We couldn't send a password-reset email. Please try again.",
+    "password-update": "We couldn't update your password. Please try again.",
+  };
+
+  return error?.message || fallbackByOperation[operation];
+}
 
 async function syncProfileFromMetadata(user: any) {
   if (!user?.id) return;
@@ -136,7 +178,7 @@ export function AuthView({ mode, initialScreen = "form", onSwitchMode, onSuccess
     });
     setBusy(false);
     if (signInError || !data.user) {
-      setError(signInError?.message || "We couldn't sign you in.");
+      setError(getFriendlyAuthError(signInError, "sign-in"));
       return;
     }
     try {
@@ -199,7 +241,7 @@ export function AuthView({ mode, initialScreen = "form", onSwitchMode, onSuccess
     setBusy(false);
 
     if (signUpError) {
-      setError(signUpError.message);
+      setError(getFriendlyAuthError(signUpError, "sign-up"));
       return;
     }
 
@@ -230,7 +272,7 @@ export function AuthView({ mode, initialScreen = "form", onSwitchMode, onSuccess
     });
     setBusy(false);
     if (resetError) {
-      setError(resetError.message);
+      setError(getFriendlyAuthError(resetError, "password-reset"));
       return;
     }
     setNotice("If that email is registered, a secure password-reset link is on the way.");
@@ -250,7 +292,7 @@ export function AuthView({ mode, initialScreen = "form", onSwitchMode, onSuccess
     const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
     setBusy(false);
     if (updateError) {
-      setError(updateError.message);
+      setError(getFriendlyAuthError(updateError, "password-update"));
       return;
     }
     setNotice("Password updated. You're signed in.");
@@ -531,8 +573,8 @@ export function AuthView({ mode, initialScreen = "form", onSwitchMode, onSuccess
             </>
           )}
 
-          {error && <div className="rounded-lg border border-red-200 bg-red-50 text-red-700 px-3 py-2.5 text-sm">{error}</div>}
-          {notice && <div className="rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 px-3 py-2.5 text-sm flex gap-2"><CheckCircle2 size={16} className="mt-0.5 flex-shrink-0" />{notice}</div>}
+          {error && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 text-red-700 px-3 py-2.5 text-sm">{error}</div>}
+          {notice && <div role="status" aria-live="polite" className="rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 px-3 py-2.5 text-sm flex gap-2"><CheckCircle2 size={16} className="mt-0.5 flex-shrink-0" />{notice}</div>}
 
           {screen === "form" && !previewMode && (
             <div className="text-center mt-2">
