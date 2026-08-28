@@ -122,6 +122,7 @@ interface Business {
   reviews: BusinessReview[];
   logoUrl?: string | null;
   coverUrl?: string | null;
+  theme?: string | null;
 }
 
 interface NeighborReview {
@@ -1372,6 +1373,7 @@ function BusinessProfileView({
   onBack,
   onUserClick,
   onMessage,
+  onOpenMessages,
   isOwnProfile = false,
   onLogoChange,
   onSettings,
@@ -1381,6 +1383,7 @@ function BusinessProfileView({
   onBack: () => void;
   onUserClick: (name: string, authorId?: string) => void;
   onMessage?: (contact: MessageContact) => void;
+  onOpenMessages?: () => void;
   isOwnProfile?: boolean;
   onLogoChange?: (url: string) => void;
   onSettings?: () => void;
@@ -1394,14 +1397,18 @@ function BusinessProfileView({
   const [businessPhotos, setBusinessPhotos] = useState(biz.photos);
   const [coverUrl, setCoverUrl] = useState<string | null>(biz.coverUrl || null);
   const [logoUrl, setLogoUrl] = useState<string | null>(biz.logoUrl || null);
+  const [theme, setTheme] = useState<ThemeName>(() => resolveProfileTheme(biz.theme));
+  const [themeOpen, setThemeOpen] = useState(false);
   const [mediaBusy, setMediaBusy] = useState(false);
   const [mediaError, setMediaError] = useState<string | null>(null);
+  const T = PROFILE_THEMES[theme];
 
   useEffect(() => {
     if (isOwnProfile) return;
     setBusinessPhotos(biz.photos);
     setCoverUrl(biz.coverUrl || null);
     setLogoUrl(biz.logoUrl || null);
+    setTheme(resolveProfileTheme(biz.theme));
   }, [biz, isOwnProfile]);
 
   useEffect(() => {
@@ -1411,7 +1418,7 @@ function BusinessProfileView({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || !active) return;
       const [{ data: businessRow }, { data: photos }, { data: profileRow }] = await Promise.all([
-        supabase.from("business_profiles").select("logo_url, cover_url").eq("user_id", user.id).maybeSingle(),
+        supabase.from("business_profiles").select("logo_url, cover_url, theme").eq("user_id", user.id).maybeSingle(),
         supabase.from("profile_photos").select("image_url, caption").eq("user_id", user.id).order("created_at", { ascending: true }),
         supabase.from("profiles").select("avatar_url").eq("id", user.id).maybeSingle(),
       ]);
@@ -1420,6 +1427,7 @@ function BusinessProfileView({
       setLogoUrl(persistedLogo);
       if (persistedLogo) onLogoChange?.(persistedLogo);
       setCoverUrl(businessRow?.cover_url || null);
+      setTheme(resolveProfileTheme(businessRow?.theme));
       if (photos) setBusinessPhotos(photos.map((p: any) => ({ url: p.image_url, alt: p.caption || "Business photo" })));
     })();
     return () => { active = false; };
@@ -1477,10 +1485,36 @@ function BusinessProfileView({
     finally { setMediaBusy(false); }
   }
 
+  async function saveBusinessTheme(nextTheme: ThemeName) {
+    if (!isOwnProfile) return;
+    const previousTheme = theme;
+    setTheme(nextTheme);
+    setThemeOpen(false);
+    setMediaError(null);
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setTheme(previousTheme);
+      setMediaError("You must be signed in to change your profile color.");
+      return;
+    }
+
+    const updatedAt = new Date().toISOString();
+    const [businessResult, profileResult] = await Promise.all([
+      supabase.from("business_profiles").update({ theme: nextTheme, updated_at: updatedAt }).eq("user_id", user.id),
+      supabase.from("profiles").update({ theme: nextTheme, updated_at: updatedAt }).eq("id", user.id),
+    ]);
+    const saveError = businessResult.error || profileResult.error;
+    if (saveError) {
+      setTheme(previousTheme);
+      setMediaError(saveError.message || "Could not save your profile color.");
+    }
+  }
+
   const visiblePhotos = photosExpanded ? businessPhotos : businessPhotos.slice(0, 4);
 
   return (
-    <div className="min-h-screen bg-purple-950">
+    <div className={`min-h-screen ${T.bar}`}>
       {/* Profile header */}
       <div className="bg-white border-b border-border">
         <div className="max-w-4xl mx-auto px-4">
@@ -1507,7 +1541,7 @@ function BusinessProfileView({
 
           {/* Hero area */}
           <div className="pb-0">
-            <div className="relative mb-4 h-36 sm:h-52 overflow-hidden rounded-xl bg-gradient-to-r from-blue-700 to-cyan-500">
+            <div className={`relative mb-4 h-36 sm:h-52 overflow-hidden rounded-xl bg-gradient-to-r ${T.cover}`}>
               {coverUrl && <img src={coverUrl} alt={biz.name + " cover"} className="h-full w-full object-cover" />}
               {isOwnProfile && <label className="absolute right-3 bottom-3 cursor-pointer rounded-lg bg-white/95 px-3 py-2 text-xs font-semibold shadow"><Camera size={13} className="inline mr-1" />Change Cover<input type="file" accept="image/*" className="hidden" onChange={(e) => void saveBusinessImage(e, "cover")} /></label>}
             </div>
@@ -1541,10 +1575,51 @@ function BusinessProfileView({
                   </span>
                 </div>
               </div>
-              <div className="flex w-full sm:w-auto gap-2 pb-1 flex-shrink-0">
+              <div className="flex w-full flex-wrap sm:w-auto gap-2 pb-1 flex-shrink-0">
+                {isOwnProfile && (
+                  <div className="relative flex-1 sm:flex-none">
+                    <button
+                      type="button"
+                      onClick={() => setThemeOpen((open) => !open)}
+                      aria-expanded={themeOpen}
+                      aria-haspopup="menu"
+                      className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border bg-white px-3 py-2 text-sm font-medium hover:bg-muted"
+                    >
+                      <span className={`h-3 w-3 rounded-full bg-gradient-to-br ${T.cover}`} aria-hidden="true" />
+                      Change Color <ChevronDown size={12} />
+                    </button>
+                    {themeOpen && (
+                      <div role="menu" className="absolute right-0 top-full z-50 mt-1 w-48 overflow-hidden rounded-xl border border-border bg-white shadow-xl">
+                        {(Object.keys(PROFILE_THEMES) as ThemeName[]).map((option) => (
+                          <button
+                            key={option}
+                            type="button"
+                            role="menuitemradio"
+                            aria-checked={option === theme}
+                            onClick={() => { void saveBusinessTheme(option); }}
+                            className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm transition-colors hover:bg-muted ${option === theme ? "font-semibold" : ""}`}
+                          >
+                            <span className={`h-4 w-4 flex-shrink-0 rounded-full bg-gradient-to-br ${PROFILE_THEMES[option].cover}`} aria-hidden="true" />
+                            {option}
+                            {option === theme ? <CheckCircle2 size={13} className="ml-auto text-primary" aria-hidden="true" /> : null}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {isOwnProfile && onOpenMessages && (
+                  <button
+                    type="button"
+                    onClick={onOpenMessages}
+                    className="flex flex-1 sm:flex-none justify-center items-center gap-1.5 rounded-lg border border-border bg-white px-4 py-2 text-sm font-medium hover:bg-muted"
+                  >
+                    <MessageSquare size={13} /> Messages
+                  </button>
+                )}
                 <a
                   href={`tel:${biz.phone}`}
-                  className="flex flex-1 sm:flex-none justify-center items-center gap-1.5 bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity font-['DM_Sans',sans-serif]"
+                  className={`flex flex-1 sm:flex-none justify-center items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors font-['DM_Sans',sans-serif] ${T.btn}`}
                 >
                   <Phone size={13} /> Call
                 </a>
@@ -2512,6 +2587,7 @@ function UserProfileView({
   profile,
   onBack,
   onMessage,
+  onOpenMessages,
   isOwnProfile = false,
   myAvatarUrl = null,
   onAvatarChange,
@@ -2521,6 +2597,7 @@ function UserProfileView({
   profile: UserProfile;
   onBack: () => void;
   onMessage?: (contact: MessageContact) => void;
+  onOpenMessages?: () => void;
   isOwnProfile?: boolean;
   myAvatarUrl?: string | null;
   onAvatarChange?: (url: string) => void;
@@ -2750,6 +2827,15 @@ function UserProfileView({
                     </div>
                   )}
                 </div>
+              )}
+              {isOwnProfile && onOpenMessages && (
+                <button
+                  type="button"
+                  onClick={onOpenMessages}
+                  className="flex items-center gap-1.5 rounded-lg border border-border bg-white px-3 py-2 text-sm font-medium transition-colors hover:bg-muted"
+                >
+                  <MessageSquare size={13} /> <span className="hidden sm:inline">Messages</span>
+                </button>
               )}
               {!isOwnProfile && (
                 <>
@@ -5248,6 +5334,7 @@ export default function App() {
         website: businessRow?.website || m.business_website || "",
         address: [businessRow?.neighborhood || row?.neighborhood || m.neighborhood, businessRow?.city || row?.city || m.city, businessRow?.zip_code || row?.zip_code || m.zip_code].filter(Boolean).join(", "),
         hours: [], founded: String(created.getFullYear()), owner: businessRow?.owner_name || profile.name, reviews: [],
+        theme: businessRow?.theme || row?.theme || null,
       });
       defaultLocation = neighborhoodLocationValue(
         businessRow?.city || row?.city || m.city,
@@ -5812,6 +5899,7 @@ export default function App() {
             reviews: [],
             logoUrl: businessRow.logo_url || ownerRow?.avatar_url || null,
             coverUrl: businessRow.cover_url || null,
+            theme: businessRow.theme || null,
           },
         });
         return;
@@ -6018,13 +6106,13 @@ export default function App() {
   if (view.page === "settings") return <SettingsView onBack={goToFeed} onProfileSaved={() => { void loadCurrentProfile(false); }} />;
   if (view.page === "me" && currentProfile) return (
     <>
-      <UserProfileView profile={currentProfile} onBack={goToFeed} isOwnProfile myAvatarUrl={myAvatarUrl} onAvatarChange={setMyAvatarUrl} onSettings={goToSettings} onAdmin={isSiteAdmin ? goToAdmin : undefined} />
+      <UserProfileView profile={currentProfile} onBack={goToFeed} onOpenMessages={() => openMessages()} isOwnProfile myAvatarUrl={myAvatarUrl} onAvatarChange={setMyAvatarUrl} onSettings={goToSettings} onAdmin={isSiteAdmin ? goToAdmin : undefined} />
       {messagingModal}
     </>
   );
   if (view.page === "my-business" && currentBusiness) return (
     <>
-      <BusinessProfileView biz={currentBusiness} onBack={goToFeed} onUserClick={goToUser} isOwnProfile onLogoChange={setMyAvatarUrl} onSettings={goToSettings} onAdmin={isSiteAdmin ? goToAdmin : undefined} />
+      <BusinessProfileView biz={currentBusiness} onBack={goToFeed} onUserClick={goToUser} onOpenMessages={() => openMessages()} isOwnProfile onLogoChange={setMyAvatarUrl} onSettings={goToSettings} onAdmin={isSiteAdmin ? goToAdmin : undefined} />
       {messagingModal}
     </>
   );
