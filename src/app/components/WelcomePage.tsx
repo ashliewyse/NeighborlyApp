@@ -139,6 +139,36 @@ export function WelcomePage() {
           </div>
         </section>
 
+        <section className="border-y border-white/10 bg-slate-950/45 py-16">
+          <div className="mx-auto grid max-w-5xl items-center gap-8 px-4 sm:px-6 lg:grid-cols-[1.1fr_0.9fr]">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-purple-300/25 bg-purple-300/10 px-3 py-1.5 text-xs font-semibold text-purple-100">
+                <HandHeart size={15} /> Why Neighborly exists
+              </div>
+              <h2 className="mt-4 font-['Playfair_Display',serif] text-3xl font-bold leading-tight sm:text-4xl">
+                Your community shouldn’t come with a paywall.
+              </h2>
+              <p className="mt-4 max-w-2xl text-sm leading-7 text-purple-100 sm:text-base">
+                Neighborly was inspired by a simple belief: people should never have to pay just to respond to a neighbor or participate in their community. Connecting, sharing, helping, and belonging should be available to everyone.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-white/15 bg-white/10 p-5 shadow-xl shadow-black/15 backdrop-blur sm:p-6">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-purple-200">Our community promise</p>
+              <h3 className="mt-2 text-xl font-bold">Core participation stays free</h3>
+              <p className="mt-2 text-sm leading-6 text-purple-100">
+                Neighbors can post, reply, message, join groups, ask for help, and support their community without paying a membership fee.
+              </p>
+              <div className="mt-5 flex items-start gap-3 rounded-xl border border-white/10 bg-black/15 p-4">
+                <Briefcase size={18} className="mt-0.5 flex-shrink-0 text-purple-200" />
+                <p className="text-xs leading-5 text-purple-100">
+                  Local businesses may choose optional paid advertising, but ordinary members will not be charged simply to participate in their community.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section className="bg-white py-16 text-slate-900">
           <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-6 rounded-3xl bg-gradient-to-r from-purple-800 to-indigo-700 px-6 py-10 text-center text-white shadow-xl sm:px-10 md:flex-row md:text-left">
             <div>
