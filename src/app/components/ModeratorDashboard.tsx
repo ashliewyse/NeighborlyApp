@@ -1,6 +1,7 @@
 import React from "react";
 import { ChevronLeft, ShieldAlert } from "lucide-react";
 import { AdminSafetyPanel } from "@/app/components/AdminSafetyPanel";
+import { ModeratorMemberTools } from "@/app/components/ModeratorMemberTools";
 
 export function ModeratorDashboard({
   onBack,
@@ -34,9 +35,10 @@ export function ModeratorDashboard({
         <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
           <p className="font-semibold">Moderator access</p>
           <p className="mt-1 text-xs leading-relaxed">
-            Moderators can review safety reports, see block activity, warn members, and hide reported posts or comments when their assigned permissions allow it. Account suspensions, bans, sign-up approvals, advertising controls, and administrator settings remain admin-only.
+            Moderators can search approved members, open profiles, review safety reports, see block activity, warn members, and hide reported posts or comments when their assigned permissions allow it. Account suspensions, bans, sign-up approvals, advertising controls, and administrator settings remain admin-only.
           </p>
         </section>
+        <ModeratorMemberTools onProfileOpen={onProfileOpen} />
         <AdminSafetyPanel onProfileOpen={onProfileOpen} />
       </main>
     </div>
