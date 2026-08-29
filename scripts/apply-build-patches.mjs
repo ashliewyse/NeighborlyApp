@@ -13,6 +13,7 @@ const patches = [
   "./patch-auth-canonical-origin.mjs",
   "./patch-profile-mobile-actions.mjs",
   "./patch-post-response-notifications.mjs",
+  "./patch-profile-badges-rank.mjs",
 ];
 
 for (const patch of patches) {
@@ -40,6 +41,8 @@ const requiredAppMarkers = [
   'flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2 mt-12 relative pl-2',
   'notification.type === "post_comment" || notification.type === "thread_comment"',
   'neighborly-notifications-${currentProfile.id}',
+  'function isNewNeighbor(createdAt?: string | null)',
+  'neighborhoodRankScore(profile)',
 ];
 
 for (const marker of requiredAppMarkers) {
