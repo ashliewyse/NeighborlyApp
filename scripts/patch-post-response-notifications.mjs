@@ -78,11 +78,9 @@ if (!source.includes("neighborly-notifications-${currentProfile.id}")) {
   );
 }
 
-replaceOnce(
-  '{notification.title === "New Local Business" ? <Briefcase size={15} /> : <Leaf size={15} />}',
-  '{notification.type === "post_comment" || notification.type === "thread_comment" ? <MessageCircle size={15} /> : notification.title === "New Local Business" ? <Briefcase size={15} /> : <Leaf size={15} />}',
-  "response notification icon",
-);
+const existingIcon = '{notification.type === "post_reported" || notification.type === "safety_reported" ? <Flag size={15} /> : notification.type === "user_blocked" || notification.type === "moderation_warning" || notification.type === "moderation_action" ? <ShieldAlert size={15} /> : notification.title === "New Local Business" ? <Briefcase size={15} /> : <Leaf size={15} />}';
+const responseIcon = '{notification.type === "post_comment" || notification.type === "thread_comment" ? <MessageCircle size={15} /> : notification.type === "post_reported" || notification.type === "safety_reported" ? <Flag size={15} /> : notification.type === "user_blocked" || notification.type === "moderation_warning" || notification.type === "moderation_action" ? <ShieldAlert size={15} /> : notification.title === "New Local Business" ? <Briefcase size={15} /> : <Leaf size={15} />}';
+replaceOnce(existingIcon, responseIcon, "response notification icon");
 
 if (changed) {
   fs.writeFileSync(appPath, source);
