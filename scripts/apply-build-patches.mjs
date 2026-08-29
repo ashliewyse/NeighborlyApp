@@ -14,6 +14,7 @@ const patches = [
   "./patch-profile-mobile-actions.mjs",
   "./patch-post-response-notifications.mjs",
   "./patch-profile-badges-rank.mjs",
+  "./patch-recent-activity-summary.mjs",
 ];
 
 for (const patch of patches) {
@@ -43,6 +44,8 @@ const requiredAppMarkers = [
   'neighborly-notifications-${currentProfile.id}',
   'function isNewNeighbor(createdAt?: string | null)',
   'neighborhoodRankScore(profile)',
+  'Earned the New Neighbor badge',
+  'No recent public activity yet.',
 ];
 
 for (const marker of requiredAppMarkers) {
