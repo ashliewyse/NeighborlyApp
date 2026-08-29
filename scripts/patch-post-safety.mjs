@@ -77,7 +77,7 @@ const postSafetyMenu = `function PostOwnerMenu({
   async function blockPostAuthor() {
     if (!post.authorId || !canBlock || safetyBusy) return;
     const confirmed = window.confirm(
-      `Block ${post.author}? You will no longer see each other's profiles, posts, comments, or direct messages. Neighborly Admin will be notified.`,
+      "Block " + post.author + "? You will no longer see each other's profiles, posts, comments, or direct messages. Neighborly Admin will be notified.",
     );
     if (!confirmed) return;
     setOpen(false);
@@ -168,14 +168,14 @@ const postSafetyMenu = `function PostOwnerMenu({
                   Reporting sends this post to Neighborly Admin for review. The person who posted it is not told who submitted the report.
                 </div>
                 <div>
-                  <label htmlFor={`report-reason-${post.databaseId}`} className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Why are you reporting this?</label>
-                  <select id={`report-reason-${post.databaseId}`} value={reportReason} onChange={(event) => setReportReason(event.target.value)} disabled={safetyBusy} className="w-full rounded-lg border border-border bg-muted px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-purple-600/30 disabled:opacity-50">
+                  <label htmlFor={"report-reason-" + post.databaseId} className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Why are you reporting this?</label>
+                  <select id={"report-reason-" + post.databaseId} value={reportReason} onChange={(event) => setReportReason(event.target.value)} disabled={safetyBusy} className="w-full rounded-lg border border-border bg-muted px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-purple-600/30 disabled:opacity-50">
                     {reportReasons.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label htmlFor={`report-details-${post.databaseId}`} className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Additional details <span className="font-normal normal-case">(optional)</span></label>
-                  <textarea id={`report-details-${post.databaseId}`} rows={4} maxLength={1000} value={reportDetails} onChange={(event) => setReportDetails(event.target.value)} disabled={safetyBusy} placeholder="Tell Neighborly Admin what happened." className="w-full resize-none rounded-lg border border-border bg-muted px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-purple-600/30 disabled:opacity-50" />
+                  <label htmlFor={"report-details-" + post.databaseId} className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Additional details <span className="font-normal normal-case">(optional)</span></label>
+                  <textarea id={"report-details-" + post.databaseId} rows={4} maxLength={1000} value={reportDetails} onChange={(event) => setReportDetails(event.target.value)} disabled={safetyBusy} placeholder="Tell Neighborly Admin what happened." className="w-full resize-none rounded-lg border border-border bg-muted px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-purple-600/30 disabled:opacity-50" />
                   <p className="mt-1 text-right text-[11px] text-muted-foreground">{reportDetails.length}/1000</p>
                 </div>
                 {safetyError && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{safetyError}</p>}
