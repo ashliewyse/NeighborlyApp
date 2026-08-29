@@ -1,10 +1,17 @@
 import { type ReactNode, useEffect, useState } from "react";
-import { Clock3, LogOut, RefreshCw, ShieldCheck, XCircle } from "lucide-react";
+import { Clock3, LogOut, RefreshCw, ShieldAlert, ShieldCheck, XCircle } from "lucide-react";
 import { Navigate, Outlet, useLocation } from "react-router";
 import { useAuth } from "@/app/auth/AuthProvider";
 import { ImageWithFallback } from "@/app/components/figma/ImageWithFallback";
 import neighborlyLogo from "@/imports/Copilot_20260807_041314.png";
 import { supabase } from "@/lib/supabase";
+
+type RestrictionState = "active" | "warned" | "suspended" | "banned";
+type Restriction = {
+  state: RestrictionState;
+  public_reason: string | null;
+  suspended_until: string | null;
+};
 
 function AccessRequestScreen({
   status,
@@ -68,6 +75,39 @@ function AccessRequestScreen({
   );
 }
 
+function AccountRestrictionScreen({ restriction }: { restriction: Restriction }) {
+  const suspended = restriction.state === "suspended";
+  return (
+    <div className="min-h-screen bg-purple-950 px-4 py-10 font-['DM_Sans',sans-serif] flex items-center justify-center">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 text-center shadow-xl sm:p-8">
+        <ImageWithFallback src={neighborlyLogo} alt="Neighborly App" className="mx-auto mb-5 h-auto w-36 object-contain" />
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-50 text-red-600">
+          <ShieldAlert size={28} />
+        </div>
+        <h1 className="font-['Playfair_Display',serif] text-2xl font-bold text-foreground">
+          {suspended ? "Your Neighborly account is temporarily suspended" : "Your Neighborly account is restricted"}
+        </h1>
+        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+          {restriction.public_reason || (suspended
+            ? "Your account has been temporarily suspended while a community safety concern is reviewed."
+            : "Your account cannot currently enter Neighborly because of a community safety decision.")}
+        </p>
+        {suspended && restriction.suspended_until ? (
+          <div className="mt-4 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-800">
+            Scheduled to end <strong>{new Date(restriction.suspended_until).toLocaleString()}</strong>.
+          </div>
+        ) : null}
+        <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
+          If you believe this was a mistake, contact Neighborly administration and include the name and email on your account.
+        </p>
+        <button onClick={() => { void supabase.auth.signOut(); }} className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border px-4 py-3 text-sm font-semibold text-muted-foreground hover:bg-muted">
+          <LogOut size={16} /> Sign out
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function ProtectedRoute({ children }: { children?: ReactNode }) {
   const {
     user,
@@ -80,8 +120,34 @@ export function ProtectedRoute({ children }: { children?: ReactNode }) {
     refreshAccess,
   } = useAuth();
   const location = useLocation();
+  const [restriction, setRestriction] = useState<Restriction | null>(null);
+  const [restrictionLoading, setRestrictionLoading] = useState(false);
 
-  if (loading || (user && accessLoading)) {
+  useEffect(() => {
+    let cancelled = false;
+    if (!user) {
+      setRestriction(null);
+      setRestrictionLoading(false);
+      return () => { cancelled = true; };
+    }
+
+    setRestrictionLoading(true);
+    void supabase.rpc("my_account_restriction").then(({ data, error }) => {
+      if (cancelled) return;
+      if (error) {
+        console.error("Could not check account restriction", error);
+        setRestriction({ state: "active", public_reason: null, suspended_until: null });
+      } else {
+        const row = Array.isArray(data) ? data[0] : null;
+        setRestriction((row || { state: "active", public_reason: null, suspended_until: null }) as Restriction);
+      }
+      setRestrictionLoading(false);
+    });
+
+    return () => { cancelled = true; };
+  }, [user?.id]);
+
+  if (loading || (user && (accessLoading || restrictionLoading))) {
     return (
       <div className="min-h-screen bg-purple-950 flex items-center justify-center px-4 text-center text-white">
         Loading your Neighborly account…
@@ -103,6 +169,12 @@ export function ProtectedRoute({ children }: { children?: ReactNode }) {
         refreshAccess={refreshAccess}
       />
     );
+  }
+
+  const suspensionActive = restriction?.state === "suspended"
+    && (!restriction.suspended_until || new Date(restriction.suspended_until).getTime() > Date.now());
+  if (restriction?.state === "banned" || suspensionActive) {
+    return <AccountRestrictionScreen restriction={restriction} />;
   }
 
   return children ?? <Outlet />;
