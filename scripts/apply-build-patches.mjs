@@ -11,6 +11,7 @@ const patches = [
   "./patch-hardening-pass.mjs",
   "./patch-staff-dashboard-ux.mjs",
   "./patch-auth-canonical-origin.mjs",
+  "./patch-profile-mobile-actions.mjs",
 ];
 
 for (const patch of patches) {
@@ -35,6 +36,7 @@ const requiredAppMarkers = [
   'onProfileOpen={openProfileFromStaff}',
   'async function openProfileFromStaff(name: string, userId: string)',
   'supabase.from("post_likes")',
+  'flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2 mt-12 relative pl-2',
 ];
 
 for (const marker of requiredAppMarkers) {
