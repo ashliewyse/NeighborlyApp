@@ -15,6 +15,7 @@ const patches = [
   "./patch-post-response-notifications.mjs",
   "./patch-profile-badges-rank.mjs",
   "./patch-recent-activity-summary.mjs",
+  "./patch-comment-likes.mjs",
 ];
 
 for (const patch of patches) {
@@ -39,6 +40,9 @@ const requiredAppMarkers = [
   'onProfileOpen={openProfileFromStaff}',
   'async function openProfileFromStaff(name: string, userId: string)',
   'supabase.from("post_likes")',
+  'supabase.from("comment_likes")',
+  'async function toggleCommentLike(postId: number, commentId: number)',
+  'commentLikeCountsByComment',
   'flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2 mt-12 relative pl-2',
   'notification.type === "post_comment" || notification.type === "thread_comment"',
   'neighborly-notifications-${currentProfile.id}',
