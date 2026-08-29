@@ -189,7 +189,7 @@ if (!source.includes("void toggleCommentLike(post.id, c.id)")) {
                                 disabled={Boolean(c.databaseId && commentLikeBusyIds.has(c.databaseId))}
                                 className={\`inline-flex items-center gap-1 text-xs font-medium transition-colors disabled:cursor-wait disabled:opacity-60 \${c.liked ? "text-blue-600" : "text-muted-foreground hover:text-blue-600"}\`}
                                 aria-pressed={Boolean(c.liked)}
-                                aria-label={\`${c.liked ? "Unlike" : "Like"} ${c.author}'s comment\`}
+                                aria-label={(c.liked ? "Unlike " : "Like ") + c.author + "'s comment"}
                               >
                                 <ThumbsUp size={12} className={c.liked ? "fill-current" : ""} />
                                 {c.liked ? "Liked" : "Like"}
