@@ -39,7 +39,7 @@ function getFriendlyAuthError(error: AuthErrorLike | null, operation: AuthOperat
   if (code === "over_email_send_rate_limit" || message.includes("email rate limit")) {
     return operation === "password-reset"
       ? "Neighborly's password-reset email service is temporarily busy. Please wait a little while before requesting another link."
-      : "Neighborly couldn't send your confirmation email because our email service is temporarily busy. Your request was not submitted. Please wait a little while and try again.";
+      : "Neighborly couldn't send another confirmation email right now. If you already submitted your access request, it is still saved. Check your inbox and spam folder for the first confirmation email, then wait about a minute before trying again.";
   }
 
   if (code === "email_address_not_authorized" || message.includes("email address not authorized")) {
