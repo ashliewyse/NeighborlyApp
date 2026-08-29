@@ -10,6 +10,7 @@ const patches = [
   "./patch-blocked-member-settings.mjs",
   "./patch-hardening-pass.mjs",
   "./patch-staff-dashboard-ux.mjs",
+  "./patch-auth-canonical-origin.mjs",
 ];
 
 for (const patch of patches) {
@@ -20,6 +21,8 @@ const appPath = new URL("../src/app/App.tsx", import.meta.url);
 const app = fs.readFileSync(appPath, "utf8");
 const settingsPath = new URL("../src/app/components/SettingsView.tsx", import.meta.url);
 const settings = fs.readFileSync(settingsPath, "utf8");
+const authViewPath = new URL("../src/app/components/AuthView.tsx", import.meta.url);
+const authView = fs.readFileSync(authViewPath, "utf8");
 
 const requiredAppMarkers = [
   'from("safety_reports")',
@@ -42,6 +45,18 @@ for (const marker of requiredAppMarkers) {
 
 if (!settings.includes("<BlockedMembersSettings />")) {
   throw new Error("Neighborly build verification failed: blocked member settings are missing.");
+}
+
+const requiredAuthMarkers = [
+  'const NEIGHBORLY_PRODUCTION_ORIGIN = "https://www.neighborshelpingneighbors.online";',
+  'emailRedirectTo: `${getAuthRedirectOrigin()}/auth/callback?next=${encodeURIComponent("/profile")}`',
+  'redirectTo: `${getAuthRedirectOrigin()}/reset-password`',
+];
+
+for (const marker of requiredAuthMarkers) {
+  if (!authView.includes(marker)) {
+    throw new Error(`Neighborly build verification failed: missing auth redirect marker: ${marker}`);
+  }
 }
 
 console.log(`Neighborly build patches verified (${patches.length} patch modules).`);
