@@ -4,9 +4,9 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "prebuild": "node scripts/patch-feed-notifications.mjs && node scripts/patch-ad-card-fit.mjs && node scripts/patch-post-likes.mjs && node scripts/patch-announcement-profile-links.mjs && node scripts/patch-post-safety.mjs && node scripts/patch-moderator-access.mjs && node scripts/patch-blocked-member-settings.mjs && node scripts/patch-hardening-pass.mjs",
+    "prebuild": "node scripts/apply-build-patches.mjs",
     "build": "vite build",
-    "predev": "node scripts/patch-feed-notifications.mjs && node scripts/patch-ad-card-fit.mjs && node scripts/patch-post-likes.mjs && node scripts/patch-announcement-profile-links.mjs && node scripts/patch-post-safety.mjs && node scripts/patch-moderator-access.mjs && node scripts/patch-blocked-member-settings.mjs && node scripts/patch-hardening-pass.mjs",
+    "predev": "node scripts/apply-build-patches.mjs",
     "dev": "vite"
   },
   "dependencies": {
