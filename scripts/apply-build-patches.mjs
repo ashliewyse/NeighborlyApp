@@ -9,6 +9,7 @@ const patches = [
   "./patch-moderator-access.mjs",
   "./patch-blocked-member-settings.mjs",
   "./patch-hardening-pass.mjs",
+  "./patch-staff-dashboard-ux.mjs",
 ];
 
 for (const patch of patches) {
@@ -29,6 +30,7 @@ const requiredAppMarkers = [
   'targetType="business"',
   'ModeratorDashboard onBack={goToFeed} onProfileOpen={openProfileFromStaff}',
   'onProfileOpen={openProfileFromStaff}',
+  'async function openProfileFromStaff(name: string, userId: string)',
   'supabase.from("post_likes")',
 ];
 
