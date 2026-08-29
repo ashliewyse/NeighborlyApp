@@ -12,6 +12,7 @@ const patches = [
   "./patch-staff-dashboard-ux.mjs",
   "./patch-auth-canonical-origin.mjs",
   "./patch-profile-mobile-actions.mjs",
+  "./patch-post-response-notifications.mjs",
 ];
 
 for (const patch of patches) {
@@ -37,6 +38,8 @@ const requiredAppMarkers = [
   'async function openProfileFromStaff(name: string, userId: string)',
   'supabase.from("post_likes")',
   'flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2 mt-12 relative pl-2',
+  'notification.type === "post_comment" || notification.type === "thread_comment"',
+  'neighborly-notifications-${currentProfile.id}',
 ];
 
 for (const marker of requiredAppMarkers) {
