@@ -2,7 +2,10 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   Ban,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   Clock3,
+  History,
   RefreshCw,
   Search,
   Shield,
@@ -41,6 +44,44 @@ type PermissionKey =
   | "can_remove_comments"
   | "can_warn_members";
 
+type SafetyHistory = {
+  reports: Array<{
+    id: string;
+    target_type: string;
+    reason: string;
+    status: string;
+    reporter_name: string;
+    target_excerpt: string | null;
+    details: string | null;
+    created_at: string;
+    reviewed_at: string | null;
+  }>;
+  blocks: Array<{
+    direction: "blocked_by_member" | "member_was_blocked";
+    other_user_id: string;
+    other_name: string;
+    created_at: string;
+  }>;
+  actions: Array<{
+    id: string;
+    action_type: string;
+    actor_name: string;
+    note: string | null;
+    created_at: string;
+  }>;
+};
+
+type AuditRow = {
+  action_id: string;
+  actor_user_id: string;
+  actor_name: string;
+  target_user_id: string | null;
+  target_name: string;
+  action_type: string;
+  note: string | null;
+  created_at: string;
+};
+
 const PERMISSION_LABELS: Array<[PermissionKey, string]> = [
   ["can_review_reports", "Review reports"],
   ["can_view_blocks", "View block activity"],
@@ -48,6 +89,28 @@ const PERMISSION_LABELS: Array<[PermissionKey, string]> = [
   ["can_remove_comments", "Hide reported comments"],
   ["can_warn_members", "Warn members"],
 ];
+
+const ACTION_LABELS: Record<string, string> = {
+  report_reviewing: "Marked report reviewing",
+  report_escalated: "Escalated report",
+  report_resolved: "Resolved report",
+  report_dismissed: "Dismissed report",
+  hide_post: "Hid reported post",
+  hide_comment: "Hid reported comment",
+  restore_post: "Restored post",
+  restore_comment: "Restored comment",
+  warn_member: "Warned member",
+  suspend_member: "Suspended member",
+  ban_member: "Banned member",
+  restore_member: "Restored member",
+  grant_moderator: "Granted moderator access",
+  revoke_moderator: "Removed moderator access",
+  update_moderator_permissions: "Changed moderator permissions",
+};
+
+function actionLabel(action: string) {
+  return ACTION_LABELS[action] || action.replaceAll("_", " ");
+}
 
 function enforcementClasses(state: MemberRow["enforcement_state"]) {
   if (state === "banned") return "bg-red-100 text-red-700";
@@ -67,22 +130,32 @@ export function AdminMemberManagement({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [expandedMemberId, setExpandedMemberId] = useState<string | null>(null);
+  const [historyBusyId, setHistoryBusyId] = useState<string | null>(null);
+  const [histories, setHistories] = useState<Record<string, SafetyHistory>>({});
+  const [recentActions, setRecentActions] = useState<AuditRow[]>([]);
 
   useEffect(() => {
     let cancelled = false;
     const timer = window.setTimeout(async () => {
       setLoading(true);
       setError(null);
-      const { data, error: loadError } = await supabase.rpc("admin_member_directory", {
-        p_search: query.trim() || null,
-      });
+      const [directoryResult, auditResult] = await Promise.all([
+        supabase.rpc("admin_member_directory", { p_search: query.trim() || null }),
+        supabase.rpc("admin_recent_moderation_actions", { p_limit: 30 }),
+      ]);
       if (cancelled) return;
-      if (loadError) {
-        console.error("Could not load member directory", loadError);
+      if (directoryResult.error) {
+        console.error("Could not load member directory", directoryResult.error);
         setMembers([]);
         setError("The member directory could not be loaded.");
       } else {
-        setMembers((data || []) as MemberRow[]);
+        setMembers((directoryResult.data || []) as MemberRow[]);
+      }
+      if (auditResult.error) {
+        console.error("Could not load moderation audit log", auditResult.error);
+      } else {
+        setRecentActions((auditResult.data || []) as AuditRow[]);
       }
       setLoading(false);
     }, query ? 250 : 0);
@@ -130,6 +203,11 @@ export function AdminMemberManagement({
       console.error("Could not update moderator access", saveError);
       setError(saveError.message || "Moderator access could not be updated.");
     } else {
+      setHistories((current) => {
+        const next = { ...current };
+        delete next[member.user_id];
+        return next;
+      });
       setRefreshKey((value) => value + 1);
     }
     setBusyId(null);
@@ -188,9 +266,37 @@ export function AdminMemberManagement({
       console.error("Could not update member status", statusError);
       setError(statusError.message || "That member's account status could not be updated.");
     } else {
+      setHistories((current) => {
+        const next = { ...current };
+        delete next[member.user_id];
+        return next;
+      });
       setRefreshKey((value) => value + 1);
     }
     setBusyId(null);
+  }
+
+  async function toggleSafetyHistory(member: MemberRow) {
+    if (expandedMemberId === member.user_id) {
+      setExpandedMemberId(null);
+      return;
+    }
+    setExpandedMemberId(member.user_id);
+    if (histories[member.user_id]) return;
+
+    setHistoryBusyId(member.user_id);
+    setError(null);
+    const { data, error: historyError } = await supabase.rpc("admin_member_safety_summary", {
+      p_user_id: member.user_id,
+    });
+    if (historyError) {
+      console.error("Could not load member safety history", historyError);
+      setError(`Safety history for ${member.display_name} could not be loaded.`);
+    } else {
+      const safeData = (data || { reports: [], blocks: [], actions: [] }) as SafetyHistory;
+      setHistories((current) => ({ ...current, [member.user_id]: safeData }));
+    }
+    setHistoryBusyId(null);
   }
 
   return (
@@ -199,9 +305,9 @@ export function AdminMemberManagement({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="flex items-center gap-2 font-semibold text-purple-950"><UserCog size={18} /> Members & Moderators</div>
-            <p className="mt-1 text-xs leading-relaxed text-purple-800">Manage moderator permissions, warnings, temporary suspensions, and bans without opening Supabase.</p>
+            <p className="mt-1 text-xs leading-relaxed text-purple-800">Manage moderator permissions, warnings, temporary suspensions, bans, and member safety history without opening Supabase.</p>
           </div>
-          <button type="button" onClick={() => setRefreshKey((value) => value + 1)} className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-purple-700 shadow-sm hover:bg-purple-100"><RefreshCw size={15} /> Refresh</button>
+          <button type="button" onClick={() => { setHistories({}); setRefreshKey((value) => value + 1); }} className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-purple-700 shadow-sm hover:bg-purple-100"><RefreshCw size={15} /> Refresh</button>
         </div>
         <div className="mt-4 grid grid-cols-2 gap-2 sm:max-w-sm">
           <div className="rounded-xl bg-white p-3"><p className="text-[10px] font-semibold uppercase text-muted-foreground">Moderators</p><p className="mt-1 text-xl font-bold text-purple-700">{moderatorCount}</p></div>
@@ -224,6 +330,8 @@ export function AdminMemberManagement({
         <div className="space-y-3">
           {members.map((member) => {
             const busy = busyId === member.user_id;
+            const historyOpen = expandedMemberId === member.user_id;
+            const history = histories[member.user_id];
             return (
               <article key={member.user_id} className="rounded-2xl bg-white p-4 shadow-sm sm:p-5">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -241,7 +349,12 @@ export function AdminMemberManagement({
                     {member.suspended_until && member.enforcement_state === "suspended" ? <p className="mt-1 text-xs font-medium text-orange-700">Suspended until {new Date(member.suspended_until).toLocaleString()}</p> : null}
                     {member.public_reason ? <p className="mt-2 rounded-lg bg-muted px-3 py-2 text-xs text-foreground/75">{member.public_reason}</p> : null}
                   </div>
-                  {onProfileOpen ? <button type="button" onClick={() => onProfileOpen(member.display_name, member.user_id)} className="inline-flex flex-shrink-0 items-center justify-center gap-1.5 rounded-lg border border-purple-200 px-3 py-2 text-xs font-semibold text-purple-700 hover:bg-purple-50">View profile</button> : null}
+                  <div className="flex flex-shrink-0 flex-wrap gap-2">
+                    {onProfileOpen ? <button type="button" onClick={() => onProfileOpen(member.display_name, member.user_id)} className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-purple-200 px-3 py-2 text-xs font-semibold text-purple-700 hover:bg-purple-50">View profile</button> : null}
+                    <button type="button" onClick={() => { void toggleSafetyHistory(member); }} className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                      <History size={14} /> Safety history {historyOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                    </button>
+                  </div>
                 </div>
 
                 {!member.is_admin && member.access_status === "approved" ? (
@@ -281,11 +394,77 @@ export function AdminMemberManagement({
                 ) : (
                   <div className="mt-4 flex items-center gap-2 rounded-lg bg-purple-50 px-3 py-2 text-xs text-purple-800"><ShieldCheck size={14} /> Administrator accounts are protected from moderator and enforcement controls here.</div>
                 )}
+
+                {historyOpen ? (
+                  <div className="mt-4 border-t border-border pt-4">
+                    {historyBusyId === member.user_id ? (
+                      <p className="text-sm text-muted-foreground">Loading safety history…</p>
+                    ) : history ? (
+                      <div className="grid gap-4 lg:grid-cols-3">
+                        <div className="rounded-xl border border-red-100 bg-red-50/50 p-3">
+                          <h4 className="text-xs font-semibold uppercase tracking-wide text-red-800">Reports against member ({history.reports.length})</h4>
+                          <div className="mt-2 space-y-2">
+                            {history.reports.length === 0 ? <p className="text-xs text-muted-foreground">No reports.</p> : history.reports.map((report) => (
+                              <div key={report.id} className="rounded-lg bg-white p-2.5 text-xs">
+                                <p className="font-semibold capitalize">{report.target_type} · {report.reason.replaceAll("_", " ")} · {report.status}</p>
+                                <p className="mt-1 text-muted-foreground">Reported by {report.reporter_name} · {new Date(report.created_at).toLocaleString()}</p>
+                                {report.target_excerpt ? <p className="mt-1 line-clamp-3 text-foreground/75">{report.target_excerpt}</p> : null}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-3">
+                          <h4 className="text-xs font-semibold uppercase tracking-wide text-blue-800">Block history ({history.blocks.length})</h4>
+                          <div className="mt-2 space-y-2">
+                            {history.blocks.length === 0 ? <p className="text-xs text-muted-foreground">No block history.</p> : history.blocks.map((block, index) => (
+                              <div key={`${block.other_user_id}-${block.created_at}-${index}`} className="rounded-lg bg-white p-2.5 text-xs">
+                                <p className="font-semibold">{block.direction === "blocked_by_member" ? `Blocked ${block.other_name}` : `Blocked by ${block.other_name}`}</p>
+                                <p className="mt-1 text-muted-foreground">{new Date(block.created_at).toLocaleString()}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl border border-purple-100 bg-purple-50/50 p-3">
+                          <h4 className="text-xs font-semibold uppercase tracking-wide text-purple-800">Staff actions ({history.actions.length})</h4>
+                          <div className="mt-2 space-y-2">
+                            {history.actions.length === 0 ? <p className="text-xs text-muted-foreground">No staff actions.</p> : history.actions.map((action) => (
+                              <div key={action.id} className="rounded-lg bg-white p-2.5 text-xs">
+                                <p className="font-semibold">{actionLabel(action.action_type)}</p>
+                                <p className="mt-1 text-muted-foreground">{action.actor_name} · {new Date(action.created_at).toLocaleString()}</p>
+                                {action.note ? <p className="mt-1 text-foreground/75">{action.note}</p> : null}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No safety history loaded.</p>
+                    )}
+                  </div>
+                ) : null}
               </article>
             );
           })}
         </div>
       )}
+
+      <div className="rounded-2xl bg-white p-4 shadow-sm sm:p-5">
+        <div className="flex items-center gap-2"><History size={17} className="text-purple-700" /><h2 className="font-semibold">Recent moderation activity</h2></div>
+        <p className="mt-1 text-xs text-muted-foreground">A private audit trail of moderator and administrator safety actions.</p>
+        <div className="mt-3 space-y-2">
+          {recentActions.length === 0 ? <p className="rounded-lg bg-muted px-3 py-4 text-center text-sm text-muted-foreground">No moderation actions have been recorded yet.</p> : recentActions.map((action) => (
+            <div key={action.action_id} className="rounded-xl border border-border px-3 py-3 text-sm">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                <p><strong>{action.actor_name}</strong> · {actionLabel(action.action_type)}{action.target_user_id ? <> · <strong>{action.target_name}</strong></> : null}</p>
+                <p className="text-xs text-muted-foreground">{new Date(action.created_at).toLocaleString()}</p>
+              </div>
+              {action.note ? <p className="mt-1 text-xs text-muted-foreground">{action.note}</p> : null}
+            </div>
+          ))}
+        </div>
+      </div>
     </section>
   );
 }
