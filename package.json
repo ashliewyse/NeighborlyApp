@@ -4,9 +4,9 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "prebuild": "node scripts/patch-feed-notifications.mjs && node scripts/patch-ad-card-fit.mjs && node scripts/patch-post-likes.mjs && node scripts/patch-announcement-profile-links.mjs",
+    "prebuild": "node scripts/patch-feed-notifications.mjs && node scripts/patch-ad-card-fit.mjs && node scripts/patch-post-likes.mjs && node scripts/patch-announcement-profile-links.mjs && node scripts/patch-post-safety.mjs",
     "build": "vite build",
-    "predev": "node scripts/patch-feed-notifications.mjs && node scripts/patch-ad-card-fit.mjs && node scripts/patch-post-likes.mjs && node scripts/patch-announcement-profile-links.mjs",
+    "predev": "node scripts/patch-feed-notifications.mjs && node scripts/patch-ad-card-fit.mjs && node scripts/patch-post-likes.mjs && node scripts/patch-announcement-profile-links.mjs && node scripts/patch-post-safety.mjs",
     "dev": "vite"
   },
   "dependencies": {
