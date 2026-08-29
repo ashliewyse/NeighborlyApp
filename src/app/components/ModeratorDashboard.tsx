@@ -2,7 +2,13 @@ import React from "react";
 import { ChevronLeft, ShieldAlert } from "lucide-react";
 import { AdminSafetyPanel } from "@/app/components/AdminSafetyPanel";
 
-export function ModeratorDashboard({ onBack }: { onBack: () => void }) {
+export function ModeratorDashboard({
+  onBack,
+  onProfileOpen,
+}: {
+  onBack: () => void;
+  onProfileOpen?: (name: string, userId: string) => void;
+}) {
   return (
     <div className="min-h-screen bg-purple-950 pb-10 font-['DM_Sans',sans-serif]">
       <header className="sticky top-0 z-40 border-b border-purple-800 bg-purple-950/95 px-4 py-3 text-white backdrop-blur-sm">
@@ -28,11 +34,10 @@ export function ModeratorDashboard({ onBack }: { onBack: () => void }) {
         <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
           <p className="font-semibold">Moderator access</p>
           <p className="mt-1 text-xs leading-relaxed">
-            Moderators can review post reports and member block activity. Sign-up approvals, advertising controls,
-            official admin posts, and other administrator settings remain private to Neighborly administrators.
+            Moderators can review safety reports, see block activity, warn members, and hide reported posts or comments when their assigned permissions allow it. Account suspensions, bans, sign-up approvals, advertising controls, and administrator settings remain admin-only.
           </p>
         </section>
-        <AdminSafetyPanel />
+        <AdminSafetyPanel onProfileOpen={onProfileOpen} />
       </main>
     </div>
   );
