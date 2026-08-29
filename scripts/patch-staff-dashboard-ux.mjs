@@ -26,4 +26,11 @@ const clickableMemberName = `{onProfileOpen ? (\n                        <button
 members = replaceOnce(members, oldMemberName, clickableMemberName, "admin member clickable name");
 fs.writeFileSync(memberPath, members);
 
+const moderatorMemberPath = new URL("../src/app/components/ModeratorMemberTools.tsx", import.meta.url);
+let moderatorMembers = fs.readFileSync(moderatorMemberPath, "utf8");
+const oldModeratorMemberName = `<h3 className="font-semibold">{member.display_name}</h3>`;
+const clickableModeratorMemberName = `{onProfileOpen ? (\n                          <button\n                            type="button"\n                            onClick={() => onProfileOpen(member.display_name, member.user_id)}\n                            className="font-semibold text-left hover:text-purple-700 hover:underline"\n                          >\n                            {member.display_name}\n                          </button>\n                        ) : (\n                          <h3 className="font-semibold">{member.display_name}</h3>\n                        )}`;
+moderatorMembers = replaceOnce(moderatorMembers, oldModeratorMemberName, clickableModeratorMemberName, "moderator member clickable name");
+fs.writeFileSync(moderatorMemberPath, moderatorMembers);
+
 console.log("Improved staff profile navigation and member search UX.");
