@@ -58,6 +58,20 @@ for (const marker of requiredAppMarkers) {
   }
 }
 
+const personalGalleryStart = app.indexOf('<Camera size={14} /> Photo Gallery ({gallery.length})');
+const personalGalleryEnd = app.indexOf('{tab === "reviews"', personalGalleryStart);
+const personalGallery = app.slice(personalGalleryStart, personalGalleryEnd);
+const ownerOnlyGalleryControls = personalGallery.match(/\{isOwnProfile && \(/g) || [];
+
+if (
+  personalGalleryStart === -1
+  || personalGalleryEnd === -1
+  || ownerOnlyGalleryControls.length < 2
+  || !personalGallery.includes("No photos shared yet.")
+) {
+  throw new Error("Neighborly build verification failed: personal gallery upload controls must be owner-only.");
+}
+
 if (!settings.includes("<BlockedMembersSettings />")) {
   throw new Error("Neighborly build verification failed: blocked member settings are missing.");
 }

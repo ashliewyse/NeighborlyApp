@@ -2991,10 +2991,12 @@ function UserProfileView({
               <h2 className={`font-semibold text-sm flex items-center gap-2 ${T.accent}`}>
                 <Camera size={14} /> Photo Gallery ({gallery.length})
               </h2>
-              <label className={`flex items-center gap-1.5 ${T.btn} text-white text-xs font-medium px-3 py-2 rounded-lg cursor-pointer transition-colors`}>
-                <Plus size={13} /> Upload Photos
-                <input type="file" accept="image/*" multiple className="hidden" onChange={handleGalleryUpload} />
-              </label>
+              {isOwnProfile && (
+                <label className={`flex items-center gap-1.5 ${T.btn} text-white text-xs font-medium px-3 py-2 rounded-lg cursor-pointer transition-colors`}>
+                  <Plus size={13} /> Upload Photos
+                  <input type="file" accept="image/*" multiple className="hidden" onChange={handleGalleryUpload} />
+                </label>
+              )}
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -3003,11 +3005,18 @@ function UserProfileView({
                   <ExpandablePhoto src={p.url} alt={p.alt} buttonClassName="h-full w-full cursor-zoom-in" imageClassName="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
                 </div>
               ))}
-              <label className="aspect-[4/3] rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:border-primary/40 transition-colors text-muted-foreground">
-                <Plus size={20} className="mb-1 opacity-50" />
-                <span className="text-xs">Add more</span>
-                <input type="file" accept="image/*" multiple className="hidden" onChange={handleGalleryUpload} />
-              </label>
+              {isOwnProfile && (
+                <label className="aspect-[4/3] rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:border-primary/40 transition-colors text-muted-foreground">
+                  <Plus size={20} className="mb-1 opacity-50" />
+                  <span className="text-xs">Add more</span>
+                  <input type="file" accept="image/*" multiple className="hidden" onChange={handleGalleryUpload} />
+                </label>
+              )}
+              {!isOwnProfile && gallery.length === 0 && (
+                <p className="col-span-full rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
+                  No photos shared yet.
+                </p>
+              )}
             </div>
           </div>
         )}
