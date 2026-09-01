@@ -16,6 +16,7 @@ const patches = [
   "./patch-profile-badges-rank.mjs",
   "./patch-recent-activity-summary.mjs",
   "./patch-comment-likes.mjs",
+  "./patch-local-business-rotation.mjs",
 ];
 
 for (const patch of patches) {
