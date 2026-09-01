@@ -18,6 +18,7 @@ const patches = [
   "./patch-comment-likes.mjs",
   "./patch-local-business-rotation.mjs",
   "./patch-empty-events.mjs",
+  "./patch-business-contact-links.mjs",
 ];
 
 for (const patch of patches) {
@@ -55,6 +56,8 @@ const requiredAppMarkers = [
   'const EVENTS: any[] = [];',
   'const allEvents: any[] = [];',
   'Post a new event',
+  'showLocation?: boolean;',
+  'label: "Location"',
 ];
 
 for (const marker of requiredAppMarkers) {
@@ -79,6 +82,10 @@ if (
 
 if (!settings.includes("<BlockedMembersSettings />")) {
   throw new Error("Neighborly build verification failed: blocked member settings are missing.");
+}
+
+if (!settings.includes("Your city or Neighborly area is always shown.")) {
+  throw new Error("Neighborly build verification failed: business location privacy control is missing.");
 }
 
 const requiredAuthMarkers = [
