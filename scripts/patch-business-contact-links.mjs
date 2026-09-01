@@ -39,7 +39,7 @@ replaceApp(
 `        website: businessRow?.website || m.business_website || "",
         address: businessRow?.show_location
           ? [businessRow?.neighborhood || row?.neighborhood || m.neighborhood, businessRow?.city || row?.city || m.city, businessRow?.zip_code || row?.zip_code || m.zip_code].filter(Boolean).join(", ")
-          : "",
+          : (businessRow?.city || row?.city || m.city || ""),
         showLocation: Boolean(businessRow?.show_location),
         hours: [],`,
   "current business public location",
@@ -52,7 +52,7 @@ replaceApp(
 `            website: businessRow.website || "",
             address: businessRow.show_location
               ? [businessRow.neighborhood, businessRow.city, businessRow.zip_code].filter(Boolean).join(", ")
-              : "",
+              : (businessRow.city || ""),
             showLocation: Boolean(businessRow.show_location),
             hours: [],`,
   "saved business public location",
@@ -80,10 +80,10 @@ replaceApp(
 `                    label: "Location",
                     value: biz.address,
                     href: \`https://www.google.com/maps/search/?api=1&query=\${encodeURIComponent(biz.address)}\`,
-                    action: "Get directions",
+                    action: "View area",
                   },
                 ].filter((item) => Boolean(item.value?.trim())).map((item) => (`,
-  "optional location and blank contact filtering",
+  "general business area and blank contact filtering",
 );
 
 replaceApp(
@@ -150,8 +150,8 @@ replaceSettings(
                   <label className="flex items-start gap-3 text-sm font-medium cursor-pointer">
                     <input type="checkbox" checked={profile.showLocation} onChange={(e) => setField("showLocation", e.target.checked)} className="mt-0.5 h-4 w-4" />
                     <span>
-                      Show my location on my business profile
-                      <span className="mt-1 block text-xs font-normal text-muted-foreground">Only your neighborhood, city, and ZIP are shown. Neighborly does not publish a street address here.</span>
+                      Show more location detail on my business profile
+                      <span className="mt-1 block text-xs font-normal text-muted-foreground">Your city or Neighborly area is always shown. Turn this on if you also want your neighborhood and ZIP shown. Neighborly does not publish a street address here.</span>
                     </span>
                   </label>
                 </div>
@@ -161,4 +161,4 @@ replaceSettings(
 
 if (appChanged) fs.writeFileSync(appPath, app);
 if (settingsChanged) fs.writeFileSync(settingsPath, settings);
-console.log("Made business contact details readable/clickable and location opt-in.");
+console.log("Made business contact details readable/clickable with city always visible and extra location detail opt-in.");
