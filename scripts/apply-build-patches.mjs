@@ -1,6 +1,6 @@
 import fs from "node:fs";
 
-// Deployment marker: remove fake starter feed content and keep production patches verified.
+// Deployment marker: beta-readiness pass with real data, safer auth recovery, and area duplicate review.
 const patches = [
   "./patch-feed-notifications.mjs",
   "./patch-empty-initial-posts.mjs",
@@ -12,7 +12,10 @@ const patches = [
   "./patch-blocked-member-settings.mjs",
   "./patch-hardening-pass.mjs",
   "./patch-staff-dashboard-ux.mjs",
+  "./patch-area-review-admin.mjs",
   "./patch-auth-canonical-origin.mjs",
+  "./patch-auth-confirmation-resend.mjs",
+  "./patch-signup-area-suggestions.mjs",
   "./patch-profile-mobile-actions.mjs",
   "./patch-post-response-notifications.mjs",
   "./patch-profile-badges-rank.mjs",
@@ -21,6 +24,7 @@ const patches = [
   "./patch-local-business-rotation.mjs",
   "./patch-empty-events.mjs",
   "./patch-business-contact-links.mjs",
+  "./patch-remove-demo-directory-data.mjs",
 ];
 
 for (const patch of patches) {
@@ -37,6 +41,8 @@ const authView = fs.readFileSync(authViewPath, "utf8");
 const requiredAppMarkers = [
   'from("safety_reports")',
   'AdminMemberManagement',
+  'AreaReviewPanel',
+  'tab === "areas" && <AreaReviewPanel />',
   'SafetyReportButton targetType="comment"',
   'SafetyReportButton targetType="message"',
   'targetType="profile"',
@@ -61,11 +67,19 @@ const requiredAppMarkers = [
   'Post a new event',
   'showLocation?: boolean;',
   'label: "Location"',
+  'const BUSINESSES: Business[] = [];',
+  'const USER_PROFILES: Record<string, UserProfile> = {};',
 ];
 
 for (const marker of requiredAppMarkers) {
   if (!app.includes(marker)) {
     throw new Error(`Neighborly build verification failed: missing App marker: ${marker}`);
+  }
+}
+
+for (const fakeMarker of ['name: "Martinez Plumbing"', 'name: "Corner Market Deli"', '"Maria Santos": {', '"James Whitfield": {']) {
+  if (app.includes(fakeMarker)) {
+    throw new Error(`Neighborly build verification failed: fake directory data remains: ${fakeMarker}`);
   }
 }
 
@@ -95,11 +109,16 @@ const requiredAuthMarkers = [
   'const NEIGHBORLY_PRODUCTION_ORIGIN = "https://www.neighborshelpingneighbors.online";',
   'emailRedirectTo: `${getAuthRedirectOrigin()}/auth/callback?next=${encodeURIComponent("/profile")}`',
   'redirectTo: `${getAuthRedirectOrigin()}/reset-password`',
+  'async function handleResendConfirmation()',
+  'Send a new confirmation email',
+  'from("community_areas")',
+  'list="neighborly-city-options"',
+  'list="neighborly-neighborhood-options"',
 ];
 
 for (const marker of requiredAuthMarkers) {
   if (!authView.includes(marker)) {
-    throw new Error(`Neighborly build verification failed: missing auth redirect marker: ${marker}`);
+    throw new Error(`Neighborly build verification failed: missing auth marker: ${marker}`);
   }
 }
 
