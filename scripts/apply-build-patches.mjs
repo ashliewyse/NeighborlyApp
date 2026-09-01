@@ -17,6 +17,7 @@ const patches = [
   "./patch-recent-activity-summary.mjs",
   "./patch-comment-likes.mjs",
   "./patch-local-business-rotation.mjs",
+  "./patch-empty-events.mjs",
 ];
 
 for (const patch of patches) {
@@ -51,6 +52,9 @@ const requiredAppMarkers = [
   'neighborhoodRankScore(profile)',
   'Earned the New Neighbor badge',
   'No recent public activity yet.',
+  'const EVENTS: any[] = [];',
+  'const allEvents: any[] = [];',
+  'Post a new event',
 ];
 
 for (const marker of requiredAppMarkers) {
