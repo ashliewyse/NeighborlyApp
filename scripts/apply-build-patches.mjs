@@ -1,8 +1,9 @@
 import fs from "node:fs";
 
-// Deployment marker: final business contact visibility behavior.
+// Deployment marker: remove fake starter feed content and keep production patches verified.
 const patches = [
   "./patch-feed-notifications.mjs",
+  "./patch-empty-initial-posts.mjs",
   "./patch-ad-card-fit.mjs",
   "./patch-post-likes.mjs",
   "./patch-announcement-profile-links.mjs",
@@ -54,6 +55,7 @@ const requiredAppMarkers = [
   'neighborhoodRankScore(profile)',
   'Earned the New Neighbor badge',
   'No recent public activity yet.',
+  'const INITIAL_POSTS: Post[] = [];',
   'const EVENTS: any[] = [];',
   'const allEvents: any[] = [];',
   'Post a new event',
