@@ -1,5 +1,6 @@
 import fs from "node:fs";
 
+// Deployment marker: final business contact visibility behavior.
 const patches = [
   "./patch-feed-notifications.mjs",
   "./patch-ad-card-fit.mjs",
