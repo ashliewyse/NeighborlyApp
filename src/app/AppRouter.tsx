@@ -90,14 +90,23 @@ function AuthCallbackPage() {
   if (!loading && user) return <Navigate to={next} replace />;
 
   const callbackError = searchParams.get("error_description") || error;
+  const callbackErrorCode = searchParams.get("error_code") || "";
+  const expiredLink =
+    callbackErrorCode.toLowerCase().includes("expired") ||
+    (callbackError || "").toLowerCase().includes("expired");
+
   if (!loading && callbackError) {
     return (
       <div className="min-h-screen bg-purple-950 flex items-center justify-center p-4">
         <div className="max-w-md rounded-2xl bg-white p-6 text-center shadow-xl">
-          <h1 className="text-xl font-bold">We could not confirm that link</h1>
-          <p className="mt-2 text-sm text-muted-foreground">{callbackError}</p>
+          <h1 className="text-xl font-bold">{expiredLink ? "That confirmation link expired" : "We could not confirm that link"}</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {expiredLink
+              ? "Confirmation links are time-limited. Return to sign in, enter your email and password, and Neighborly will give you an option to send a fresh confirmation email."
+              : callbackError}
+          </p>
           <a href="/sign-in" className="mt-5 inline-flex rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white">
-            Return to sign in
+            {expiredLink ? "Return to sign in & get a new link" : "Return to sign in"}
           </a>
         </div>
       </div>
