@@ -1401,7 +1401,16 @@ function BusinessProfileView({
   const [themeOpen, setThemeOpen] = useState(false);
   const [mediaBusy, setMediaBusy] = useState(false);
   const [mediaError, setMediaError] = useState<string | null>(null);
+  const [businessCrop, setBusinessCrop] = useState<{ src: string; kind: "logo" | "cover" } | null>(null);
+  const businessCropSource = useRef<string | null>(null);
   const T = PROFILE_THEMES[theme];
+
+  useEffect(() => () => {
+    if (businessCrop) {
+      URL.revokeObjectURL(businessCrop.src);
+      if (businessCropSource.current === businessCrop.src) businessCropSource.current = null;
+    }
+  }, [businessCrop]);
 
   useEffect(() => {
     if (isOwnProfile) return;
@@ -1443,15 +1452,33 @@ function BusinessProfileView({
     return supabase.storage.from("neighborly-media").getPublicUrl(path).data.publicUrl;
   }
 
-  async function saveBusinessImage(e: React.ChangeEvent<HTMLInputElement>, kind: "logo" | "cover") {
-    if (!isOwnProfile) return;
+  function openBusinessCrop(e: React.ChangeEvent<HTMLInputElement>, kind: "logo" | "cover") {
     const file = e.target.files?.[0];
     e.target.value = "";
-    if (!file) return;
+    if (!isOwnProfile || mediaBusy || !file) return;
+    setMediaError(null);
+    const src = URL.createObjectURL(file);
+    businessCropSource.current = src;
+    setBusinessCrop({ src, kind });
+  }
+
+  function closeBusinessCrop() {
+    businessCropSource.current = null;
+    setBusinessCrop(null);
+  }
+
+  async function saveBusinessImage(croppedUrl: string, kind: "logo" | "cover", source: string) {
+    if (!isOwnProfile || mediaBusy || businessCropSource.current !== source) {
+      URL.revokeObjectURL(croppedUrl);
+      return;
+    }
+    closeBusinessCrop();
     setMediaBusy(true); setMediaError(null);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("You must be signed in.");
+      const croppedBlob = await (await fetch(croppedUrl)).blob();
+      const file = new File([croppedBlob], kind + ".jpg", { type: "image/jpeg" });
       const publicUrl = await uploadBusinessFile(file, kind);
       const update = kind === "logo" ? { logo_url: publicUrl } : { cover_url: publicUrl };
       const { error } = await supabase.from("business_profiles").update({ ...update, updated_at: new Date().toISOString() }).eq("user_id", user.id);
@@ -1463,7 +1490,7 @@ function BusinessProfileView({
         if (profileError) throw profileError;
       } else setCoverUrl(publicUrl);
     } catch (e: any) { setMediaError(e?.message || "Could not save business photo."); }
-    finally { setMediaBusy(false); }
+    finally { URL.revokeObjectURL(croppedUrl); setMediaBusy(false); }
   }
 
   async function saveBusinessGallery(e: React.ChangeEvent<HTMLInputElement>) {
@@ -1543,14 +1570,14 @@ function BusinessProfileView({
           <div className="pb-0">
             <div className={`relative mb-4 h-36 sm:h-52 overflow-hidden rounded-xl bg-gradient-to-r ${T.cover}`}>
               {coverUrl && <img src={coverUrl} alt={biz.name + " cover"} className="h-full w-full object-cover" />}
-              {isOwnProfile && <label className="absolute right-3 bottom-3 cursor-pointer rounded-lg bg-white/95 px-3 py-2 text-xs font-semibold shadow"><Camera size={13} className="inline mr-1" />Change Cover<input type="file" accept="image/*" className="hidden" onChange={(e) => void saveBusinessImage(e, "cover")} /></label>}
+              {isOwnProfile && <label className="absolute right-3 bottom-3 cursor-pointer rounded-lg bg-white/95 px-3 py-2 text-xs font-semibold shadow"><Camera size={13} className="inline mr-1" />Change Cover<input type="file" accept="image/*" className="hidden" disabled={mediaBusy} onChange={(e) => openBusinessCrop(e, "cover")} /></label>}
             </div>
             {mediaError && isOwnProfile && <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{mediaError}</div>}
             {mediaBusy && isOwnProfile && <div className="mb-3 text-xs text-muted-foreground">Saving photo…</div>}
             <div className="flex flex-col sm:flex-row sm:items-end gap-4 pb-4">
               <div className="relative w-20 h-20 rounded-2xl bg-card border-4 border-card shadow-md flex items-center justify-center text-primary flex-shrink-0 overflow-hidden">
                 {logoUrl ? <img src={logoUrl} alt={biz.name} className="w-full h-full object-cover" /> : <Briefcase size={28} />}
-                {isOwnProfile && <label className="absolute inset-x-0 bottom-0 cursor-pointer bg-black/55 py-1 text-center text-[10px] text-white">Edit<input type="file" accept="image/*" className="hidden" onChange={(e) => void saveBusinessImage(e, "logo")} /></label>}
+                {isOwnProfile && <label className="absolute inset-x-0 bottom-0 cursor-pointer bg-black/55 py-1 text-center text-[10px] text-white">Edit<input type="file" accept="image/*" className="hidden" disabled={mediaBusy} onChange={(e) => openBusinessCrop(e, "logo")} /></label>}
               </div>
               <div className="flex-1 pb-1">
                 <div className="flex flex-wrap items-center gap-2 mb-1">
@@ -2139,6 +2166,14 @@ function BusinessProfileView({
           </div>
         )}
       </div>
+      {isOwnProfile && businessCrop && (
+        <CropModal
+          src={businessCrop.src}
+          mode={businessCrop.kind === "logo" ? "avatar" : "cover"}
+          onApply={(url) => void saveBusinessImage(url, businessCrop.kind, businessCrop.src)}
+          onClose={closeBusinessCrop}
+        />
+      )}
     </div>
   );
 }

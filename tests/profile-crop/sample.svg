@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800">
+  <rect width="1200" height="800" fill="#dbeafe"/>
+  <rect width="400" height="800" fill="#2563eb"/>
+  <rect x="800" width="400" height="800" fill="#16a34a"/>
+  <circle cx="600" cy="400" r="180" fill="#f97316"/>
+  <text x="600" y="420" text-anchor="middle" font-family="sans-serif" font-size="60" fill="white">Crop test</text>
+</svg>
