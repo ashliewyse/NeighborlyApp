@@ -2224,16 +2224,30 @@ function CropModal({
 }) {
   const cfg = CROP_CFG[mode];
   const imgRef = useRef<HTMLImageElement>(null);
+  const [viewportElement, setViewportElement] = useState<HTMLDivElement | null>(null);
+  const [viewportWidth, setViewportWidth] = useState<number>(cfg.w);
   const [zoom, setZoom] = useState(1);
   const [cx, setCx] = useState(0);
   const [cy, setCy] = useState(0);
   const [natW, setNatW] = useState(0);
   const [natH, setNatH] = useState(0);
-  const [baseScale, setBaseScale] = useState(1);
   const [applying, setApplying] = useState(false);
-  const drag = useRef<{ sx: number; sy: number; scx: number; scy: number } | null>(null);
+  const drag = useRef<{ pointerId: number; sx: number; sy: number; scx: number; scy: number } | null>(null);
 
+  const viewportHeight = viewportWidth * cfg.outH / cfg.outW;
+  const baseScale = natW && natH ? Math.max(viewportWidth / natW, viewportHeight / natH) : 1;
   const displayScale = baseScale * zoom;
+
+  useEffect(() => {
+    const viewport = viewportElement;
+    if (!viewport) return;
+    setViewportWidth(viewport.clientWidth);
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry.contentRect.width > 0) setViewportWidth(entry.contentRect.width);
+    });
+    observer.observe(viewport);
+    return () => observer.disconnect();
+  }, [viewportElement]);
 
   function onImgLoad() {
     const img = imgRef.current!;
@@ -2241,8 +2255,6 @@ function CropModal({
     const nH = img.naturalHeight;
     setNatW(nW);
     setNatH(nH);
-    const bs = Math.max(cfg.w / nW, cfg.h / nH);
-    setBaseScale(bs);
     setZoom(1);
     setCx(nW / 2);
     setCy(nH / 2);
@@ -2250,19 +2262,22 @@ function CropModal({
 
   function clamp(nx: number, ny: number, z: number) {
     const ds = baseScale * z;
-    const hW = cfg.w / (2 * ds);
-    const hH = cfg.h / (2 * ds);
+    const hW = viewportWidth / (2 * ds);
+    const hH = viewportHeight / (2 * ds);
     const cx = hW >= natW / 2 ? Math.max(0, Math.min(natW, nx)) : Math.max(hW, Math.min(natW - hW, nx));
     const cy = hH >= natH / 2 ? Math.max(0, Math.min(natH, ny)) : Math.max(hH, Math.min(natH - hH, ny));
     return { cx, cy };
   }
 
-  function onMouseDown(e: React.MouseEvent) {
+  function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.button !== 0 || drag.current || !natW || applying) return;
     e.preventDefault();
-    drag.current = { sx: e.clientX, sy: e.clientY, scx: cx, scy: cy };
+    e.currentTarget.setPointerCapture(e.pointerId);
+    drag.current = { pointerId: e.pointerId, sx: e.clientX, sy: e.clientY, scx: cx, scy: cy };
   }
-  function onMouseMove(e: React.MouseEvent) {
-    if (!drag.current) return;
+  function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (!drag.current || drag.current.pointerId !== e.pointerId) return;
+    e.preventDefault();
     const dx = e.clientX - drag.current.sx;
     const dy = e.clientY - drag.current.sy;
     const { cx: ncx, cy: ncy } = clamp(
@@ -2273,7 +2288,11 @@ function CropModal({
     setCx(ncx);
     setCy(ncy);
   }
-  function onMouseUp() { drag.current = null; }
+  function onPointerEnd(e: React.PointerEvent<HTMLDivElement>) {
+    if (drag.current?.pointerId !== e.pointerId) return;
+    drag.current = null;
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+  }
 
   function onWheel(e: React.WheelEvent) {
     e.preventDefault();
@@ -2289,14 +2308,14 @@ function CropModal({
     setApplying(true);
     const url = await getCanvasCrop(
       imgRef.current, cx, cy, displayScale,
-      cfg.w, cfg.h, cfg.outW, cfg.outH,
+      viewportWidth, viewportHeight, cfg.outW, cfg.outH,
     );
     onApply(url);
     setApplying(false);
   }
 
-  const imgL = cfg.w / 2 - cx * displayScale;
-  const imgT = cfg.h / 2 - cy * displayScale;
+  const imgL = viewportWidth / 2 - cx * displayScale;
+  const imgT = viewportHeight / 2 - cy * displayScale;
 
   return (
     <Dialog.Root open onOpenChange={(o) => { if (!o) onClose(); }}>
@@ -2304,7 +2323,7 @@ function CropModal({
         <Dialog.Overlay className="fixed inset-0 bg-black/75 z-[60] backdrop-blur-sm animate-in fade-in-0 duration-200" />
         <Dialog.Content
           className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[61] bg-white rounded-2xl shadow-2xl overflow-hidden animate-in fade-in-0 zoom-in-95 duration-200"
-          style={{ width: `min(95vw, ${cfg.w + 64}px)` }}
+          style={{ width: `min(95vw, ${cfg.w + 64}px)`, maxHeight: "95dvh", overflowY: "auto" }}
           aria-describedby={undefined}
         >
           {/* Header */}
@@ -2323,17 +2342,19 @@ function CropModal({
           {/* Viewport */}
           <div className="flex flex-col items-center gap-4 p-5">
             <div
-              className="relative overflow-hidden rounded-xl bg-stone-900 select-none"
+              ref={setViewportElement}
+              className="relative overflow-hidden rounded-xl bg-stone-900 select-none cursor-grab active:cursor-grabbing"
               style={{
                 width: cfg.w,
-                height: cfg.h,
+                aspectRatio: `${cfg.outW} / ${cfg.outH}`,
                 maxWidth: "100%",
-                cursor: drag.current ? "grabbing" : "grab",
+                touchAction: "none",
               }}
-              onMouseDown={onMouseDown}
-              onMouseMove={onMouseMove}
-              onMouseUp={onMouseUp}
-              onMouseLeave={onMouseUp}
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerEnd}
+              onPointerCancel={onPointerEnd}
+              onLostPointerCapture={onPointerEnd}
               onWheel={onWheel}
             >
               {/* Image */}

@@ -11,7 +11,7 @@ export default mergeConfig(appConfig, defineConfig({
       name: 'profile-crop-scan-export',
       setup(build) {
         build.onLoad({ filter: /[\\/]src[\\/]app[\\/]App\.tsx$/ }, async ({ path }) => ({
-          contents: await readFile(path, 'utf8') + '\nexport { BusinessProfileView };\n',
+          contents: await readFile(path, 'utf8') + '\nexport { BusinessProfileView, CropModal };\n',
           loader: 'tsx',
         }));
       },
@@ -22,7 +22,7 @@ export default mergeConfig(appConfig, defineConfig({
     enforce: 'pre',
     transform(code, id) {
       if (id.replace(/\\/g, '/').endsWith('/src/app/App.tsx')) {
-        return code + '\nexport { BusinessProfileView };\n';
+        return code + '\nexport { BusinessProfileView, CropModal };\n';
       }
     },
   }],

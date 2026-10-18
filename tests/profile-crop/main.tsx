@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { BusinessProfileView } from '../../src/app/App';
 import { calls } from './supabase';
 import '../../src/styles/index.css';
+import { DragChecks } from './drag-checks';
 
 const business = {
   id: 1, name: 'Crop Test Business', category: 'Services', city: 'Test City',
@@ -39,4 +40,4 @@ function Harness() {
   </>;
 }
 
-createRoot(document.getElementById('root')!).render(<Harness />);
+createRoot(document.getElementById('root')!).render(location.search.includes('drag-checks') ? <DragChecks /> : <Harness />);

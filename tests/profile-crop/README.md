@@ -16,3 +16,11 @@ Check each of **Change Cover** and **Edit**:
 5. Open with `?visitor` and verify neither edit control appears.
 6. Enable **Delay crop processing**, open a crop, Apply, then Cancel while Applying.
    After processing finishes there must be no upload or metadata update.
+
+For repeatable drag regressions, open the same URL with `?drag-checks` and click
+**Run drag checks**. Run at desktop and phone widths. The eight checks exercise
+the actual cropper's mouse/touch pointer handlers, unrelated pointers, cancellation,
+frame dimensions, and exported JPEG pixels after zooming and panning. Synthetic
+pointer capture is stubbed; also verify a real mouse drag continues past the crop
+frame edge, stops on release, and can start again. On a phone, check finger dragging
+inside both crop frames and ensure the page does not scroll during the drag.
