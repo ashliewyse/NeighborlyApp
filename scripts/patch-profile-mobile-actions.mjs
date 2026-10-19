@@ -13,5 +13,17 @@ if (!source.includes(responsive)) {
   source = source.replace(legacy, responsive);
 }
 
+// The business color button is leftmost on phones. Anchor its wider menu to
+// that left edge below sm, while preserving the existing desktop alignment.
+const businessMenu = '<div role="menu" className="absolute right-0 top-full z-50 mt-1 w-48 overflow-hidden rounded-xl border border-border bg-white shadow-xl">';
+const responsiveBusinessMenu = '<div role="menu" className="absolute left-0 right-auto sm:left-auto sm:right-0 top-full z-50 mt-1 w-48 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-border bg-white shadow-xl">';
+
+if (!source.includes(responsiveBusinessMenu)) {
+  if (source.split(businessMenu).length !== 2) {
+    throw new Error("Could not uniquely identify the business-profile color menu.");
+  }
+  source = source.replace(businessMenu, responsiveBusinessMenu);
+}
+
 fs.writeFileSync(appPath, source);
-console.log("Applied responsive wrapping to user-profile action buttons.");
+console.log("Applied responsive profile actions and mobile business color-menu alignment.");
