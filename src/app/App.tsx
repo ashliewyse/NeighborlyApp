@@ -1405,12 +1405,17 @@ function BusinessProfileView({
   const businessCropSource = useRef<string | null>(null);
   const T = PROFILE_THEMES[theme];
   const isMidnightDark = theme === "Midnight Dark";
-  const profileHeaderSurface = isMidnightDark
-    ? "bg-gradient-to-b from-slate-950 via-slate-900 to-slate-800 text-slate-100"
-    : "bg-white";
-  const profileControlSurface = isMidnightDark
-    ? "border-slate-700 bg-slate-900 text-slate-100 hover:bg-slate-800"
-    : "border-border bg-white text-foreground hover:bg-muted";
+  const PROFILE_SURFACES: Record<ThemeName, { header: string; border: string; control: string; menu: string; menuHover: string; muted: string }> = {
+    "Classic Blue": { header: "bg-gradient-to-b from-blue-100 via-blue-50 to-sky-50 text-slate-900", border: "border-blue-200", control: "bg-white/90 text-blue-950 hover:bg-blue-100", menu: "bg-white text-slate-900", menuHover: "hover:bg-blue-50", muted: "text-slate-600" },
+    "Ocean Breeze": { header: "bg-gradient-to-b from-cyan-100 via-teal-50 to-sky-50 text-slate-900", border: "border-teal-200", control: "bg-white/90 text-teal-950 hover:bg-teal-100", menu: "bg-white text-slate-900", menuHover: "hover:bg-teal-50", muted: "text-slate-600" },
+    "Sunset Glow": { header: "bg-gradient-to-b from-orange-100 via-rose-50 to-pink-50 text-slate-900", border: "border-rose-200", control: "bg-white/90 text-rose-950 hover:bg-rose-100", menu: "bg-white text-slate-900", menuHover: "hover:bg-rose-50", muted: "text-slate-600" },
+    "Emerald Forest": { header: "bg-gradient-to-b from-emerald-100 via-green-50 to-lime-50 text-slate-900", border: "border-emerald-200", control: "bg-white/90 text-emerald-950 hover:bg-emerald-100", menu: "bg-white text-slate-900", menuHover: "hover:bg-emerald-50", muted: "text-slate-600" },
+    "Royal Purple": { header: "bg-gradient-to-b from-purple-100 via-violet-50 to-fuchsia-50 text-slate-900", border: "border-purple-200", control: "bg-white/90 text-purple-950 hover:bg-purple-100", menu: "bg-white text-slate-900", menuHover: "hover:bg-purple-50", muted: "text-slate-600" },
+    "Midnight Dark": { header: "bg-gradient-to-b from-slate-950 via-slate-900 to-slate-800 text-slate-100", border: "border-slate-700", control: "bg-slate-900/90 text-slate-100 hover:bg-slate-800", menu: "bg-slate-900 text-slate-100", menuHover: "hover:bg-slate-800", muted: "text-slate-400" },
+  };
+  const S = PROFILE_SURFACES[theme];
+  const profileHeaderSurface = S.header;
+  const profileControlSurface = `${S.border} ${S.control}`;
 
   useEffect(() => () => {
     if (businessCrop) {
@@ -1550,7 +1555,7 @@ function BusinessProfileView({
   return (
     <div className={`min-h-screen ${T.bar}`}>
       {/* Profile header */}
-      <div className={`${profileHeaderSurface} border-b ${isMidnightDark ? "border-slate-700" : "border-border"}`}>
+      <div className={`${profileHeaderSurface} border-b ${S.border}`}>
         <div className="max-w-4xl mx-auto px-4">
           <div className="flex items-center justify-between py-3">
             <button
@@ -1623,7 +1628,7 @@ function BusinessProfileView({
                       Change Color <ChevronDown size={12} />
                     </button>
                     {themeOpen && (
-                      <div role="menu" className={`absolute right-0 top-full z-50 mt-1 w-48 overflow-hidden rounded-xl border shadow-xl ${isMidnightDark ? "border-slate-700 bg-slate-900 text-slate-100" : "border-border bg-white text-foreground"}`}>
+                      <div role="menu" className={`absolute left-0 right-auto sm:left-auto sm:right-0 top-full z-50 mt-1 w-56 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border shadow-xl ${S.border} ${S.menu}`}>
                         {(Object.keys(PROFILE_THEMES) as ThemeName[]).map((option) => (
                           <button
                             key={option}
@@ -1631,7 +1636,7 @@ function BusinessProfileView({
                             role="menuitemradio"
                             aria-checked={option === theme}
                             onClick={() => { void saveBusinessTheme(option); }}
-                            className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm transition-colors ${isMidnightDark ? "hover:bg-slate-800" : "hover:bg-muted"} ${option === theme ? "font-semibold" : ""}`}
+                            className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm transition-colors ${S.menuHover} ${option === theme ? "font-semibold" : ""}`}
                           >
                             <span className={`h-4 w-4 flex-shrink-0 rounded-full bg-gradient-to-br ${PROFILE_THEMES[option].cover}`} aria-hidden="true" />
                             {option}
@@ -2843,7 +2848,7 @@ function UserProfileView({
         )}
       </div>
 
-      <div className={`${isOwnProfile ? T.tint : "bg-white"} border-b border-border`}>
+      <div className={`${profileHeaderSurface} border-b ${S.border}`}>
         <div className="max-w-3xl mx-auto px-4">
           {/* Avatar row + action buttons */}
           <div className="flex items-start justify-between -mt-10 pt-0 pb-2">
