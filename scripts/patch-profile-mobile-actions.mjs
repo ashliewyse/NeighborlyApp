@@ -18,7 +18,9 @@ if (!source.includes(responsive)) {
 const businessMenu = '<div role="menu" className="absolute right-0 top-full z-50 mt-1 w-48 overflow-hidden rounded-xl border border-border bg-white shadow-xl">';
 const responsiveBusinessMenu = '<div role="menu" className="absolute left-0 right-auto sm:left-auto sm:right-0 top-full z-50 mt-1 w-48 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-border bg-white shadow-xl">';
 
-if (!source.includes(responsiveBusinessMenu)) {
+const alreadyDarkModeAwareMenu = source.includes('role="menu" className={`absolute right-0 top-full z-50 mt-1 w-48 overflow-hidden rounded-xl border shadow-xl ${isMidnightDark ? "border-slate-700 bg-slate-900 text-slate-100" : "border-border bg-white text-foreground"}`}');
+
+if (!source.includes(responsiveBusinessMenu) && !alreadyDarkModeAwareMenu) {
   if (source.split(businessMenu).length !== 2) {
     throw new Error("Could not uniquely identify the business-profile color menu.");
   }
