@@ -1404,6 +1404,13 @@ function BusinessProfileView({
   const [businessCrop, setBusinessCrop] = useState<{ src: string; kind: "logo" | "cover" } | null>(null);
   const businessCropSource = useRef<string | null>(null);
   const T = PROFILE_THEMES[theme];
+  const isMidnightDark = theme === "Midnight Dark";
+  const profileHeaderSurface = isMidnightDark
+    ? "bg-gradient-to-b from-slate-950 via-slate-900 to-slate-800 text-slate-100"
+    : "bg-white";
+  const profileControlSurface = isMidnightDark
+    ? "border-slate-700 bg-slate-900 text-slate-100 hover:bg-slate-800"
+    : "border-border bg-white text-foreground hover:bg-muted";
 
   useEffect(() => () => {
     if (businessCrop) {
@@ -1543,7 +1550,7 @@ function BusinessProfileView({
   return (
     <div className={`min-h-screen ${T.bar}`}>
       {/* Profile header */}
-      <div className="bg-white border-b border-border">
+      <div className={`${profileHeaderSurface} border-b ${isMidnightDark ? "border-slate-700" : "border-border"}`}>
         <div className="max-w-4xl mx-auto px-4">
           <div className="flex items-center justify-between py-3">
             <button
@@ -1559,7 +1566,7 @@ function BusinessProfileView({
                 </button>
               )}
               {isOwnProfile && onSettings && (
-                <button onClick={onSettings} className="inline-flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-medium text-foreground hover:bg-muted">
+                <button onClick={onSettings} className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${profileControlSurface}`}>
                   ⚙️ Settings
                 </button>
               )}
@@ -1610,13 +1617,13 @@ function BusinessProfileView({
                       onClick={() => setThemeOpen((open) => !open)}
                       aria-expanded={themeOpen}
                       aria-haspopup="menu"
-                      className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border bg-white px-3 py-2 text-sm font-medium hover:bg-muted"
+                      className={`flex w-full items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${profileControlSurface}`}
                     >
                       <span className={`h-3 w-3 rounded-full bg-gradient-to-br ${T.cover}`} aria-hidden="true" />
                       Change Color <ChevronDown size={12} />
                     </button>
                     {themeOpen && (
-                      <div role="menu" className="absolute right-0 top-full z-50 mt-1 w-48 overflow-hidden rounded-xl border border-border bg-white shadow-xl">
+                      <div role="menu" className={`absolute right-0 top-full z-50 mt-1 w-48 overflow-hidden rounded-xl border shadow-xl ${isMidnightDark ? "border-slate-700 bg-slate-900 text-slate-100" : "border-border bg-white text-foreground"}`}>
                         {(Object.keys(PROFILE_THEMES) as ThemeName[]).map((option) => (
                           <button
                             key={option}
@@ -1624,7 +1631,7 @@ function BusinessProfileView({
                             role="menuitemradio"
                             aria-checked={option === theme}
                             onClick={() => { void saveBusinessTheme(option); }}
-                            className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm transition-colors hover:bg-muted ${option === theme ? "font-semibold" : ""}`}
+                            className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm transition-colors ${isMidnightDark ? "hover:bg-slate-800" : "hover:bg-muted"} ${option === theme ? "font-semibold" : ""}`}
                           >
                             <span className={`h-4 w-4 flex-shrink-0 rounded-full bg-gradient-to-br ${PROFILE_THEMES[option].cover}`} aria-hidden="true" />
                             {option}
@@ -1639,7 +1646,7 @@ function BusinessProfileView({
                   <button
                     type="button"
                     onClick={onOpenMessages}
-                    className="flex flex-1 sm:flex-none justify-center items-center gap-1.5 rounded-lg border border-border bg-white px-4 py-2 text-sm font-medium hover:bg-muted"
+                    className={`flex flex-1 sm:flex-none justify-center items-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${profileControlSurface}`}
                   >
                     <MessageSquare size={13} /> Messages
                   </button>
