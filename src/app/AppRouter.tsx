@@ -5,6 +5,8 @@ import { WelcomePage } from "@/app/components/WelcomePage";
 import { useAuth } from "@/app/auth/AuthProvider";
 import { ProtectedRoute } from "@/app/auth/ProtectedRoute";
 
+import { InstallAppPage } from "@/app/components/InstallApp";
+
 type AuthMode = "signin" | "signup";
 type AuthScreen = "form" | "forgot" | "recovery";
 const App = lazy(() => import("@/app/App"));
@@ -135,6 +137,7 @@ export function AppRouter() {
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
+      <Route path="/install" element={<InstallAppPage />} />
       <Route path="/sign-in" element={<AuthPage mode="signin" />} />
       <Route path="/sign-up" element={<AuthPage mode="signup" />} />
       <Route path="/forgot-password" element={<AuthPage mode="signin" initialScreen="forgot" />} />

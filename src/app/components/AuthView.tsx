@@ -255,7 +255,7 @@ export function AuthView({ mode, initialScreen = "form", onSwitchMode, onSuccess
       return;
     }
 
-    setNotice("Access request submitted. Check your email to verify your address, then sign in to see your approval status.");
+    setNotice("Account created. Check your email to verify your address, then sign in to join Neighborly.");
     setStep(1);
     setAgreedToGuidelines(false);
   }
@@ -332,7 +332,7 @@ export function AuthView({ mode, initialScreen = "form", onSwitchMode, onSuccess
             {previewComplete ? `${accountType === "business" ? "Business" : "Personal"} preview complete` : previewMode ? "Preview the Neighborly sign-up" : screen === "forgot" ? "Reset your password" : screen === "recovery" ? "Choose a new password" : mode === "signin" ? "Welcome back to Neighborly" : "Join the Neighborly beta"}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {previewComplete ? "You reached the end of this walkthrough without creating an account." : previewMode ? "Try every step exactly as a new neighbor would see it." : screen === "forgot" ? "We'll email a secure reset link to your registered address." : screen === "recovery" ? "Create a new password for your Neighborly account." : mode === "signin" ? "Sign in to connect with your local community or check your approval status." : "Create your profile and request access. You can change your profile details later."}
+            {previewComplete ? "You reached the end of this walkthrough without creating an account." : previewMode ? "Try every step exactly as a new neighbor would see it." : screen === "forgot" ? "We'll email a secure reset link to your registered address." : screen === "recovery" ? "Create a new password for your Neighborly account." : mode === "signin" ? "Sign in to connect with your local community." : "Create your free Neighborly account. You can change your profile details later."}
           </p>
         </div>
 
@@ -405,7 +405,7 @@ export function AuthView({ mode, initialScreen = "form", onSwitchMode, onSuccess
           ) : mode === "signin" ? (
             <>
               <div className="rounded-xl border border-purple-100 bg-purple-50 px-4 py-3 text-sm leading-5 text-purple-950">
-                Approved members can enter Neighborly here. If you recently requested access, sign in to check your approval status.
+                Sign in with your Neighborly account. New members should confirm their email first.
               </div>
               <div>
                 <label className={labelClass}>Email</label>
@@ -430,7 +430,7 @@ export function AuthView({ mode, initialScreen = "form", onSwitchMode, onSuccess
           ) : step === 1 ? (
             <>
               <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm leading-5 text-blue-950">
-                {previewMode ? "Walk through the same choices a new neighbor sees. The fixed demo login below is only for this preview." : "Requesting access takes about two minutes. After submitting, verify your email and sign in to see when your account is approved."}
+                {previewMode ? "Walk through the same choices a new neighbor sees. The fixed demo login below is only for this preview." : "Creating an account takes about two minutes. Confirm your email, then sign in to join your community."}
               </div>
               <div>
                 <label className={labelClass}>Account Type</label>
@@ -568,7 +568,7 @@ export function AuthView({ mode, initialScreen = "form", onSwitchMode, onSuccess
 
               <div className="flex gap-2">
                 <button onClick={() => { setStep(1); resetMessages(); }} className="px-4 py-2.5 rounded-lg border border-border text-sm font-medium">Back</button>
-                <button disabled={busy || !agreedToGuidelines || (accountType === "business" && (!businessName.trim() || !businessCategory.trim()))} onClick={handleSignUp} className="flex-1 bg-blue-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">{busy ? "Submitting request…" : previewMode ? "Complete Safe Preview" : "Send Access Request"}</button>
+                <button disabled={busy || !agreedToGuidelines || (accountType === "business" && (!businessName.trim() || !businessCategory.trim()))} onClick={handleSignUp} className="flex-1 bg-blue-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">{busy ? "Creating account…" : previewMode ? "Complete Safe Preview" : "Create Account"}</button>
               </div>
             </>
           )}
@@ -579,9 +579,9 @@ export function AuthView({ mode, initialScreen = "form", onSwitchMode, onSuccess
           {screen === "form" && !previewMode && (
             <div className="text-center mt-2">
               {mode === "signin" ? (
-                <p className="text-sm text-muted-foreground">New to Neighborly? <button onClick={() => { onSwitchMode("signup"); setStep(1); resetMessages(); }} className="text-blue-600 font-medium hover:underline">Request beta access</button></p>
+                <p className="text-sm text-muted-foreground">New to Neighborly? <button onClick={() => { onSwitchMode("signup"); setStep(1); resetMessages(); }} className="text-blue-600 font-medium hover:underline">Create an account</button></p>
               ) : (
-                <p className="text-sm text-muted-foreground">Already registered or waiting for approval? <button onClick={() => { onSwitchMode("signin"); setStep(1); resetMessages(); }} className="text-blue-600 font-medium hover:underline">Sign in</button></p>
+                <p className="text-sm text-muted-foreground">Already have an account? <button onClick={() => { onSwitchMode("signin"); setStep(1); resetMessages(); }} className="text-blue-600 font-medium hover:underline">Sign in</button></p>
               )}
             </div>
           )}
