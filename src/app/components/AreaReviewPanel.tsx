@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2, MapPin, Merge, RefreshCw } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
+import { AreaDirectory } from "./AreaDirectory";
+
 type AreaReviewRow = {
   id: string;
   user_id: string;
@@ -69,6 +71,7 @@ export function AreaReviewPanel() {
 
   return (
     <section className="space-y-4">
+      <AreaDirectory />
       <div className="rounded-2xl border border-purple-200 bg-white p-4 shadow-sm sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
