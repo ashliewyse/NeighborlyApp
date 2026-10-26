@@ -1,0 +1,3 @@
+const areas=[{id:1,city:'Michigan City',neighborhood:null,state_code:'IN',is_active:true},{id:2,city:'Michigan City',neighborhood:'Downtown',state_code:'IN',is_active:true},{id:3,city:'Hobart',neighborhood:'Downtown',state_code:'IN',is_active:false}];
+export const supabase={rpc:async()=>({data:[],error:null}),auth:{getUser:async()=>({data:{user:{id:'crop-test-owner'}}})},from(table:string){const q={select:()=>q,eq:()=>q,or:()=>q,order:()=>q,range:async()=>({data:table==='community_areas'?areas:[],error:null}),maybeSingle:async()=>({data:null,error:null}),then(resolve:any){resolve({data:[],error:null});}};return q;}};
+export const publicSupabase=supabase;

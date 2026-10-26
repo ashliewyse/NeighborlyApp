@@ -2848,7 +2848,7 @@ function UserProfileView({
         )}
       </div>
 
-      <div className={`${profileHeaderSurface} border-b ${S.border}`}>
+      <div className={`${isOwnProfile ? T.tint : "bg-white"} border-b border-border`}>
         <div className="max-w-3xl mx-auto px-4">
           {/* Avatar row + action buttons */}
           <div className="flex items-start justify-between -mt-10 pt-0 pb-2">
@@ -6610,11 +6610,11 @@ export default function App() {
           {/* Desktop nav — center */}
           <nav className="hidden lg:flex items-center gap-1 mx-auto">
             {[
-              { icon: <HandHeart size={16} />, label: "Help Wanted", page: "helpwanted" as const },
-              { icon: <CalendarDays size={16} />, label: "Events", page: "events" as const },
-              { icon: <Briefcase size={16} />, label: "Businesses", page: "feed" as const },
-              { icon: <ShoppingBag size={16} />, label: "Classifieds", page: "classifieds" as const },
-              { icon: <Search size={16} />, label: "Search", page: "search" as const },
+              { icon: <HandHeart size={16} className="text-emerald-600" />, label: "Help Wanted", page: "helpwanted" as const },
+              { icon: <CalendarDays size={16} className="text-violet-600" />, label: "Events", page: "events" as const },
+              { icon: <Briefcase size={16} className="text-blue-600" />, label: "Businesses", page: "feed" as const },
+              { icon: <ShoppingBag size={16} className="text-amber-600" />, label: "Classifieds", page: "classifieds" as const },
+              { icon: <Search size={16} className="text-teal-600" />, label: "Search", page: "search" as const },
             ].map((item) => (
               <button
                 key={item.label}
@@ -6755,7 +6755,7 @@ export default function App() {
       {messagingModal}
       {postEditDialog}
 
-      <main className="max-w-screen-2xl mx-auto px-6 py-6 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
+      <main className="max-w-screen-2xl mx-auto px-6 lg:pr-2 py-6 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
         
         {/* Feed */}
         <section className="flex flex-col gap-4 min-w-0">
