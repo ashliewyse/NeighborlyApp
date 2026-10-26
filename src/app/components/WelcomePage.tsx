@@ -21,10 +21,10 @@ const communityHighlights = [
   },
 ];
 
-const betaSteps = [
-  ["1", "Request access", "Choose a personal or business account and create your Neighborly profile."],
+const joinSteps = [
+  ["1", "Create your account", "Choose a personal or business account and create your Neighborly profile."],
   ["2", "Verify your email", "Use the secure email from Neighborly to confirm that the address belongs to you."],
-  ["3", "Join the community", "After approval, sign in to post, message, follow neighbors, and explore your area."],
+  ["3", "Join the community", "After confirming your email, sign in to post, message, follow neighbors, and explore your area."],
 ] as const;
 
 export function WelcomePage() {
@@ -43,7 +43,7 @@ export function WelcomePage() {
               Sign In
             </Link>
             <Link to="/sign-up" className="rounded-lg bg-white px-3 py-2 text-sm font-semibold text-purple-900 shadow-sm hover:bg-purple-50 sm:px-4">
-              Request Access
+              Create Account
             </Link>
           </nav>
         </div>
@@ -63,13 +63,14 @@ export function WelcomePage() {
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link to="/sign-up" className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-6 py-3.5 font-semibold text-purple-900 shadow-lg shadow-black/15 hover:bg-purple-50">
-                Request Beta Access <ArrowRight size={18} />
+                Create Account <ArrowRight size={18} />
               </Link>
               <Link to="/sign-in" className="inline-flex items-center justify-center rounded-xl border border-white/30 px-6 py-3.5 font-semibold text-white hover:bg-white/10">
                 I Already Have an Account
               </Link>
             </div>
-            <p className="mt-4 text-sm text-purple-200">Neighborly is invite-only while the community is being tested and improved.</p>
+            <p className="mt-4 text-sm text-purple-200">Join your local community with a free personal or business account.</p>
+            <Link to="/install" className="mt-3 inline-flex text-sm font-semibold text-white underline underline-offset-4">Install Neighborly on your phone →</Link>
           </div>
 
           <div className="rounded-3xl border border-white/15 bg-white/10 p-4 shadow-2xl shadow-black/25 backdrop-blur sm:p-6" aria-label="Neighborly community preview">
@@ -96,7 +97,7 @@ export function WelcomePage() {
                 </div>
               </div>
               <div className="mt-4 flex items-center gap-2 border-t border-slate-200 pt-4 text-xs font-medium text-slate-600">
-                <ShieldCheck size={16} className="text-emerald-600" /> Community guidelines and member approval help keep Neighborly welcoming.
+                <ShieldCheck size={16} className="text-emerald-600" /> Community guidelines and active moderation help keep Neighborly welcoming.
               </div>
             </div>
           </div>
@@ -159,12 +160,12 @@ export function WelcomePage() {
         <section id="how-it-works" className="bg-purple-50 py-16 text-slate-900 scroll-mt-6">
           <div className="mx-auto max-w-5xl px-4 sm:px-6">
             <div className="text-center">
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-purple-700">Invite-only beta</p>
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-purple-700">How to join</p>
               <h2 className="mt-3 font-['Playfair_Display',serif] text-3xl font-bold">Joining is simple</h2>
-              <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-600">The approval step helps Neighborly grow carefully while the experience and safety tools are still being tested.</p>
+              <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-600">Create an account, confirm your email, and start connecting with your community.</p>
             </div>
             <div className="mt-10 grid gap-5 md:grid-cols-3">
-              {betaSteps.map(([number, title, description]) => (
+              {joinSteps.map(([number, title, description]) => (
                 <article key={number} className="rounded-2xl border border-purple-100 bg-white p-6 shadow-sm">
                   <span className="flex h-9 w-9 items-center justify-center rounded-full bg-purple-700 text-sm font-bold text-white">{number}</span>
                   <h3 className="mt-4 font-bold">{title}</h3>
@@ -178,12 +179,12 @@ export function WelcomePage() {
         <section className="bg-white py-16 text-slate-900">
           <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-6 rounded-3xl bg-gradient-to-r from-purple-800 to-indigo-700 px-6 py-10 text-center text-white shadow-xl sm:px-10 md:flex-row md:text-left">
             <div>
-              <div className="flex items-center justify-center gap-2 text-sm font-semibold text-purple-100 md:justify-start"><BadgeCheck size={18} /> Help shape Neighborly during beta</div>
+              <div className="flex items-center justify-center gap-2 text-sm font-semibold text-purple-100 md:justify-start"><BadgeCheck size={18} /> Help shape your community</div>
               <h2 className="mt-2 font-['Playfair_Display',serif] text-3xl font-bold">Ready to meet your Neighborly community?</h2>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-purple-100">Create your profile, request access, and share feedback as Neighborly grows.</p>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-purple-100">Create your profile, join your neighbors, and share feedback as Neighborly grows.</p>
             </div>
             <Link to="/sign-up" className="inline-flex flex-shrink-0 items-center gap-2 rounded-xl bg-white px-5 py-3 font-semibold text-purple-900 hover:bg-purple-50">
-              Request Access <ArrowRight size={17} />
+              Create Account <ArrowRight size={17} />
             </Link>
           </div>
         </section>

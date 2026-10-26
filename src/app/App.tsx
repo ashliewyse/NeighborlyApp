@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useAuth } from "@/app/auth/AuthProvider";
 import { Analytics } from "@vercel/analytics/react";
 import { useLocation, useNavigate } from "react-router";
 import { SettingsView } from "@/app/components/SettingsView";
@@ -4015,6 +4016,7 @@ function AdminDashboard({
   defaultNeighborhood: string;
   onPostCreated: (post: Post) => void;
 }) {
+  const { approvalRequired } = useAuth();
   const [tab, setTab] = useState<"access" | "posts" | "feedback" | "advertising">("access");
   const [accessRequests, setAccessRequests] = useState<MemberAccessRequest[]>([]);
   const [feedbackItems, setFeedbackItems] = useState<SiteFeedback[]>([]);
@@ -4287,8 +4289,8 @@ function AdminDashboard({
           <section className="space-y-4">
             <div className="flex flex-col gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="font-semibold">Invite-only testing is active</p>
-                <p className="mt-1 text-xs leading-relaxed">New accounts cannot enter Neighborly until you approve them here. Existing members kept their access.</p>
+                <p className="font-semibold">{approvalRequired ? "Invite-only testing is active" : "Registration is open"}</p>
+                <p className="mt-1 text-xs leading-relaxed">{approvalRequired ? "New accounts need approval before entering Neighborly." : "New members can create an account, confirm their email, and join without waiting for approval. Moderation and admin permissions still apply."}</p>
               </div>
               <button type="button" onClick={onPreviewSignup} className="inline-flex flex-shrink-0 items-center justify-center gap-2 rounded-lg bg-blue-700 px-4 py-2.5 text-xs font-semibold text-white hover:bg-blue-800">
                 <UserPlus size={15} /> Preview Sign-Up
@@ -7208,6 +7210,7 @@ export default function App() {
             <button onClick={() => setFeedbackOpen(true)} className="flex w-full items-center justify-center gap-2 rounded-xl border border-purple-200 bg-white px-4 py-3 text-sm font-semibold text-purple-700 shadow-sm hover:bg-purple-50">
               <MessageSquare size={16} /> Send Feedback
             </button>
+            <a href="/install" className="block rounded-xl border border-purple-200 bg-white px-4 py-3 text-center text-sm font-semibold text-purple-700 hover:bg-purple-50">Install Neighborly</a>
 
             <CommunityGroupsCard
               groups={visibleGroups}
@@ -7308,6 +7311,7 @@ export default function App() {
           <button onClick={() => { setFeedbackOpen(true); setSidebarOpen(false); }} className="flex w-full items-center justify-center gap-2 rounded-xl border border-purple-300 bg-white px-4 py-3 text-sm font-semibold text-purple-700 hover:bg-purple-50">
             <MessageSquare size={16} /> Send Feedback
           </button>
+          <a href="/install" className="block rounded-xl border border-purple-200 bg-white px-4 py-3 text-center text-sm font-semibold text-purple-700 hover:bg-purple-50">Install Neighborly</a>
 
           <CommunityGroupsCard
             groups={visibleGroups}
