@@ -1,3 +1,4 @@
+import { AmandaFeaturedAd } from "./components/AmandaFeaturedAd";
 import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/app/auth/AuthProvider";
 import { Analytics } from "@vercel/analytics/react";
@@ -7199,6 +7200,9 @@ export default function App() {
 
             <WeatherCard locationName={browsingLocation} weather={weather} />
 
+            <AmandaFeaturedAd />
+
+
             <AdvertisingSidebarCard
               ad={activeAdvertisement}
               onAdvertise={() => setAdvertiseOpen(true)}
@@ -7293,6 +7297,8 @@ export default function App() {
           <WeatherCard locationName={browsingLocation} weather={weather} />
 
           {/* Local business feature */}
+          <AmandaFeaturedAd />
+
           <AdvertisingSidebarCard
             ad={activeAdvertisement}
             onAdvertise={() => setAdvertiseOpen(true)}
