@@ -1,5 +1,7 @@
-import { ArrowRight, BadgeCheck, Briefcase, Download, HandHeart, House, MapPin, MessageCircle, ShieldCheck, Users } from "lucide-react";
+import { ArrowRight, BadgeCheck, Briefcase, Download, HandHeart, MapPin, MessageCircle, ShieldCheck, Users } from "lucide-react";
 import { Link } from "react-router";
+import { ImageWithFallback } from "@/app/components/figma/ImageWithFallback";
+import neighborlyLogo from "@/imports/Copilot_20260807_041314.png";
 
 const communityHighlights = [
   {
@@ -31,10 +33,7 @@ export function WelcomePage() {
       <header className="border-b border-white/10 bg-purple-950/85 backdrop-blur">
         <div className="mx-auto flex max-w-6xl flex-col items-stretch gap-3 px-4 py-4 sm:px-6 md:flex-row md:items-center md:justify-between">
           <Link to="/" aria-label="Neighborly welcome page" className="block self-start">
-            <span className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 shadow-sm">
-              <House size={28} strokeWidth={2.2} className="text-purple-700" aria-hidden="true" />
-              <span className="font-['Playfair_Display',serif] text-xl font-bold text-purple-800">Neighborly</span>
-            </span>
+            <span className="inline-flex items-center rounded-xl bg-white px-3 py-2 shadow-sm"><ImageWithFallback src={neighborlyLogo} alt="Neighborly original logo" className="block h-auto w-40 max-w-full object-contain sm:w-44" /></span>
           </Link>
           <nav className="grid w-full grid-cols-3 gap-2 md:flex md:w-auto md:items-center" aria-label="Welcome page navigation">
             <Link to="/install" className="inline-flex min-w-0 items-center justify-center gap-1.5 rounded-lg bg-blue-500 px-2 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-600 md:px-4"><Download size={16} /> <span className="hidden sm:inline">Install App</span><span className="sm:hidden">Install</span></Link>
