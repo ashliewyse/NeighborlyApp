@@ -4745,7 +4745,7 @@ function AdvertisingSidebarCard({
           <img
             src={ad.imageUrl}
             alt={`${ad.businessName} local business feature`}
-            className="block h-auto max-h-96 w-full object-contain"
+            className="block h-auto max-h-56 w-full object-contain sm:max-h-72"
             onError={(event) => { event.currentTarget.style.display = "none"; }}
           />
           <span className="absolute left-2 top-2 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">Paid Local Feature</span>
