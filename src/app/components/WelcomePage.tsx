@@ -1,7 +1,5 @@
-import { ArrowRight, BadgeCheck, Briefcase, HandHeart, MapPin, MessageCircle, ShieldCheck, Users } from "lucide-react";
+import { ArrowRight, BadgeCheck, Briefcase, Download, HandHeart, House, MapPin, MessageCircle, ShieldCheck, Users } from "lucide-react";
 import { Link } from "react-router";
-import { ImageWithFallback } from "@/app/components/figma/ImageWithFallback";
-import neighborlyLogo from "@/imports/Copilot_20260807_041314.png";
 
 const communityHighlights = [
   {
@@ -33,9 +31,13 @@ export function WelcomePage() {
       <header className="border-b border-white/10 bg-purple-950/85 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
           <Link to="/" aria-label="Neighborly welcome page" className="block w-36 sm:w-44">
-            <ImageWithFallback src={neighborlyLogo} alt="Neighborly" className="h-auto w-full object-contain" />
+            <span className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 shadow-sm">
+              <House size={28} strokeWidth={2.2} className="text-purple-700" aria-hidden="true" />
+              <span className="font-['Playfair_Display',serif] text-xl font-bold text-purple-800">Neighborly</span>
+            </span>
           </Link>
           <nav className="flex items-center gap-2" aria-label="Welcome page navigation">
+            <Link to="/install" className="inline-flex items-center gap-1.5 rounded-lg bg-blue-500 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-600 sm:px-4"><Download size={16} /> <span className="hidden sm:inline">Install App</span><span className="sm:hidden">Install</span></Link>
             <a href="#how-it-works" className="hidden px-3 py-2 text-sm font-medium text-purple-100 hover:text-white sm:inline-flex">
               How it works
             </a>
@@ -70,7 +72,7 @@ export function WelcomePage() {
               </Link>
             </div>
             <p className="mt-4 text-sm text-purple-200">Join your local community with a free personal or business account.</p>
-            <Link to="/install" className="mt-3 inline-flex text-sm font-semibold text-white underline underline-offset-4">Install Neighborly on your phone →</Link>
+            <Link to="/install" className="mt-4 inline-flex items-center gap-2 rounded-xl bg-blue-500 px-5 py-3 text-base font-bold text-white shadow-lg hover:bg-blue-600"><Download size={20} /> Install Neighborly on Your Phone</Link>
           </div>
 
           <div className="rounded-3xl border border-white/15 bg-white/10 p-4 shadow-2xl shadow-black/25 backdrop-blur sm:p-6" aria-label="Neighborly community preview">
