@@ -4393,6 +4393,15 @@ function AdminDashboard({
 
         {tab === "advertising" && (
           <section className="space-y-4">
+            <article className="rounded-2xl border border-purple-200 bg-white p-5 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="font-semibold text-purple-900">Elite FNP Aesthetics · Amanda Dech</h3>
+                <span className="rounded-full bg-purple-100 px-3 py-1 text-xs font-semibold text-purple-800">Complimentary featured ad · Active</span>
+              </div>
+              <p className="mt-2 text-sm text-slate-700">Featured in both mobile and desktop sidebars. This is a separate account-free placement, not a paid advertising campaign.</p>
+              <p className="mt-2 text-sm font-medium">Call or text: <a href="tel:+12194196311" className="underline">219-419-6311</a></p>
+              <a href="https://www.facebook.com/share/18jYcfT1ub/" target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-sm font-semibold text-purple-700 underline">View Amanda's Facebook destination</a>
+            </article>
             {loading ? <div className="rounded-xl bg-white p-8 text-center text-sm text-muted-foreground">Loading advertisement requests…</div> : advertisements.length === 0 ? <div className="rounded-xl bg-white p-8 text-center text-sm text-muted-foreground">No advertisement requests have been submitted yet.</div> : advertisements.map((item) => {
               const selectedMethod = paymentMethods[item.id] || item.payment_method || "bank_transfer";
               return (
@@ -7287,7 +7296,7 @@ export default function App() {
       )}
 
       {/* Mobile sliding drawer — panel */}
-      <aside className={`fixed top-0 right-0 bottom-0 z-50 w-72 lg:hidden bg-purple-950 overflow-y-auto flex flex-col gap-4 p-4 shadow-2xl transition-transform duration-300 ease-in-out ${sidebarOpen ? "translate-x-0" : "translate-x-full"}`}>
+      <aside className={`fixed top-0 right-0 bottom-0 z-50 w-[min(22rem,90vw)] lg:hidden bg-purple-950 overflow-y-auto overscroll-contain flex flex-col gap-4 p-4 pb-28 shadow-2xl transition-transform duration-300 ease-in-out ${sidebarOpen ? "translate-x-0" : "translate-x-full"}`}>
           {/* Logo card */}
           <div className="bg-card rounded-xl border border-border p-4 shadow-sm flex items-center justify-center">
             <img src={neighborlyAppLogo} alt="Neighborly App" className="w-full h-auto object-contain" />
