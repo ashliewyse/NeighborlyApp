@@ -6686,7 +6686,7 @@ export default function App() {
       <button
         onClick={() => setSidebarOpen(!sidebarOpen)}
         className={`fixed top-1/2 -translate-y-1/2 z-[60] lg:hidden bg-purple-900 text-white p-2.5 rounded-l-xl shadow-lg hover:bg-purple-800 transition-all duration-300 ease-in-out flex items-center justify-center border-l border-t border-b border-purple-700 ${
-          sidebarOpen ? "right-[min(22rem,90vw)]" : "right-0 rounded-l-xl rounded-r-none"
+          sidebarOpen ? "right-[min(18rem,82vw)]" : "right-0 rounded-l-xl rounded-r-none"
         }`}
         aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
         aria-expanded={sidebarOpen}
@@ -7291,7 +7291,7 @@ export default function App() {
       )}
 
       {/* Mobile sliding drawer — panel */}
-      <aside id="neighborly-mobile-sidebar" className={`fixed top-0 right-0 bottom-0 z-50 w-[min(22rem,90vw)] lg:hidden bg-purple-950 overflow-y-auto overscroll-contain flex flex-col gap-4 p-4 pb-28 shadow-2xl transition-transform duration-300 ease-in-out ${sidebarOpen ? "translate-x-0" : "translate-x-full"}`}>
+      <aside id="neighborly-mobile-sidebar" className={`fixed top-0 right-0 bottom-0 z-50 w-[min(18rem,82vw)] lg:hidden bg-purple-950 overflow-y-auto overscroll-contain flex flex-col gap-4 p-4 pb-28 shadow-2xl transition-transform duration-300 ease-in-out ${sidebarOpen ? "translate-x-0" : "translate-x-full"}`}>
           {/* Logo card */}
           <div className="bg-card rounded-xl border border-border p-4 shadow-sm flex items-center justify-center">
             <img src={neighborlyAppLogo} alt="Neighborly App" className="w-full h-auto object-contain" />
