@@ -6536,7 +6536,7 @@ export default function App() {
     <div className="min-h-screen bg-purple-950 font-['DM_Sans',sans-serif] relative">
       {showWelcome && currentProfile && (
         <div role="status" aria-live="polite" className="fixed inset-0 z-[90] flex flex-col items-center justify-center bg-purple-950 px-6 text-center text-white">
-          <h1 className="font-['Playfair_Display',serif] text-3xl font-bold sm:text-4xl">Welcome back, {currentProfile.name?.trim().split(/\\s+/)[0] || "Neighbor"}!</h1>
+          <h1 className="font-['Playfair_Display',serif] text-3xl font-bold sm:text-4xl">Welcome back, {currentProfile.name?.trim().split(/\s+/)[0] || "Neighbor"}!</h1>
           <p className="mt-3 text-base text-purple-200">Your neighborhood is waiting.</p>
         </div>
       )}
