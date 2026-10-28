@@ -9,6 +9,7 @@ let changed = false;
 
 function replaceOnce(needle, replacement, label) {
   if (source.includes(replacement)) return;
+  if (label === "ad image sizing" && source.includes('className="block h-auto max-h-56 w-full object-contain sm:max-h-72"')) return;
   if (!source.includes(needle)) {
     throw new Error(`Neighborly ad patch failed: could not find ${label}.`);
   }
