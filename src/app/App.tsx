@@ -5172,6 +5172,16 @@ export default function App() {
   const [currentBusiness, setCurrentBusiness] = useState<Business | null>(null);
   const [currentAccountType, setCurrentAccountType] = useState<"personal" | "business">("personal");
   const [authReady, setAuthReady] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(false);
+  const welcomedSessionRef = useRef(false);
+  useEffect(() => {
+    if (!authReady || !currentProfile?.id || welcomedSessionRef.current) return;
+    welcomedSessionRef.current = true;
+    setShowWelcome(true);
+    const timeout = window.setTimeout(() => setShowWelcome(false), 2200);
+    return () => window.clearTimeout(timeout);
+  }, [authReady, currentProfile?.id]);
+
   const [isSiteAdmin, setIsSiteAdmin] = useState(false);
   const [adminStatusReady, setAdminStatusReady] = useState(false);
   const [adminAttentionCount, setAdminAttentionCount] = useState(0);
@@ -6524,6 +6534,13 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-purple-950 font-['DM_Sans',sans-serif] relative">
+      {showWelcome && currentProfile && (
+        <div role="status" aria-live="polite" className="fixed inset-0 z-[90] flex flex-col items-center justify-center bg-purple-950 px-6 text-center text-white">
+          <h1 className="font-['Playfair_Display',serif] text-3xl font-bold sm:text-4xl">Welcome back, {currentProfile.name?.trim().split(/\\s+/)[0] || "Neighbor"}!</h1>
+          <p className="mt-3 text-base text-purple-200">Your neighborhood is waiting.</p>
+        </div>
+      )}
+
       {/* Top Header */}
       <header className="sticky top-0 z-40 bg-white border-b border-border shadow-sm">
         <div className="max-w-screen-2xl mx-auto px-3 sm:px-6 h-16 flex items-center gap-2 sm:gap-4">
