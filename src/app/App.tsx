@@ -6189,7 +6189,17 @@ export default function App() {
     />
   ) : null;
 
-  if (!authReady) return <div className="min-h-screen bg-purple-950 flex items-center justify-center text-white">Loading your Neighborly profile…</div>;
+  if (!authReady) return (
+    <div className="min-h-[100dvh] bg-purple-950 flex flex-col items-center justify-center px-6 text-center text-white" role="status" aria-live="polite">
+      <div className="flex h-24 w-24 items-center justify-center rounded-3xl bg-white/10 ring-1 ring-white/20">
+        <img src="/icons/neighborly-192.png" alt="" className="h-20 w-20 object-contain" />
+      </div>
+      <h1 className="mt-5 font-['Playfair_Display',serif] text-3xl font-bold tracking-tight">Neighborly</h1>
+      <p className="mt-2 text-sm text-purple-200">Neighbors Helping Neighbors</p>
+      <div className="mt-8 h-1 w-36 overflow-hidden rounded-full bg-white/20"><div className="h-full w-1/2 animate-pulse rounded-full bg-blue-400" /></div>
+      <p className="mt-4 text-sm text-purple-200">Loading your neighborhood…</p>
+    </div>
+  );
 
   if (view.page === "admin" && currentProfile && isSiteAdmin) return (
     <AdminDashboard
