@@ -1,4 +1,3 @@
-import { AmandaFeaturedAd } from "./components/AmandaFeaturedAd";
 import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/app/auth/AuthProvider";
 import { Analytics } from "@vercel/analytics/react";
@@ -4393,15 +4392,7 @@ function AdminDashboard({
 
         {tab === "advertising" && (
           <section className="space-y-4">
-            <article className="rounded-2xl border border-purple-200 bg-white p-5 shadow-sm">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="font-semibold text-purple-900">Elite FNP Aesthetics · Amanda Dech</h3>
-                <span className="rounded-full bg-purple-100 px-3 py-1 text-xs font-semibold text-purple-800">Complimentary featured ad · Active</span>
-              </div>
-              <p className="mt-2 text-sm text-slate-700">Featured in both mobile and desktop sidebars. This is a separate account-free placement, not a paid advertising campaign.</p>
-              <p className="mt-2 text-sm font-medium">Call or text: <a href="tel:+12194196311" className="underline">219-419-6311</a></p>
-              <a href="https://www.facebook.com/share/18jYcfT1ub/" target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-sm font-semibold text-purple-700 underline">View Amanda's Facebook destination</a>
-            </article>
+
             {loading ? <div className="rounded-xl bg-white p-8 text-center text-sm text-muted-foreground">Loading advertisement requests…</div> : advertisements.length === 0 ? <div className="rounded-xl bg-white p-8 text-center text-sm text-muted-foreground">No advertisement requests have been submitted yet.</div> : advertisements.map((item) => {
               const selectedMethod = paymentMethods[item.id] || item.payment_method || "bank_transfer";
               return (
@@ -4738,7 +4729,7 @@ function AdvertisingSidebarCard({
       <button
         type="button"
         onClick={onOpenProfile}
-        aria-label={`View ${ad.businessName} business profile`}
+        aria-label={`Open ${ad.businessName} advertisement`}
         className="group block w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-600"
       >
         <div className="relative flex min-h-16 w-full items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -4755,7 +4746,7 @@ function AdvertisingSidebarCard({
           <h3 className="mt-1 text-sm font-bold text-foreground">{ad.headline}</h3>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{ad.description}</p>
           <span className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg bg-blue-600 py-2 text-xs font-semibold text-white transition-colors group-hover:bg-blue-700">
-            View Business Profile <ChevronRight size={13} />
+            Learn More <ChevronRight size={13} />
           </span>
         </div>
       </button>
@@ -5168,6 +5159,8 @@ export default function App() {
   const [advertiseOpen, setAdvertiseOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [liveAdvertisements, setLiveAdvertisements] = useState<LiveAdvertisement[]>([]);
+  const [adRotationIndex, setAdRotationIndex] = useState(0);
+  useEffect(() => { const timer = window.setInterval(() => setAdRotationIndex((index) => index + 1), 12000); return () => window.clearInterval(timer); }, []);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [myAvatarUrl, setMyAvatarUrl] = useState<string | null>(null);
   const postsLoadedRef = useRef(false);
@@ -5230,7 +5223,7 @@ export default function App() {
       const priority: Record<AdvertisingTier, number> = { starter: 1, spotlight: 2, featured: 3 };
       return priority[right.tier] - priority[left.tier];
     });
-  const activeAdvertisement = visibleAdvertisements[0] || null;
+  const activeAdvertisement = visibleAdvertisements.length ? visibleAdvertisements[adRotationIndex % visibleAdvertisements.length] : null;
   const visibleGroups = groups
     .filter((group) => {
       if (activeLocation === "All Areas") return true;
@@ -7209,14 +7202,14 @@ export default function App() {
 
             <WeatherCard locationName={browsingLocation} weather={weather} />
 
-            <AmandaFeaturedAd />
 
 
             <AdvertisingSidebarCard
               ad={activeAdvertisement}
               onAdvertise={() => setAdvertiseOpen(true)}
               onOpenProfile={() => {
-                if (activeAdvertisement) void goToUser(activeAdvertisement.businessName, activeAdvertisement.ownerId, { preferBusiness: true });
+                if (activeAdvertisement?.destinationUrl && /^https:\/\//i.test(activeAdvertisement.destinationUrl)) window.open(activeAdvertisement.destinationUrl, "_blank", "noopener,noreferrer");
+                else if (activeAdvertisement) void goToUser(activeAdvertisement.businessName, activeAdvertisement.ownerId, { preferBusiness: true });
               }}
             />
 
@@ -7306,14 +7299,15 @@ export default function App() {
           <WeatherCard locationName={browsingLocation} weather={weather} />
 
           {/* Local business feature */}
-          <AmandaFeaturedAd />
+
 
           <AdvertisingSidebarCard
             ad={activeAdvertisement}
             onAdvertise={() => setAdvertiseOpen(true)}
             onOpenProfile={() => {
               setSidebarOpen(false);
-              if (activeAdvertisement) void goToUser(activeAdvertisement.businessName, activeAdvertisement.ownerId, { preferBusiness: true });
+              if (activeAdvertisement?.destinationUrl && /^https:\/\//i.test(activeAdvertisement.destinationUrl)) window.open(activeAdvertisement.destinationUrl, "_blank", "noopener,noreferrer");
+                else if (activeAdvertisement) void goToUser(activeAdvertisement.businessName, activeAdvertisement.ownerId, { preferBusiness: true });
             }}
           />
 
