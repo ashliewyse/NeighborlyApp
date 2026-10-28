@@ -29,22 +29,22 @@ export function WelcomePage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-purple-950 via-purple-900 to-slate-950 text-white font-['DM_Sans',sans-serif]">
       <header className="border-b border-white/10 bg-purple-950/85 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
-          <Link to="/" aria-label="Neighborly welcome page" className="block w-36 sm:w-44">
+        <div className="mx-auto flex max-w-6xl flex-col items-stretch gap-3 px-4 py-4 sm:px-6 md:flex-row md:items-center md:justify-between">
+          <Link to="/" aria-label="Neighborly welcome page" className="block self-start">
             <span className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 shadow-sm">
               <House size={28} strokeWidth={2.2} className="text-purple-700" aria-hidden="true" />
               <span className="font-['Playfair_Display',serif] text-xl font-bold text-purple-800">Neighborly</span>
             </span>
           </Link>
-          <nav className="flex items-center gap-2" aria-label="Welcome page navigation">
-            <Link to="/install" className="inline-flex items-center gap-1.5 rounded-lg bg-blue-500 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-600 sm:px-4"><Download size={16} /> <span className="hidden sm:inline">Install App</span><span className="sm:hidden">Install</span></Link>
+          <nav className="grid w-full grid-cols-3 gap-2 md:flex md:w-auto md:items-center" aria-label="Welcome page navigation">
+            <Link to="/install" className="inline-flex min-w-0 items-center justify-center gap-1.5 rounded-lg bg-blue-500 px-2 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-600 md:px-4"><Download size={16} /> <span className="hidden sm:inline">Install App</span><span className="sm:hidden">Install</span></Link>
             <a href="#how-it-works" className="hidden px-3 py-2 text-sm font-medium text-purple-100 hover:text-white sm:inline-flex">
               How it works
             </a>
-            <Link to="/sign-in" className="rounded-lg border border-white/25 px-3 py-2 text-sm font-semibold text-white hover:bg-white/10 sm:px-4">
+            <Link to="/sign-in" className="flex min-w-0 items-center justify-center rounded-lg border border-white/25 px-2 py-2.5 text-center text-sm font-semibold text-white hover:bg-white/10 md:px-4">
               Sign In
             </Link>
-            <Link to="/sign-up" className="rounded-lg bg-white px-3 py-2 text-sm font-semibold text-purple-900 shadow-sm hover:bg-purple-50 sm:px-4">
+            <Link to="/sign-up" className="flex min-w-0 items-center justify-center rounded-lg bg-white px-2 py-2.5 text-center text-sm font-semibold text-purple-900 shadow-sm hover:bg-purple-50 md:px-4">
               Create Account
             </Link>
           </nav>
