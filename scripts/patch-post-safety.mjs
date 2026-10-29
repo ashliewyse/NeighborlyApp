@@ -198,8 +198,11 @@ source = source.slice(0, postMenuStart) + postSafetyMenu + source.slice(postMenu
 
 const oldTabState = 'const [tab, setTab] = useState<"access" | "posts" | "feedback" | "advertising">("access");';
 const newTabState = 'const [tab, setTab] = useState<"access" | "posts" | "safety" | "feedback" | "advertising">("access");';
+const supportTabState = 'const [tab, setTab] = useState<"support" | "posts" | "feedback" | "advertising">("support");';
+const supportSafetyTabState = 'const [tab, setTab] = useState<"support" | "posts" | "safety" | "feedback" | "advertising">("support");';
 if (source.includes(oldTabState)) source = source.replace(oldTabState, newTabState);
-else if (!source.includes(newTabState)) throw new Error("Could not patch admin tab state.");
+else if (source.includes(supportTabState)) source = source.replace(supportTabState, supportSafetyTabState);
+else if (!source.includes(newTabState) && !source.includes(supportSafetyTabState)) throw new Error("Could not patch admin tab state.");
 
 const oldAdminNav = '<nav className="grid grid-cols-2 overflow-hidden rounded-xl bg-white p-1 shadow-sm sm:grid-cols-4" aria-label="Admin sections">';
 const newAdminNav = '<nav className="grid grid-cols-2 overflow-hidden rounded-xl bg-white p-1 shadow-sm sm:grid-cols-5" aria-label="Admin sections">';
