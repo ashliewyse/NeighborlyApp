@@ -3,6 +3,7 @@ import { useAuth } from "@/app/auth/AuthProvider";
 import { Analytics } from "@vercel/analytics/react";
 import { useLocation, useNavigate } from "react-router";
 import { SettingsView } from "@/app/components/SettingsView";
+import { SupportAdminPanel } from "@/app/components/SupportAdminPanel";
 import {
   ActiveNeighbor,
   ActiveNeighborsCard,
@@ -223,16 +224,6 @@ interface SiteFeedback {
   admin_response: string | null;
   responded_at: string | null;
   created_at: string;
-}
-
-interface MemberAccessRequest {
-  user_id: string;
-  email: string;
-  requested_name: string;
-  account_type: "personal" | "business";
-  status: "pending" | "approved" | "declined";
-  requested_at: string;
-  reviewed_at: string | null;
 }
 
 interface AdminAdvertisement {
@@ -4016,9 +4007,8 @@ function AdminDashboard({
   defaultNeighborhood: string;
   onPostCreated: (post: Post) => void;
 }) {
-  const { approvalRequired } = useAuth();
-  const [tab, setTab] = useState<"access" | "posts" | "feedback" | "advertising">("access");
-  const [accessRequests, setAccessRequests] = useState<MemberAccessRequest[]>([]);
+  const [tab, setTab] = useState<"support" | "posts" | "feedback" | "advertising">("support");
+  const [newHelpCount, setNewHelpCount] = useState(0);
   const [feedbackItems, setFeedbackItems] = useState<SiteFeedback[]>([]);
   const [advertisements, setAdvertisements] = useState<AdminAdvertisement[]>([]);
   const [loading, setLoading] = useState(true);
@@ -4055,18 +4045,14 @@ function AdminDashboard({
       .select("id, user_id, tier, business_name, headline, description, image_url, destination_url, phone, contact_email, target_city, status, billing_status, payment_method, payment_reference, starts_at, ends_at, created_at")
       .order("created_at", { ascending: false })
       .limit(100);
-    const accessRequest = supabase
-      .from("member_access")
-      .select("user_id, email, requested_name, account_type, status, requested_at, reviewed_at")
-      .order("requested_at", { ascending: false })
-      .limit(100);
-    void Promise.all([accessRequest, feedbackRequest, advertisingRequest]).then(([accessResult, feedbackResult, advertisingResult]) => {
+    const supportCountRequest = supabase.from("support_requests").select("id", { count: "exact", head: true }).eq("status", "new");
+    void Promise.all([supportCountRequest, feedbackRequest, advertisingRequest]).then(([supportResult, feedbackResult, advertisingResult]) => {
       if (cancelled) return;
-      if (accessResult.error || feedbackResult.error || advertisingResult.error) {
-        console.error("Could not load admin dashboard", accessResult.error || feedbackResult.error || advertisingResult.error);
+      if (supportResult.error || feedbackResult.error || advertisingResult.error) {
+        console.error("Could not load admin dashboard", supportResult.error || feedbackResult.error || advertisingResult.error);
         setLoadError("Some admin information could not be loaded. Please refresh.");
       }
-      setAccessRequests((accessResult.data || []) as MemberAccessRequest[]);
+      setNewHelpCount(supportResult.count || 0);
       setFeedbackItems((feedbackResult.data || []) as SiteFeedback[]);
       setAdvertisements((advertisingResult.data || []) as AdminAdvertisement[]);
       setLoading(false);
@@ -4170,32 +4156,6 @@ function AdminDashboard({
     setActionBusyId(null);
   }
 
-  async function reviewMemberAccess(item: MemberAccessRequest, status: "approved" | "declined") {
-    if (actionBusyId) return;
-    setActionBusyId(item.user_id);
-    setActionError(null);
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      setActionError("Please sign in again before reviewing access requests.");
-      setActionBusyId(null);
-      return;
-    }
-    const reviewedAt = new Date().toISOString();
-    const { error } = await supabase
-      .from("member_access")
-      .update({ status, reviewed_by: user.id, reviewed_at: reviewedAt, updated_at: reviewedAt })
-      .eq("user_id", item.user_id)
-      .select("user_id")
-      .single();
-    if (error) {
-      console.error("Could not review member access", error);
-      setActionError("That access request could not be updated.");
-    } else {
-      setAccessRequests((current) => current.map((request) => request.user_id === item.user_id ? { ...request, status, reviewed_at: reviewedAt } : request));
-    }
-    setActionBusyId(null);
-  }
-
   async function saveFeedbackResponse(item: SiteFeedback) {
     const response = (responseDrafts[item.id] ?? item.admin_response ?? "").trim();
     if (!response || actionBusyId) return;
@@ -4245,8 +4205,6 @@ function AdminDashboard({
   }
 
   const unreadFeedback = feedbackItems.filter((item) => item.status === "unread").length;
-  const pendingAccessRequests = accessRequests.filter((item) => item.status === "pending");
-  const reviewedAccessRequests = accessRequests.filter((item) => item.status !== "pending").slice(0, 20);
   const pendingAds = advertisements.filter((item) => item.status === "pending").length;
   const activeAds = advertisements.filter((item) => item.status === "active" && item.billing_status === "paid").length;
 
@@ -4265,7 +4223,7 @@ function AdminDashboard({
 
       <main className="mx-auto max-w-6xl space-y-5 px-4 py-5 sm:px-6">
         <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div className="rounded-xl bg-white p-4 shadow-sm"><p className="text-xs font-semibold uppercase text-muted-foreground">Access requests</p><p className="mt-1 text-2xl font-bold text-blue-700">{pendingAccessRequests.length}</p></div>
+          <div className="rounded-xl bg-white p-4 shadow-sm"><p className="text-xs font-semibold uppercase text-muted-foreground">New help requests</p><p className="mt-1 text-2xl font-bold text-blue-700">{newHelpCount}</p></div>
           <div className="rounded-xl bg-white p-4 shadow-sm"><p className="text-xs font-semibold uppercase text-muted-foreground">Unread feedback</p><p className="mt-1 text-2xl font-bold text-purple-700">{unreadFeedback}</p></div>
           <div className="rounded-xl bg-white p-4 shadow-sm"><p className="text-xs font-semibold uppercase text-muted-foreground">Pending ads</p><p className="mt-1 text-2xl font-bold text-amber-600">{pendingAds}</p></div>
           <div className="rounded-xl bg-white p-4 shadow-sm"><p className="text-xs font-semibold uppercase text-muted-foreground">Active ads</p><p className="mt-1 text-2xl font-bold text-emerald-600">{activeAds}</p></div>
@@ -4273,7 +4231,7 @@ function AdminDashboard({
 
         <nav className="grid grid-cols-2 overflow-hidden rounded-xl bg-white p-1 shadow-sm sm:grid-cols-4" aria-label="Admin sections">
           {([
-            { id: "access" as const, label: `Access${pendingAccessRequests.length ? ` (${pendingAccessRequests.length})` : ""}`, icon: <UserCheck size={16} /> },
+            { id: "support" as const, label: `Help & Support${newHelpCount ? ` (${newHelpCount})` : ""}`, icon: <MessageSquare size={16} /> },
             { id: "posts" as const, label: "Create Posts", icon: <Megaphone size={16} /> },
             { id: "feedback" as const, label: `Feedback${unreadFeedback ? ` (${unreadFeedback})` : ""}`, icon: <MessageSquare size={16} /> },
             { id: "advertising" as const, label: `Advertising${pendingAds ? ` (${pendingAds})` : ""}`, icon: <CircleDollarSign size={16} /> },
@@ -4285,52 +4243,10 @@ function AdminDashboard({
         {loadError && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{loadError}</p>}
         {actionError && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{actionError}</p>}
 
-        {tab === "access" && (
+        {tab === "support" && (
           <section className="space-y-4">
-            <div className="flex flex-col gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="font-semibold">{approvalRequired ? "Invite-only testing is active" : "Registration is open"}</p>
-                <p className="mt-1 text-xs leading-relaxed">{approvalRequired ? "New accounts need approval before entering Neighborly." : "New members can create an account, confirm their email, and join without waiting for approval. Moderation and admin permissions still apply."}</p>
-              </div>
-              <button type="button" onClick={onPreviewSignup} className="inline-flex flex-shrink-0 items-center justify-center gap-2 rounded-lg bg-blue-700 px-4 py-2.5 text-xs font-semibold text-white hover:bg-blue-800">
-                <UserPlus size={15} /> Preview Sign-Up
-              </button>
-            </div>
-            <div>
-              <h2 className="mb-3 font-semibold text-white">Pending requests</h2>
-              {loading ? <div className="rounded-xl bg-white p-8 text-center text-sm text-muted-foreground">Loading access requests…</div> : pendingAccessRequests.length === 0 ? <div className="rounded-xl bg-white p-8 text-center text-sm text-muted-foreground">No one is waiting for approval.</div> : (
-                <div className="space-y-3">
-                  {pendingAccessRequests.map((item) => (
-                    <article key={item.user_id} className="rounded-2xl border-2 border-blue-300 bg-white p-5 shadow-sm">
-                      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold">{item.requested_name || "New Neighbor"}</h3><span className="rounded-full bg-blue-100 px-2 py-1 text-[10px] font-semibold uppercase text-blue-700">{item.account_type}</span></div>
-                          <a href={`mailto:${item.email}`} className="mt-1 block break-all text-sm text-blue-600 hover:underline">{item.email}</a>
-                          <p className="mt-1 text-xs text-muted-foreground">Requested {new Date(item.requested_at).toLocaleString()}</p>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <button onClick={() => { void reviewMemberAccess(item, "approved"); }} disabled={actionBusyId === item.user_id} className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">Approve access</button>
-                          <button onClick={() => { void reviewMemberAccess(item, "declined"); }} disabled={actionBusyId === item.user_id} className="rounded-lg border border-red-200 px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50">Decline</button>
-                        </div>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              )}
-            </div>
-            {reviewedAccessRequests.length > 0 ? (
-              <div>
-                <h2 className="mb-3 font-semibold text-white">Recently reviewed</h2>
-                <div className="space-y-2">
-                  {reviewedAccessRequests.map((item) => (
-                    <article key={item.user_id} className="flex flex-col justify-between gap-3 rounded-xl bg-white p-4 shadow-sm sm:flex-row sm:items-center">
-                      <div className="min-w-0"><p className="font-semibold">{item.requested_name || "Neighbor"}</p><p className="truncate text-xs text-muted-foreground">{item.email}</p></div>
-                      <div className="flex items-center gap-2"><span className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase ${item.status === "approved" ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>{item.status}</span>{item.status === "declined" ? <button onClick={() => { void reviewMemberAccess(item, "approved"); }} disabled={actionBusyId === item.user_id} className="rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50">Approve now</button> : null}</div>
-                    </article>
-                  ))}
-                </div>
-              </div>
-            ) : null}
+            <button type="button" onClick={onPreviewSignup} className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2.5 text-xs font-semibold text-purple-800 hover:bg-purple-50"><UserPlus size={15} /> Preview Sign-Up</button>
+            <SupportAdminPanel />
           </section>
         )}
 
@@ -5499,14 +5415,14 @@ export default function App() {
     }
     let cancelled = false;
     async function refreshAdminAttention() {
-      const [accessResult, feedbackResult, advertisingResult] = await Promise.all([
-        supabase.from("member_access").select("user_id", { count: "exact", head: true }).eq("status", "pending"),
+      const [supportResult, feedbackResult, advertisingResult] = await Promise.all([
+        supabase.from("support_requests").select("id", { count: "exact", head: true }).eq("status", "new"),
         supabase.from("site_feedback").select("id", { count: "exact", head: true }).eq("status", "unread"),
         supabase.from("advertising_campaigns").select("id", { count: "exact", head: true }).eq("status", "pending"),
       ]);
       if (cancelled) return;
-      if (!accessResult.error && !feedbackResult.error && !advertisingResult.error) {
-        setAdminAttentionCount((accessResult.count || 0) + (feedbackResult.count || 0) + (advertisingResult.count || 0));
+      if (!supportResult.error && !feedbackResult.error && !advertisingResult.error) {
+        setAdminAttentionCount((supportResult.count || 0) + (feedbackResult.count || 0) + (advertisingResult.count || 0));
       }
     }
     void refreshAdminAttention();
@@ -6191,8 +6107,10 @@ export default function App() {
 
   if (!authReady) return (
     <div className="min-h-[100dvh] bg-purple-950 flex flex-col items-center justify-center px-6 text-center text-white" role="status" aria-live="polite">
-      <div className="flex h-24 w-24 items-center justify-center rounded-3xl bg-white/10 ring-1 ring-white/20">
-        <img src="/icons/neighborly-192.png" alt="" className="h-20 w-20 object-contain" />
+      <div className="flex h-36 w-36 flex-col items-center justify-center rounded-3xl bg-white p-3 shadow-2xl shadow-black/30">
+        <div className="h-[75px] w-24 overflow-hidden"><img src={neighborlyLogo} alt="Neighborly house logo" className="h-auto w-full object-contain" /></div>
+        <span className="mt-1 bg-gradient-to-r from-purple-700 to-blue-500 bg-clip-text font-[\u0027Playfair_Display\u0027,serif] text-xl font-bold text-transparent">Neighborly</span>
+        <span className="mt-0.5 whitespace-nowrap text-[8px] font-semibold text-slate-600">Neighbors Helping Neighbors</span>
       </div>
       <h1 className="mt-5 font-['Playfair_Display',serif] text-3xl font-bold tracking-tight">Neighborly</h1>
       <p className="mt-2 text-sm text-purple-200">Neighbors Helping Neighbors</p>
@@ -7245,6 +7163,7 @@ export default function App() {
             <button onClick={() => setFeedbackOpen(true)} className="flex w-full items-center justify-center gap-2 rounded-xl border border-purple-200 bg-white px-4 py-3 text-sm font-semibold text-purple-700 shadow-sm hover:bg-purple-50">
               <MessageSquare size={16} /> Send Feedback
             </button>
+            <a href="/help" className="block rounded-xl border border-purple-200 bg-white px-4 py-3 text-center text-sm font-semibold text-purple-700 hover:bg-purple-50">Help & FAQs</a>
             <a href="/install" className="block rounded-xl border border-purple-200 bg-white px-4 py-3 text-center text-sm font-semibold text-purple-700 hover:bg-purple-50">Install Neighborly</a>
 
             <CommunityGroupsCard
@@ -7308,7 +7227,7 @@ export default function App() {
               onToggleFollow={(neighbor) => { void toggleActiveNeighborFollow(neighbor); }}
             />
 
-            <p className="text-xs text-muted-foreground text-center px-2">© 2026 Neighborly · Privacy · Terms · Help</p>
+            <p className="text-xs text-muted-foreground text-center px-2">© 2026 Neighborly · Privacy · Terms · <a href="/help" className="underline">Help</a></p>
         </aside>
       </main>
       
@@ -7349,6 +7268,7 @@ export default function App() {
           <button onClick={() => { setFeedbackOpen(true); setSidebarOpen(false); }} className="flex w-full items-center justify-center gap-2 rounded-xl border border-purple-300 bg-white px-4 py-3 text-sm font-semibold text-purple-700 hover:bg-purple-50">
             <MessageSquare size={16} /> Send Feedback
           </button>
+          <a href="/help" onClick={() => setSidebarOpen(false)} className="block rounded-xl border border-purple-200 bg-white px-4 py-3 text-center text-sm font-semibold text-purple-700 hover:bg-purple-50">Help & FAQs</a>
           <a href="/install" className="block rounded-xl border border-purple-200 bg-white px-4 py-3 text-center text-sm font-semibold text-purple-700 hover:bg-purple-50">Install Neighborly</a>
 
           <CommunityGroupsCard
@@ -7411,7 +7331,7 @@ export default function App() {
             onToggleFollow={(neighbor) => { void toggleActiveNeighborFollow(neighbor); }}
           />
 
-          <p className="text-xs text-muted-foreground text-center px-2 pb-2">© 2026 Neighborly · Privacy · Terms · Help</p>
+          <p className="text-xs text-muted-foreground text-center px-2 pb-2">© 2026 Neighborly · Privacy · Terms · <a href="/help" className="underline">Help</a></p>
       </aside>
 
       {advertiseOpen && (
