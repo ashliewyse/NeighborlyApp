@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate, useSearchParams } from "react-router";
 import { AuthView } from "@/app/components/AuthView";
 import { WelcomePage } from "@/app/components/WelcomePage";
+import { HelpCenter } from "@/app/components/HelpCenter";
 import { useAuth } from "@/app/auth/AuthProvider";
 import { ProtectedRoute } from "@/app/auth/ProtectedRoute";
 
@@ -138,6 +139,7 @@ export function AppRouter() {
     <Routes>
       <Route path="/" element={<HomePage />} />
       <Route path="/install" element={<InstallAppPage />} />
+      <Route path="/help" element={<HelpCenter />} />
       <Route path="/sign-in" element={<AuthPage mode="signin" />} />
       <Route path="/sign-up" element={<AuthPage mode="signup" />} />
       <Route path="/forgot-password" element={<AuthPage mode="signin" initialScreen="forgot" />} />
