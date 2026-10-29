@@ -60,7 +60,7 @@ function getFriendlyAuthError(error: AuthErrorLike | null, operation: AuthOperat
 
   const fallbackByOperation: Record<AuthOperation, string> = {
     "sign-in": "We couldn't sign you in. Please check your information and try again.",
-    "sign-up": "We couldn't submit your access request. Please try again.",
+    "sign-up": "We couldn't create your account. Please try again.",
     "password-reset": "We couldn't send a password-reset email. Please try again.",
     "password-update": "We couldn't update your password. Please try again.",
   };
@@ -329,7 +329,7 @@ export function AuthView({ mode, initialScreen = "form", onSwitchMode, onSuccess
             <ImageWithFallback src={neighborlyLogo} alt="Neighborly App" className="w-full h-auto object-contain" />
           </div>
           <h1 className="font-['Playfair_Display',serif] font-bold text-2xl text-foreground">
-            {previewComplete ? `${accountType === "business" ? "Business" : "Personal"} preview complete` : previewMode ? "Preview the Neighborly sign-up" : screen === "forgot" ? "Reset your password" : screen === "recovery" ? "Choose a new password" : mode === "signin" ? "Welcome back to Neighborly" : "Join the Neighborly beta"}
+            {previewComplete ? `${accountType === "business" ? "Business" : "Personal"} preview complete` : previewMode ? "Preview the Neighborly sign-up" : screen === "forgot" ? "Reset your password" : screen === "recovery" ? "Choose a new password" : mode === "signin" ? "Welcome back to Neighborly" : "Join Neighborly"}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
             {previewComplete ? "You reached the end of this walkthrough without creating an account." : previewMode ? "Try every step exactly as a new neighbor would see it." : screen === "forgot" ? "We'll email a secure reset link to your registered address." : screen === "recovery" ? "Create a new password for your Neighborly account." : mode === "signin" ? "Sign in to connect with your local community." : "Create your free Neighborly account. You can change your profile details later."}
@@ -576,6 +576,11 @@ export function AuthView({ mode, initialScreen = "form", onSwitchMode, onSuccess
           {error && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 text-red-700 px-3 py-2.5 text-sm">{error}</div>}
           {notice && <div role="status" aria-live="polite" className="rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 px-3 py-2.5 text-sm flex gap-2"><CheckCircle2 size={16} className="mt-0.5 flex-shrink-0" />{notice}</div>}
 
+          {!previewMode && (
+            <div className="text-center mt-2">
+              <Link to="/help" className="inline-block mb-2 font-semibold text-sm text-purple-700 hover:underline">Having trouble signing in or joining? Get Help</Link>
+            </div>
+          )}
           {screen === "form" && !previewMode && (
             <div className="text-center mt-2">
               {mode === "signin" ? (
