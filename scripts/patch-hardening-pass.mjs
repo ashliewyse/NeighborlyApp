@@ -34,7 +34,10 @@ const adminSignature = `function AdminDashboard({\n  onBack,\n  onPreviewSignup,
 const adminSignatureWithProfile = `function AdminDashboard({\n  onBack,\n  onPreviewSignup,\n  defaultCity,\n  defaultNeighborhood,\n  onPostCreated,\n  onProfileOpen,\n}: {\n  onBack: () => void;\n  onPreviewSignup: () => void;\n  defaultCity: string;\n  defaultNeighborhood: string;\n  onPostCreated: (post: Post) => void;\n  onProfileOpen: (name: string, userId: string) => void;\n}) {`;
 replaceOnce(adminSignature, adminSignatureWithProfile, "AdminDashboard profile callback signature");
 
-replaceOnce(
+const supportTab = 'const [tab, setTab] = useState<"support" | "posts" | "safety" | "feedback" | "advertising">("support");';
+const supportWithMembersTab = 'const [tab, setTab] = useState<"support" | "members" | "posts" | "safety" | "feedback" | "advertising">("support");';
+if (source.includes(supportTab)) source = source.replace(supportTab, supportWithMembersTab);
+else if (!source.includes(supportWithMembersTab)) replaceOnce(
   'const [tab, setTab] = useState<"access" | "posts" | "safety" | "feedback" | "advertising">("access");',
   'const [tab, setTab] = useState<"access" | "members" | "posts" | "safety" | "feedback" | "advertising">("access");',
   "expanded admin tab state",
@@ -47,15 +50,18 @@ if (source.includes('sm:grid-cols-5" aria-label="Admin sections"')) {
 const accessNav = '            { id: "access" as const, label: `Access${pendingAccessRequests.length ? ` (${pendingAccessRequests.length})` : ""}`, icon: <UserCheck size={16} /> },';
 const membersNav = '            { id: "members" as const, label: "Members", icon: <Users size={16} /> },';
 if (!source.includes(membersNav)) {
-  if (!source.includes(accessNav)) throw new Error("Could not find admin access nav item.");
-  source = source.replace(accessNav, `${accessNav}\n${membersNav}`);
+  const supportNav = '            { id: "support" as const, label: `Help & Support${newHelpCount ? ` (${newHelpCount})` : ""}`, icon: <MessageSquare size={16} /> },';
+  if (source.includes(supportNav)) source = source.replace(supportNav, `${supportNav}\n${membersNav}`);
+  else if (source.includes(accessNav)) source = source.replace(accessNav, `${accessNav}\n${membersNav}`);
+  else throw new Error("Could not find admin tab nav item.");
 }
 
 const accessPanelAnchor = '        {tab === "access" && (';
 const membersPanel = '        {tab === "members" && <AdminMemberManagement onProfileOpen={onProfileOpen} />}\n\n';
 if (!source.includes(membersPanel.trim())) {
-  const index = source.indexOf(accessPanelAnchor);
-  if (index < 0) throw new Error("Could not find admin access panel anchor.");
+  const supportPanelAnchor = '        {tab === "support" && (';
+  const index = source.indexOf(source.includes(supportPanelAnchor) ? supportPanelAnchor : accessPanelAnchor);
+  if (index < 0) throw new Error("Could not find admin support panel anchor.");
   source = source.slice(0, index) + membersPanel + source.slice(index);
 }
 
