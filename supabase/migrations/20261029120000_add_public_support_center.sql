@@ -43,9 +43,12 @@ alter table public.support_faqs enable row level security;
 revoke all on public.support_faqs from anon, authenticated;
 grant select on public.support_faqs to anon, authenticated;
 grant insert, update, delete on public.support_faqs to authenticated;
-create policy "published FAQs are public and admins can read all"
+create policy "published FAQs are public"
   on public.support_faqs for select to anon, authenticated
-  using (published or exists (select 1 from public.site_admins a where a.user_id = (select auth.uid()) and a.enabled));
+  using (published);
+create policy "admins may read unpublished FAQs"
+  on public.support_faqs for select to authenticated
+  using (exists (select 1 from public.site_admins a where a.user_id = (select auth.uid()) and a.enabled));
 create policy "admins may add FAQs"
   on public.support_faqs for insert to authenticated
   with check (exists (select 1 from public.site_admins a where a.user_id = (select auth.uid()) and a.enabled));
