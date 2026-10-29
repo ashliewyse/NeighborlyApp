@@ -46,6 +46,7 @@ export function InstallAppPage(){
      <section className="rounded-xl border border-slate-200 p-4"><h2 className="font-semibold">Computer</h2><p className="mt-2 text-sm leading-6 text-slate-600">In Chrome or Edge, use the install icon in the address bar or the browser menu’s install option.</p></section>
     </div>}
     <p className="mt-5 text-xs leading-5 text-slate-500">An internet connection is required for Neighborly. If you are viewing this inside another app, open it in Safari or Chrome to install.</p>
+    <Link to="/help" className="mt-4 block rounded-xl border border-purple-200 bg-purple-50 p-3 text-center text-sm font-bold text-purple-800 hover:bg-purple-100">Need help installing? Visit Help & Support</Link>
    </section>
   </div>
  </main>;
