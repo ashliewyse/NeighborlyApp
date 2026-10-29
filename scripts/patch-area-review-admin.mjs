@@ -16,7 +16,10 @@ if (!source.includes(areaImport)) {
   source = source.replace(memberImport, `${memberImport}\n${areaImport}`);
 }
 
-replaceOnce(
+const supportTabState = 'const [tab, setTab] = useState<"support" | "members" | "posts" | "safety" | "feedback" | "advertising">("support");';
+const supportTabWithAreas = 'const [tab, setTab] = useState<"support" | "members" | "areas" | "posts" | "safety" | "feedback" | "advertising">("support");';
+if (source.includes(supportTabState)) source = source.replace(supportTabState, supportTabWithAreas);
+else if (!source.includes(supportTabWithAreas)) replaceOnce(
   'const [tab, setTab] = useState<"access" | "members" | "posts" | "safety" | "feedback" | "advertising">("access");',
   'const [tab, setTab] = useState<"access" | "members" | "areas" | "posts" | "safety" | "feedback" | "advertising">("access");',
   "admin tab state not found",
@@ -40,13 +43,23 @@ if (!source.includes(areasPanel)) {
 
 const attentionWithSafety = `      const [accessResult, feedbackResult, advertisingResult, safetyResult] = await Promise.all([\n        supabase.from("member_access").select("user_id", { count: "exact", head: true }).eq("status", "pending"),\n        supabase.from("site_feedback").select("id", { count: "exact", head: true }).eq("status", "unread"),\n        supabase.from("advertising_campaigns").select("id", { count: "exact", head: true }).eq("status", "pending"),\n        supabase.from("safety_reports").select("id", { count: "exact", head: true }).in("status", ["open", "escalated"]),\n      ]);`;
 const attentionWithAreas = `      const [accessResult, feedbackResult, advertisingResult, safetyResult, areaResult] = await Promise.all([\n        supabase.from("member_access").select("user_id", { count: "exact", head: true }).eq("status", "pending"),\n        supabase.from("site_feedback").select("id", { count: "exact", head: true }).eq("status", "unread"),\n        supabase.from("advertising_campaigns").select("id", { count: "exact", head: true }).eq("status", "pending"),\n        supabase.from("safety_reports").select("id", { count: "exact", head: true }).in("status", ["open", "escalated"]),\n        supabase.from("area_review_requests").select("id", { count: "exact", head: true }).eq("status", "pending"),\n      ]);`;
-replaceOnce(attentionWithSafety, attentionWithAreas, "admin attention query not found");
-
-replaceOnce(
-  'if (!accessResult.error && !feedbackResult.error && !advertisingResult.error && !safetyResult.error) {\n        setAdminAttentionCount((accessResult.count || 0) + (feedbackResult.count || 0) + (advertisingResult.count || 0) + (safetyResult.count || 0));',
-  'if (!accessResult.error && !feedbackResult.error && !advertisingResult.error && !safetyResult.error && !areaResult.error) {\n        setAdminAttentionCount((accessResult.count || 0) + (feedbackResult.count || 0) + (advertisingResult.count || 0) + (safetyResult.count || 0) + (areaResult.count || 0));',
-  "admin attention count not found",
-);
+const supportAttention = `      const [supportResult, feedbackResult, advertisingResult] = await Promise.all([\n        supabase.from("support_requests").select("id", { count: "exact", head: true }).eq("status", "new"),\n        supabase.from("site_feedback").select("id", { count: "exact", head: true }).eq("status", "unread"),\n        supabase.from("advertising_campaigns").select("id", { count: "exact", head: true }).eq("status", "pending"),\n      ]);`;
+const supportWithAreas = `      const [supportResult, feedbackResult, advertisingResult, safetyResult, areaResult] = await Promise.all([\n        supabase.from("support_requests").select("id", { count: "exact", head: true }).eq("status", "new"),\n        supabase.from("site_feedback").select("id", { count: "exact", head: true }).eq("status", "unread"),\n        supabase.from("advertising_campaigns").select("id", { count: "exact", head: true }).eq("status", "pending"),\n        supabase.from("safety_reports").select("id", { count: "exact", head: true }).in("status", ["open", "escalated"]),\n        supabase.from("area_review_requests").select("id", { count: "exact", head: true }).eq("status", "pending"),\n      ]);`;
+if (source.includes(supportAttention)) {
+  source = source.replace(supportAttention, supportWithAreas);
+  replaceOnce(
+    'if (!supportResult.error && !feedbackResult.error && !advertisingResult.error) {\n        setAdminAttentionCount((supportResult.count || 0) + (feedbackResult.count || 0) + (advertisingResult.count || 0));',
+    'if (!supportResult.error && !feedbackResult.error && !advertisingResult.error && !safetyResult.error && !areaResult.error) {\n        setAdminAttentionCount((supportResult.count || 0) + (feedbackResult.count || 0) + (advertisingResult.count || 0) + (safetyResult.count || 0) + (areaResult.count || 0));',
+    "support admin attention count",
+  );
+} else {
+  replaceOnce(attentionWithSafety, attentionWithAreas, "admin attention query not found");
+  replaceOnce(
+    'if (!accessResult.error && !feedbackResult.error && !advertisingResult.error && !safetyResult.error) {\n        setAdminAttentionCount((accessResult.count || 0) + (feedbackResult.count || 0) + (advertisingResult.count || 0) + (safetyResult.count || 0));',
+    'if (!accessResult.error && !feedbackResult.error && !advertisingResult.error && !safetyResult.error && !areaResult.error) {\n        setAdminAttentionCount((accessResult.count || 0) + (feedbackResult.count || 0) + (advertisingResult.count || 0) + (safetyResult.count || 0) + (areaResult.count || 0));',
+    "admin attention count not found",
+  );
+}
 
 if (!source.includes('tab === "areas" && <AreaReviewPanel />')) {
   throw new Error("Area review admin patch verification failed.");
