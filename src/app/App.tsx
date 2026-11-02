@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { ProfileReviewsPanel, useProfileReviews } from "./components/ProfileReviews";
 import { useAuth } from "@/app/auth/AuthProvider";
 import { Analytics } from "@vercel/analytics/react";
 import { useLocation, useNavigate } from "react-router";
@@ -1385,7 +1386,7 @@ function BusinessProfileView({
     "about" | "posts" | "services" | "photos" | "contact" | "reviews"
   >("about");
   const [photosExpanded, setPhotosExpanded] = useState(false);
-  const [reviewHelpful, setReviewHelpful] = useState<Record<number, boolean>>({});
+  const reviewState = useProfileReviews(biz.ownerId, isOwnProfile);
   const [businessPhotos, setBusinessPhotos] = useState(biz.photos);
   const [coverUrl, setCoverUrl] = useState<string | null>(biz.coverUrl || null);
   const [logoUrl, setLogoUrl] = useState<string | null>(biz.logoUrl || null);
@@ -1596,15 +1597,15 @@ function BusinessProfileView({
                   {biz.category} · Est. {biz.founded} · Owned by{" "}
                   {biz.owner}
                 </p>
-                <div className="flex items-center gap-2 mt-1">
-                  <StarRating rating={biz.rating} />
+                <button type="button" onClick={() => setTab("reviews")} aria-label="View business ratings and write a review" className="flex items-center gap-2 mt-1 rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
+                  <StarRating rating={reviewState.average} />
                   <span className="text-sm font-semibold">
-                    {biz.rating}
+                    {reviewState.displayRating}
                   </span>
                   <span className="text-sm text-muted-foreground">
-                    ({biz.reviewCount} reviews)
+                    ({reviewState.reviews.length} reviews)
                   </span>
-                </div>
+                </button>
               </div>
               <div className="flex w-full flex-wrap sm:w-auto gap-2 pb-1 flex-shrink-0">
                 {isOwnProfile && (
@@ -1681,7 +1682,7 @@ function BusinessProfileView({
                 }`}
               >
                 {t === "reviews"
-                  ? `Reviews (${biz.reviews.length})`
+                  ? `Reviews (${reviewState.reviews.length})`
                   : t === "photos"
                     ? `Photos (${businessPhotos.length})`
                     : t.charAt(0).toUpperCase() + t.slice(1)}
@@ -1781,7 +1782,7 @@ function BusinessProfileView({
                   {[
                     {
                       label: "Reviews",
-                      value: biz.reviewCount,
+                      value: reviewState.reviews.length,
                     },
                     {
                       label: "Years Open",
@@ -1789,7 +1790,7 @@ function BusinessProfileView({
                     },
                     {
                       label: "Rating",
-                      value: `${biz.rating}★`,
+                      value: `${reviewState.displayRating}★`,
                     },
                     {
                       label: "Badges",
@@ -2034,141 +2035,7 @@ function BusinessProfileView({
           </div>
         )}
 
-        {tab === "reviews" && (
-          <div className="flex flex-col gap-4">
-            {/* Summary */}
-            <div className="bg-white rounded-xl border border-border p-6">
-              <div className="grid grid-cols-1 md:grid-cols-[auto_1fr] gap-8 items-center">
-                <div className="text-center">
-                  <p className="font-['Playfair_Display',serif] font-bold text-5xl text-blue-600">
-                    {biz.rating}
-                  </p>
-                  <StarRating rating={biz.rating} size="lg" />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {biz.reviewCount} reviews
-                  </p>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  {[5, 4, 3, 2, 1].map((star) => {
-                    const count = biz.reviews.filter(
-                      (r) => Math.round(r.rating) === star,
-                    ).length;
-                    const pct = biz.reviews.length
-                      ? (count / biz.reviews.length) * 100
-                      : 0;
-                    return (
-                      <div
-                        key={star}
-                        className="flex items-center gap-2"
-                      >
-                        <span className="text-xs text-muted-foreground w-4 text-right">
-                          {star}
-                        </span>
-                        <Star
-                          size={10}
-                          className="text-amber-400 fill-amber-400"
-                        />
-                        <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-amber-400 rounded-full"
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                        <span className="text-xs text-muted-foreground w-4">
-                          {count}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
-            {biz.reviews.map((r) => (
-              <div
-                key={r.id}
-                className="bg-white rounded-xl border border-border p-5"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-3">
-                    <Avatar name={r.author} size="md" />
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <button
-                          onClick={() => onUserClick(r.author)}
-                          className="font-semibold text-sm hover:text-blue-600 transition-colors"
-                        >
-                          {r.author}
-                        </button>
-                        {r.authorBadges.map((b) => (
-                          <UserBadgePill key={b} type={b} />
-                        ))}
-                      </div>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <StarRating rating={r.rating} />
-                        <span className="text-xs text-muted-foreground">
-                          {r.date}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <p className="text-sm text-foreground/80 leading-relaxed mt-3">
-                  {r.body}
-                </p>
-                <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border">
-                  <button
-                    onClick={() =>
-                      setReviewHelpful((p) => ({
-                        ...p,
-                        [r.id]: !p[r.id],
-                      }))
-                    }
-                    className={`flex items-center gap-1.5 text-xs font-medium transition-colors font-['DM_Sans',sans-serif] ${reviewHelpful[r.id] ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
-                  >
-                    <ThumbsUp
-                      size={12}
-                      className={
-                        reviewHelpful[r.id]
-                          ? "fill-primary text-primary"
-                          : ""
-                      }
-                    />
-                    Helpful (
-                    {r.helpful + (reviewHelpful[r.id] ? 1 : 0)})
-                  </button>
-                  <button className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
-                    <Flag size={11} /> Report
-                  </button>
-                </div>
-              </div>
-            ))}
-
-            <div className="bg-white rounded-xl border border-border p-5">
-              <h3 className="font-semibold text-sm mb-3">
-                Write a Review
-              </h3>
-              <div className="flex gap-1 mb-3">
-                {[1, 2, 3, 4, 5].map((s) => (
-                  <button key={s}>
-                    <Star
-                      size={20}
-                      className="text-stone-200 hover:text-amber-400 hover:fill-amber-400 transition-colors"
-                    />
-                  </button>
-                ))}
-              </div>
-              <textarea
-                placeholder={`How was your experience with ${biz.name}?`}
-                rows={3}
-                className="w-full bg-muted rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600/20 resize-none"
-              />
-              <button className="mt-2 bg-primary text-primary-foreground px-5 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity font-['DM_Sans',sans-serif]">
-                Submit Review
-              </button>
-            </div>
-          </div>
-        )}
+        {tab === "reviews" && <ProfileReviewsPanel model={reviewState} name={biz.name} />}
       </div>
       {isOwnProfile && businessCrop && (
         <CropModal
@@ -2669,12 +2536,8 @@ function UserProfileView({
   const [coverUrl, setCoverUrl] = useState<string | null>(profile.coverUrl || null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(myAvatarUrl || profile.avatarUrl || null);
   const [gallery, setGallery] = useState(profile.galleryPhotos);
-  const [reviews, setReviews] = useState<NeighborReview[]>(profile.neighborReviews);
-  const [hoverStar, setHoverStar] = useState(0);
-  const [pickedStar, setPickedStar] = useState(0);
-  const [reviewText, setReviewText] = useState("");
-  const [reviewSubmitted, setReviewSubmitted] = useState(false);
-  const [helpfulMap, setHelpfulMap] = useState<Record<number, boolean>>({});
+  const reviewState = useProfileReviews(profile.id, isOwnProfile);
+  const reviews = reviewState.reviews;
   const [themeOpen, setThemeOpen] = useState(false);
   const [cropSrc, setCropSrc] = useState<string | null>(null);
   const [cropMode, setCropMode] = useState<"avatar" | "cover">("avatar");
@@ -2709,10 +2572,8 @@ function UserProfileView({
     };
   }, [theme]);
 
-  const avgRating = reviews.length
-    ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length
-    : profile.rating;
-  const displayRating = avgRating.toFixed(1);
+  const avgRating = reviewState.average;
+  const displayRating = reviewState.displayRating;
 
   function openCrop(file: File, mode: "avatar" | "cover") {
     setCropMode(mode);
@@ -2792,16 +2653,6 @@ function UserProfileView({
       }
     } catch (e: any) { setMediaError(e?.message || "Could not save profile photos."); }
     finally { setMediaBusy(false); }
-  }
-  function submitReview() {
-    if (!pickedStar || !reviewText.trim()) return;
-    setReviews((prev) => [
-      { id: Date.now(), author: "You", authorBadges: [], rating: pickedStar, date: "Just now", body: reviewText.trim(), helpful: 0 },
-      ...prev,
-    ]);
-    setReviewSubmitted(true);
-    setPickedStar(0);
-    setReviewText("");
   }
 
   return (
@@ -2919,14 +2770,14 @@ function UserProfileView({
             <h1 className="font-['Playfair_Display',serif] font-bold text-xl leading-tight">
               {profile.name}
             </h1>
-            <div className="flex items-center gap-1.5 mt-1">
+            <button type="button" onClick={() => setTab("reviews")} aria-label="View neighbor ratings and write a review" className="flex items-center gap-1.5 mt-1 rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
               {[1,2,3,4,5].map((s) => (
                 <Star key={s} size={14}
                   className={s <= Math.round(avgRating) ? "fill-amber-400 text-amber-400" : "text-stone-200"} />
               ))}
               <span className="text-sm font-semibold ml-0.5">{displayRating}</span>
               <span className="text-xs text-muted-foreground">({reviews.length} ratings)</span>
-            </div>
+            </button>
             <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
               <MapPin size={10} /> {profile.neighborhood} · Member since {profile.joinDate}
             </p>
@@ -3081,83 +2932,7 @@ function UserProfileView({
           </div>
         )}
 
-        {tab === "reviews" && (
-          <div className="flex flex-col gap-4">
-            <div className="bg-white rounded-xl border border-border p-5">
-              <h2 className={`font-semibold text-sm mb-4 flex items-center gap-2 ${T.accent}`}>
-                <Star size={14} /> Neighbor Ratings
-              </h2>
-              <div className="grid grid-cols-[auto_1fr] gap-6 items-center">
-                <div className="text-center">
-                  <p className={`font-['Playfair_Display',serif] font-bold text-5xl ${T.accent}`}>{displayRating}</p>
-                  <div className="flex items-center gap-0.5 mt-1 justify-center">
-                    {[1,2,3,4,5].map((s) => (
-                      <Star key={s} size={16} className={s <= Math.round(avgRating) ? "fill-amber-400 text-amber-400" : "text-stone-200"} />
-                    ))}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">{reviews.length} ratings</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl border border-border p-5">
-              <h3 className={`font-semibold text-sm mb-3 flex items-center gap-2 ${T.accent}`}>
-                <MessageSquare size={14} /> Rate &amp; Review {profile.name.split(" ")[0]}
-              </h3>
-              {reviewSubmitted ? (
-                <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg px-4 py-3 text-sm">
-                  <CheckCircle2 size={15} /> Your review was submitted — thank you!
-                </div>
-              ) : (
-                <>
-                  <div className="flex items-center gap-1 mb-3">
-                    {[1,2,3,4,5].map((s) => (
-                      <button
-                        key={s}
-                        onMouseEnter={() => setHoverStar(s)}
-                        onMouseLeave={() => setHoverStar(0)}
-                        onClick={() => setPickedStar(s)}
-                        className="transition-transform hover:scale-125"
-                      >
-                        <Star size={30}
-                          className={s <= (hoverStar || pickedStar) ? "fill-amber-400 text-amber-400" : "text-stone-200"} />
-                      </button>
-                    ))}
-                  </div>
-                  <textarea
-                    rows={3}
-                    placeholder={`Share your experience as ${profile.name.split(" ")[0]}'s neighbor…`}
-                    value={reviewText}
-                    onChange={(e) => setReviewText(e.target.value)}
-                    className="w-full bg-muted rounded-lg px-3 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
-                  />
-                  <button
-                    onClick={submitReview}
-                    disabled={!pickedStar || !reviewText.trim()}
-                    className={`mt-2 ${T.btn} text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-40`}
-                  >
-                    Submit Review
-                  </button>
-                </>
-              )}
-            </div>
-
-            {reviews.map((r) => (
-              <div key={r.id} className="bg-white rounded-xl border border-border p-5">
-                <div className="flex items-start gap-3">
-                  <Avatar name={r.author} size="sm" />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-semibold">{r.author}</span>
-                      <span className="text-xs text-muted-foreground">{r.date}</span>
-                    </div>
-                    <p className="text-sm text-foreground/80 leading-relaxed mt-2">{r.body}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        {tab === "reviews" && <ProfileReviewsPanel model={reviewState} name={profile.name} />}
       </div>
 
       {cropSrc && (
