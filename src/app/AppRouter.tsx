@@ -7,6 +7,9 @@ import { useAuth } from "@/app/auth/AuthProvider";
 import { ProtectedRoute } from "@/app/auth/ProtectedRoute";
 
 import { InstallAppPage } from "@/app/components/InstallApp";
+import { GroupPageRoute } from "@/app/components/groups/GroupPage";
+import { SharedPostRoute } from "@/app/components/SharedPostPage";
+import { safeReturnPath } from "@/lib/sharing.mjs";
 
 type AuthMode = "signin" | "signup";
 type AuthScreen = "form" | "forgot" | "recovery";
@@ -35,15 +38,15 @@ function AuthPage({ mode, initialScreen = "form" }: { mode: AuthMode; initialScr
   const location = useLocation();
   const navigate = useNavigate();
 
-  const requestedPath =
+  const requestedPath = safeReturnPath(
     typeof location.state === "object" &&
     location.state !== null &&
     "from" in location.state &&
     typeof location.state.from === "string"
       ? location.state.from
-      : mode === "signup"
-        ? "/profile"
-        : "/";
+      : new URLSearchParams(location.search).get("next"),
+    mode === "signup" ? "/profile" : "/",
+  );
 
   const handleSuccess = useCallback(() => {
     navigate(requestedPath, { replace: true });
@@ -65,7 +68,7 @@ function AuthPage({ mode, initialScreen = "form" }: { mode: AuthMode; initialScr
     <AuthView
       mode={mode}
       initialScreen={initialScreen}
-      onSwitchMode={(nextMode) => navigate(nextMode === "signin" ? "/sign-in" : "/sign-up", { replace: true })}
+      onSwitchMode={(nextMode) => navigate(`${nextMode === "signin" ? "/sign-in" : "/sign-up"}?next=${encodeURIComponent(requestedPath)}`, { replace: true, state: { from: requestedPath } })}
       onSuccess={handleSuccess}
     />
   );
@@ -88,7 +91,7 @@ function AuthCallbackPage() {
   const { user, loading, error } = useAuth();
   const [searchParams] = useSearchParams();
   const requestedNext = searchParams.get("next") || "/profile";
-  const next = requestedNext.startsWith("/") && !requestedNext.startsWith("//") ? requestedNext : "/profile";
+  const next = safeReturnPath(requestedNext, "/profile");
 
   if (!loading && user) return <Navigate to={next} replace />;
 
@@ -108,7 +111,7 @@ function AuthCallbackPage() {
               ? "Confirmation links are time-limited. Return to sign in, enter your email and password, and Neighborly will give you an option to send a fresh confirmation email."
               : callbackError}
           </p>
-          <a href="/sign-in" className="mt-5 inline-flex rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white">
+          <a href={`/sign-in?next=${encodeURIComponent(next)}`} className="mt-5 inline-flex rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white">
             {expiredLink ? "Return to sign in & get a new link" : "Return to sign in"}
           </a>
         </div>
@@ -147,6 +150,8 @@ export function AppRouter() {
       <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
       <Route element={<ProtectedRoute />}>
+        <Route path="/groups/:groupId" element={<GroupPageRoute />} />
+        <Route path="/posts/:postId" element={<SharedPostRoute />} />
         <Route path="/sign-up-preview" element={<SignupPreviewPage />} />
         <Route
           path="/*"

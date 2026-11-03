@@ -38,3 +38,6 @@ jobs:
 
       - name: Verify patches and build
         run: pnpm run build
+
+      - name: Verify interactions and database permissions
+        run: pnpm test

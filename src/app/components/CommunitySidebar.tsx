@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import { Link } from "react-router";
 import * as Dialog from "@radix-ui/react-dialog";
 import { LoaderCircle, MapPin, UserPlus, UserCheck, Users, X } from "lucide-react";
 
@@ -93,9 +94,9 @@ export function CommunityGroupsCard({
             return (
               <div key={group.id} className="rounded-lg border border-border/60 p-2.5 transition-colors hover:bg-secondary/30">
                 <div className="mb-1 flex items-center justify-between gap-2">
-                  <span className="min-w-0 flex-1 truncate text-xs font-semibold" title={group.name}>
+                  <Link to={`/groups/${group.id}`} className="min-w-0 flex-1 break-words text-xs font-semibold text-purple-800 hover:underline" title={group.name}>
                     <span aria-hidden="true">{group.emoji}</span> {group.name}
-                  </span>
+                  </Link>
                   <button
                     onClick={() => onToggleMembership(group)}
                     disabled={busy}

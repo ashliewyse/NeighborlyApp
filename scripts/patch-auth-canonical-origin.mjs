@@ -43,7 +43,7 @@ const requiredMarkers = [
 ];
 
 for (const marker of requiredMarkers) {
-  if (!source.includes(marker)) {
+  if (!source.includes(marker) && !source.includes(marker.replace('encodeURIComponent("/profile")', 'encodeURIComponent(getAuthReturnPath())'))) {
     throw new Error(`Auth redirect patch failed: missing marker: ${marker}`);
   }
 }

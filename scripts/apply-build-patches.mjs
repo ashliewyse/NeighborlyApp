@@ -25,6 +25,7 @@ const patches = [
   "./patch-empty-events.mjs",
   "./patch-business-contact-links.mjs",
   "./patch-remove-demo-directory-data.mjs",
+  "./patch-groups-and-sharing.mjs",
 ];
 
 for (const patch of patches) {
@@ -107,7 +108,7 @@ if (!settings.includes("Your city or Neighborly area is always shown.")) {
 
 const requiredAuthMarkers = [
   'const NEIGHBORLY_PRODUCTION_ORIGIN = "https://www.neighborshelpingneighbors.online";',
-  'emailRedirectTo: `${getAuthRedirectOrigin()}/auth/callback?next=${encodeURIComponent("/profile")}`',
+  'emailRedirectTo: `${getAuthRedirectOrigin()}/auth/callback?next=${encodeURIComponent(getAuthReturnPath())}`',
   'redirectTo: `${getAuthRedirectOrigin()}/reset-password`',
   'async function handleResendConfirmation()',
   'Send a new confirmation email',
