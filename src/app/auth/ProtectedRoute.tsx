@@ -5,6 +5,7 @@ import { useAuth } from "@/app/auth/AuthProvider";
 import { ImageWithFallback } from "@/app/components/figma/ImageWithFallback";
 import neighborlyLogo from "@/imports/Copilot_20260807_041314.png";
 import { supabase } from "@/lib/supabase";
+import { safeReturnPath } from "@/lib/sharing.mjs";
 
 type RestrictionState = "active" | "warned" | "suspended" | "banned";
 type Restriction = {
@@ -157,7 +158,7 @@ export function ProtectedRoute({ children }: { children?: ReactNode }) {
 
   if (!user) {
     const from = `${location.pathname}${location.search}${location.hash}`;
-    return <Navigate to="/sign-in" replace state={{ from }} />;
+    return <Navigate to={`/sign-in?next=${encodeURIComponent(safeReturnPath(from))}`} replace state={{ from: safeReturnPath(from) }} />;
   }
 
   if (approvalRequired && accessStatus !== "approved") {

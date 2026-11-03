@@ -2,6 +2,7 @@ import { ArrowRight, BadgeCheck, Briefcase, Download, HandHeart, MapPin, Message
 import { Link } from "react-router";
 import { ImageWithFallback } from "@/app/components/figma/ImageWithFallback";
 import neighborlyLogo from "@/imports/Copilot_20260807_041314.png";
+import { ShareButton } from "@/app/components/ShareButton";
 
 const communityHighlights = [
   {
@@ -73,6 +74,7 @@ export function WelcomePage() {
             <p className="mt-4 text-sm text-purple-200">Join your local community with a free personal or business account.</p>
             <Link to="/install" className="mt-4 inline-flex items-center gap-2 rounded-xl bg-blue-500 px-5 py-3 text-base font-bold text-white shadow-lg hover:bg-blue-600"><Download size={20} /> Install Neighborly on Your Phone</Link>
             <p className="mt-4 text-sm text-purple-100">Having trouble signing up or installing? <Link to="/help" className="font-bold underline hover:text-white">Visit Help & FAQs</Link>.</p>
+            <div className="mt-4"><ShareButton label="Share Neighborly" /></div>
           </div>
 
           <div className="rounded-3xl border border-white/15 bg-white/10 p-4 shadow-2xl shadow-black/25 backdrop-blur sm:p-6" aria-label="Neighborly community preview">
