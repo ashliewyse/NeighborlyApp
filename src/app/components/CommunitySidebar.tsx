@@ -106,6 +106,9 @@ export function CommunityGroupsCard({
                   </button>
                 </div>
                 <p className="line-clamp-2 text-xs text-muted-foreground">{group.description}</p>
+                <Link to={`/groups/${group.id}`} aria-label={`Open ${group.name} discussion`} className="inline-flex min-h-10 items-center text-sm font-semibold text-purple-800 underline">
+                  Open discussion
+                </Link>
                 <div className="mt-1 flex items-center justify-between gap-2 text-[10px] text-muted-foreground">
                   <span>{group.members} {group.members === 1 ? "member" : "members"}</span>
                   <span className="max-w-28 truncate" title={group.neighborhood ? `${group.neighborhood}, ${group.city}` : group.city}>

@@ -5996,6 +5996,25 @@ export default function App() {
     </div>
   );
 
+  if (location.pathname.replace(/\/$/, "") === "/groups") return (
+    <main className="min-h-screen bg-purple-50 px-4 py-6">
+      <div className="mx-auto max-w-2xl space-y-4">
+        <button className="text-sm font-semibold text-purple-800" onClick={() => navigate("/")}>← Back to feed</button>
+        <h1 className="text-2xl font-bold">Groups</h1>
+        <CommunityGroupsCard
+          groups={groups}
+          loading={groupsLoading}
+          error={groupsError}
+          busyGroupId={groupActionBusyId}
+          onToggleMembership={group => { void toggleJoinGroup(group); }}
+          onCreate={() => setIsCreateGroupOpen(true)}
+        />
+        <CreateGroupDialog open={isCreateGroupOpen} areas={areaOptions}
+          defaultAreaValue={activeLocation === "All Areas" ? homeArea : activeLocation}
+          onOpenChange={setIsCreateGroupOpen} onCreate={createCommunityGroup} />
+      </div>
+    </main>
+  );
   if (view.page === "admin" && currentProfile && isSiteAdmin) return (
     <AdminDashboard
       onBack={goToFeed}
@@ -6445,6 +6464,7 @@ export default function App() {
 
           {/* Desktop nav — center */}
           <nav className="hidden lg:flex items-center gap-1 mx-auto">
+            <button onClick={() => navigate("/groups")} className="flex flex-col items-center gap-0.5 rounded-lg px-3 py-2 text-xs font-medium hover:bg-secondary"><Users size={16} />Groups</button>
             {[
               { icon: <HandHeart size={16} className="text-emerald-600" />, label: "Help Wanted", page: "helpwanted" as const },
               { icon: <CalendarDays size={16} className="text-violet-600" />, label: "Events", page: "events" as const },
@@ -7251,7 +7271,7 @@ export default function App() {
         {[
           { label: "Help Wanted", icon: <HandHeart size={20} />, action: () => setView({ page: "helpwanted" }), page: "helpwanted" },
           { label: "Search", icon: <Search size={20} />, action: () => setView({ page: "search" }), page: "search" },
-          { label: "Post", icon: <Plus size={20} />, action: () => { goToFeed(); setPostCreateError(null); setComposing(true); }, page: null },
+          { label: "Groups", icon: <Users size={20} />, action: () => navigate("/groups"), page: null },
           { label: "Events", icon: <CalendarDays size={20} />, action: () => setView({ page: "events" }), page: "events" },
           { label: "Sell", icon: <ShoppingBag size={20} />, action: () => setView({ page: "classifieds" }), page: "classifieds" },
         ].map(({ label, icon, action, page }) => (
@@ -7259,15 +7279,13 @@ export default function App() {
             key={label}
             onClick={action}
             className={`flex-1 flex flex-col items-center justify-center gap-1 text-xs font-medium transition-colors ${
-              label === "Post"
-                ? "bg-primary text-primary-foreground mx-3 my-2 rounded-xl"
-                : view.page === page
+              view.page === page
                 ? "text-white"
                 : "text-purple-200 hover:text-white"
             }`}
           >
             {icon}
-            {label !== "Post" && label}
+            {label}
           </button>
         ))}
     
