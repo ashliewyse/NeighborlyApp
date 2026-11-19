@@ -1327,10 +1327,109 @@ function AuthView({
 
 // ─── Business Profile ─────────────────────────────────────────────────────────
 
+type ProfilePostUpdate = (post: Post) => Post;
+const ProfileActivity = React.createContext({
+  author: "Neighbor",
+  avatar: null as string | null,
+  update: (_id: string, _change: ProfilePostUpdate) => {},
+});
+
+type ProfileComment = {
+  id: string;
+  author_id: string;
+  body: string;
+  image_path: string | null;
+  created_at: string;
+  profiles: { full_name: string } | null;
+};
+
+function ProfilePostActions({ postId, initialLikes, initialComments, viewerId }: {
+  postId: string;
+  initialLikes: { user_id: string }[];
+  initialComments: ProfileComment[];
+  viewerId?: string;
+}) {
+  const activity = React.useContext(ProfileActivity);
+  const [liked, setLiked] = useState(initialLikes.some(like => like.user_id === viewerId));
+  const [likes, setLikes] = useState(initialLikes.length);
+  const [comments, setComments] = useState(initialComments);
+  const [expanded, setExpanded] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function save(action: "like" | "comment") {
+    if (busy) return;
+    const body = draft.trim();
+    if (action === "comment" && !body) return;
+    setBusy(true);
+    setError("");
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || user.id !== viewerId) throw new Error("Please sign in again and reopen this profile.");
+      if (action === "like") {
+        const result = liked
+          ? await supabase.from("post_likes").delete().eq("post_id", postId).eq("user_id", user.id)
+          : await supabase.from("post_likes").insert({ post_id: postId, user_id: user.id });
+        if (result.error) throw result.error;
+        const count = Math.max(0, likes + (liked ? -1 : 1));
+        setLiked(!liked);
+        setLikes(count);
+        activity.update(postId, post => ({ ...post, liked: !liked, likes: count }));
+      } else {
+        const result = await supabase.from("post_comments")
+          .insert({ post_id: postId, author_id: user.id, body })
+          .select("id, created_at").single();
+        if (result.error) throw result.error;
+        const saved = result.data;
+        setComments(current => [...current, { ...saved, author_id: user.id, body, image_path: null, profiles: { full_name: activity.author } }]);
+        const comment: Comment = {
+          databaseId: saved.id, id: new Date(saved.created_at).getTime(), author: activity.author,
+          authorId: user.id, authorAvatar: activity.avatar, authorBadges: [], body, time: "Just now", likes: 0,
+        };
+        activity.update(postId, post => ({ ...post, comments: [...post.comments, comment] }));
+        setDraft("");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <div className="mt-4 border-t border-border pt-2">
+    <div className="flex gap-4 text-sm">
+      <button aria-pressed={liked} disabled={busy} onClick={() => void save("like")} className="flex items-center gap-1.5 py-2">
+        <Heart size={16} className={liked ? "fill-blue-600 text-blue-600" : ""} /> {liked ? "Liked" : "Like"} ({likes})
+      </button>
+      <button aria-expanded={expanded} onClick={() => setExpanded(!expanded)} className="flex items-center gap-1.5 py-2">
+        <MessageCircle size={16} /> Comment ({comments.length})
+      </button>
+    </div>
+    {expanded && <div className="space-y-2">
+      {comments.map(comment => <div key={comment.id} className="rounded-lg bg-muted p-3 text-sm">
+        <strong>{comment.author_id === viewerId ? activity.author : comment.profiles?.full_name || "Neighbor"}</strong>
+        <p className="whitespace-pre-wrap">{comment.body}</p>
+        {comment.image_path && <ExpandablePhoto src={supabase.storage.from("neighborly-media").getPublicUrl(comment.image_path).data.publicUrl} alt="Comment photo" imageClassName="max-h-64 object-contain" />}
+      </div>)}
+      <form className="flex gap-2" onSubmit={event => { event.preventDefault(); void save("comment"); }}>
+        <input aria-label="Write a comment" placeholder="Write a comment…" value={draft} disabled={busy} onChange={event => setDraft(event.target.value)} className="min-w-0 flex-1 rounded-lg border p-2 text-sm" />
+        <button disabled={busy || !draft.trim()} className="px-2 text-blue-600 disabled:opacity-50">Post</button>
+      </form>
+    </div>}
+    {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+  </div>;
+}
+
 function ProfilePostsFeed({ profileName, profileType, profileOwnerId }: { profileName: string; profileType: "business" | "personal"; profileOwnerId?: string }) {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [viewerId, setViewerId] = useState<string>();
+  const [failed, setFailed] = useState(false);
+  const [attempt, retry] = useState(0);
   useEffect(() => {
+    setLoading(true);
+    setFailed(false);
     let active = true;
     (async () => {
       let ownerId: string | null = profileOwnerId || null;
@@ -1350,15 +1449,18 @@ function ProfilePostsFeed({ profileName, profileType, profileOwnerId }: { profil
         ownerId = profileRow?.id || null;
       }
       if (!ownerId) { if (active) { setItems([]); setLoading(false); } return; }
-      const { data, error } = await supabase.from("posts").select("id, author_id, category, content, image_url, created_at").eq("author_id", ownerId).eq("is_admin_post", false).order("created_at", { ascending: false }).limit(50);
+      const [result, viewer] = await Promise.all([supabase.from("posts").select("id, author_id, category, content, image_url, created_at, post_likes(user_id), post_comments(id, author_id, body, image_path, created_at, profiles(full_name))").eq("author_id", ownerId).eq("is_admin_post", false).order("created_at", { ascending: false }).order("created_at", { referencedTable: "post_comments", ascending: true }).limit(50), supabase.auth.getUser()]);
       if (!active) return;
-      setItems(error ? [] : (data || [])); setLoading(false);
-    })();
+      if (result.error) throw result.error;
+      setViewerId(viewer.data.user?.id);
+      setItems(result.data || []); setLoading(false);
+    })().catch(() => { if (active) { setFailed(true); setLoading(false); } });
     return () => { active = false; };
-  }, [profileName, profileType, profileOwnerId]);
+  }, [profileName, profileType, profileOwnerId, attempt]);
   if (loading) return <div className="bg-white rounded-xl border border-border p-6 text-sm text-muted-foreground">Loading posts…</div>;
+  if (failed) return <div role="alert">Posts could not be loaded. <button onClick={() => retry(value => value + 1)}>Try again</button></div>;
   if (!items.length) return <div className="bg-white rounded-xl border border-border p-6"><h3 className="font-semibold text-lg mb-2">Posts</h3><p className="text-sm text-muted-foreground">No posts from {profileName} yet.</p></div>;
-  return <div className="space-y-4">{items.map((post:any) => <div key={post.id} className="bg-white rounded-xl border border-border p-4 sm:p-5"><div className="font-semibold mb-1">{profileName}</div><div className="text-xs text-muted-foreground mb-3">{new Date(post.created_at).toLocaleDateString()}</div><p className="text-sm sm:text-base whitespace-pre-wrap">{post.content}</p>{post.image_url && <div className="mt-3 flex max-h-[72vh] justify-center overflow-hidden rounded-lg bg-muted"><ExpandablePhoto src={post.image_url} alt={`${profileName}'s post photo`} buttonClassName="flex max-h-[72vh] max-w-full cursor-zoom-in justify-center" imageClassName="max-h-[72vh] max-w-full object-contain" /></div>}</div>)}</div>;
+  return <div className="space-y-4">{items.map((post:any) => <div key={post.id} className="bg-white rounded-xl border border-border p-4 sm:p-5"><div className="font-semibold mb-1">{profileName}</div><div className="text-xs text-muted-foreground mb-3">{new Date(post.created_at).toLocaleDateString()}</div><p className="text-sm sm:text-base whitespace-pre-wrap">{post.content}</p>{post.image_url && <div className="mt-3 flex max-h-[72vh] justify-center overflow-hidden rounded-lg bg-muted"><ExpandablePhoto src={post.image_url} alt={`${profileName}'s post photo`} buttonClassName="flex max-h-[72vh] max-w-full cursor-zoom-in justify-center" imageClassName="max-h-[72vh] max-w-full object-contain" /></div>}<ProfilePostActions postId={post.id} initialLikes={post.post_likes} initialComments={post.post_comments} viewerId={viewerId} /></div>)}</div>;
 }
 
 function BusinessProfileView({
@@ -5907,20 +6009,29 @@ export default function App() {
     />
   );
   if (view.page === "settings") return <SettingsView onBack={goToFeed} onProfileSaved={() => { void loadCurrentProfile(false); }} />;
+  const profileActivity = {
+    author: commentAuthorName,
+    avatar: myAvatarUrl,
+    update(id: string, change: ProfilePostUpdate) {
+      const apply = (current: Post[]) => current.map(post => post.databaseId === id ? change(post) : post);
+      setPosts(apply);
+      setClassifiedPosts(apply);
+    },
+  };
   if (view.page === "me" && currentProfile) return (
-    <>
+    <ProfileActivity.Provider value={profileActivity}>
       <UserProfileView profile={currentProfile} onBack={goToFeed} onOpenMessages={() => openMessages()} isOwnProfile myAvatarUrl={myAvatarUrl} onAvatarChange={setMyAvatarUrl} onSettings={goToSettings} onAdmin={isSiteAdmin ? goToAdmin : undefined} />
       {messagingModal}
-    </>
+    </ProfileActivity.Provider>
   );
   if (view.page === "my-business" && currentBusiness) return (
-    <>
+    <ProfileActivity.Provider value={profileActivity}>
       <BusinessProfileView biz={currentBusiness} onBack={goToFeed} onUserClick={goToUser} onOpenMessages={() => openMessages()} isOwnProfile onLogoChange={setMyAvatarUrl} onSettings={goToSettings} onAdmin={isSiteAdmin ? goToAdmin : undefined} />
       {messagingModal}
-    </>
+    </ProfileActivity.Provider>
   );
   if (view.page === "saved-business") return (
-    <>
+    <ProfileActivity.Provider value={profileActivity}>
       <BusinessProfileView
         biz={view.business}
         onBack={goToFeed}
@@ -5928,13 +6039,13 @@ export default function App() {
         onMessage={openMessages}
       />
       {messagingModal}
-    </>
+    </ProfileActivity.Provider>
   );
   if (view.page === "business") {
     const biz = BUSINESSES.find((b) => b.id === view.id);
     if (biz)
       return (
-        <>
+        <ProfileActivity.Provider value={profileActivity}>
           <BusinessProfileView
             biz={biz}
             onBack={goToFeed}
@@ -5942,12 +6053,12 @@ export default function App() {
             onMessage={openMessages}
           />
           {messagingModal}
-        </>
+        </ProfileActivity.Provider>
       );
   }
   if (view.page === "user") {
     return (
-      <>
+      <ProfileActivity.Provider value={profileActivity}>
         <UserProfileView
           key={view.profile.id || view.profile.name}
           profile={view.profile}
@@ -5955,7 +6066,7 @@ export default function App() {
           onMessage={openMessages}
         />
         {messagingModal}
-      </>
+      </ProfileActivity.Provider>
     );
   }
 
