@@ -7269,10 +7269,9 @@ export default function App() {
       {/* Fixed bottom nav — mobile */}
       <div className="fixed bottom-0 left-0 right-0 z-50 lg:hidden bg-purple-800 border-t border-purple-700 flex items-stretch h-16">
         {[
-          { label: "Groups", icon: <Users size={20} />, action: () => navigate("/groups"), page: null },
           { label: "Help Wanted", icon: <HandHeart size={20} />, action: () => setView({ page: "helpwanted" }), page: "helpwanted" },
           { label: "Search", icon: <Search size={20} />, action: () => setView({ page: "search" }), page: "search" },
-          { label: "Post", icon: <Plus size={20} />, action: () => { goToFeed(); setPostCreateError(null); setComposing(true); }, page: null },
+          { label: "Groups", icon: <Users size={20} />, action: () => navigate("/groups"), page: null },
           { label: "Events", icon: <CalendarDays size={20} />, action: () => setView({ page: "events" }), page: "events" },
           { label: "Sell", icon: <ShoppingBag size={20} />, action: () => setView({ page: "classifieds" }), page: "classifieds" },
         ].map(({ label, icon, action, page }) => (
@@ -7280,15 +7279,13 @@ export default function App() {
             key={label}
             onClick={action}
             className={`flex-1 flex flex-col items-center justify-center gap-1 text-xs font-medium transition-colors ${
-              label === "Post"
-                ? "bg-primary text-primary-foreground mx-3 my-2 rounded-xl"
-                : view.page === page
+              view.page === page
                 ? "text-white"
                 : "text-purple-200 hover:text-white"
             }`}
           >
             {icon}
-            {label !== "Post" && label}
+            {label}
           </button>
         ))}
     
